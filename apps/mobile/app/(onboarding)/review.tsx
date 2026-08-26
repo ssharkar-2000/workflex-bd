@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLaunchStore } from '../../src/store/launch-store';
 import type { TranslationKey } from '../../src/i18n';
 import { StepShell } from '../../src/components/onboarding/StepShell';
 import { ShimmerButton } from '../../src/components/ShimmerButton';
@@ -36,13 +35,12 @@ export default function ReviewScreen() {
       queryClient.setQueryData(['onboarding-status'], status);
       void queryClient.invalidateQueries({ queryKey: ['me'] });
 
-      // Straight to the dashboard, holding the session. This step used to end
-      // registration and signed out so the new password got used once, but
-      // verification is now reachable from the dashboard by an already
-      // signed-in user — logging them out mid-flow would be a surprise, and
-      // the account is fully usable while review is pending anyway.
-      useLaunchStore.getState().open();
-      router.replace('/(app)/home');
+      // Confirmation screen, then the dashboard from there. The session is
+      // held throughout — this step used to sign the user out so the new
+      // password got used once, but verification is now reachable from the
+      // dashboard by an already signed-in user, and the account is fully
+      // usable while review is pending.
+      router.replace('/(onboarding)/success');
     },
     onError: (err) => setError(errorMessage(err)),
   });

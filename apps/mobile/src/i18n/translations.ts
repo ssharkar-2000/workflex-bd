@@ -283,6 +283,12 @@ export const en = {
   'ob.verify.resendIn': 'Resend code in {seconds}s',
   'ob.verify.changeNumber': 'Wrong number? Go back and edit it',
   'ob.draftLost': 'Your details were lost. Please fill the form again.',
+  'ob.success.title': 'Congratulations!',
+  'ob.success.body':
+    'Your WorkFlex BD account has been successfully created.',
+  'ob.success.reviewNote':
+    'Your documents are with our team. You can browse now — applying and posting unlock once you are approved.',
+  'ob.success.cta': 'Go to Dashboard',
   'ob.firstNamePlaceholder': 'Enter first name',
   'ob.lastNamePlaceholder': 'Enter last name',
   'ob.passwordPlaceholder': 'Enter password',
@@ -627,6 +633,11 @@ export const bn: Record<TranslationKey, string> = {
   'ob.verify.resendIn': '{seconds} সেকেন্ড পর আবার কোড পাঠানো যাবে',
   'ob.verify.changeNumber': 'নম্বর ভুল? ফিরে গিয়ে ঠিক করুন',
   'ob.draftLost': 'আপনার তথ্য হারিয়ে গেছে। আবার ফর্মটি পূরণ করুন।',
+  'ob.success.title': 'অভিনন্দন!',
+  'ob.success.body': 'আপনার ওয়ার্কফ্লেক্স বিডি অ্যাকাউন্ট তৈরি হয়েছে।',
+  'ob.success.reviewNote':
+    'আপনার নথি আমাদের টিমের কাছে আছে। এখনই ঘুরে দেখতে পারেন — অনুমোদনের পর আবেদন ও পোস্ট করা চালু হবে।',
+  'ob.success.cta': 'ড্যাশবোর্ডে যান',
   'ob.firstNamePlaceholder': 'নামের প্রথম অংশ লিখুন',
   'ob.lastNamePlaceholder': 'নামের শেষ অংশ লিখুন',
   'ob.passwordPlaceholder': 'পাসওয়ার্ড লিখুন',
