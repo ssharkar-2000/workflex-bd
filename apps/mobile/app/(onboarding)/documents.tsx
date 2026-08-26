@@ -63,7 +63,7 @@ export default function DocumentsScreen() {
 
   if (isLoading || !data) {
     return (
-      <StepShell step={2 + offset} total={total} title={t('ob.docs.title')}>
+      <StepShell step={3 + offset} total={total} title={t('ob.docs.title')}>
         <ActivityIndicator color="#BFDCFF" />
       </StepShell>
     );
@@ -82,7 +82,7 @@ export default function DocumentsScreen() {
 
   return (
     <StepShell
-      step={2 + offset}
+      step={3 + offset}
       total={total}
       title={t('ob.docs.title')}
       subtitle={t('ob.docs.subtitle')}

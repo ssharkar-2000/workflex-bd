@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import {
+  bdPhoneSchema,
   onboardingProfileSchema,
   sanitizeAddress,
   sanitizeDesignation,
@@ -20,15 +21,11 @@ import { PasswordStrength } from '../../src/components/onboarding/PasswordStreng
 import { ChoiceCards } from '../../src/components/onboarding/ChoiceCards';
 import { useIntentStore } from '../../src/store/intent-store';
 import { useTheme } from '../../src/lib/use-theme';
-import { PhoneVerifyField } from '../../src/components/onboarding/PhoneVerifyField';
-import { EmailVerifyField } from '../../src/components/onboarding/EmailVerifyField';
+import { PhoneField } from '../../src/components/onboarding/PhoneField';
 import { ShimmerButton } from '../../src/components/ShimmerButton';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
-import {
-  fetchOnboardingStatus,
-  saveOnboardingProfile,
-} from '../../src/api/onboarding';
-import { useAuthStore } from '../../src/store/auth-store';
+import { requestOtp } from '../../src/api/auth';
+import { useRegistrationDraft } from '../../src/store/registration-draft-store';
 import { useErrorMessage } from '../../src/lib/error-message';
 import { useT } from '../../src/i18n';
 import { useStepCount } from '../../src/lib/onboarding-steps';
@@ -36,7 +33,6 @@ import { useStepCount } from '../../src/lib/onboarding-steps';
 export default function DetailsScreen() {
   const t = useT();
   const router = useRouter();
-  const queryClient = useQueryClient();
   const params = useLocalSearchParams<{ accountType?: string }>();
   const accountType: AccountType =
     params.accountType === 'COMPANY' ? 'COMPANY' : 'INDIVIDUAL';
@@ -54,10 +50,11 @@ export default function DetailsScreen() {
   const [tin, setTin] = useState('');
   const [tradeLicenseNo, setTradeLicenseNo] = useState('');
 
-  const [verifiedPhone, setVerifiedPhone] = useState<string | null>(null);
+  const [phone, setPhone] = useState('');
   const [experienceType, setExperienceType] = useState<ExperienceType | null>(
     null,
   );
+  const setDraft = useRegistrationDraft((s) => s.set);
 
   const { c } = useTheme();
   const intent = useIntentStore((s) => s.intent);
@@ -70,45 +67,33 @@ export default function DetailsScreen() {
   const { total, offset } = useStepCount();
   const errorMessage = useErrorMessage();
 
-  const save = useMutation({
-    mutationFn: (input: OnboardingProfileInput) =>
-      saveOnboardingProfile(input),
-    onSuccess: (status) => {
-      void queryClient.invalidateQueries({ queryKey: ['onboarding-status'] });
-      if (status.warnings.length > 0) {
-        Alert.alert(t('ob.details.title'), status.warnings.join('\n\n'));
-      }
-      router.push('/(onboarding)/documents');
+  /**
+   * "Register Now" sends the SMS code and moves to the verify screen. The
+   * profile itself is saved there, because POST /onboarding/profile is
+   * authenticated by the session that verifying the code creates.
+   */
+  const sendCode = useMutation({
+    mutationFn: async (args: {
+      input: OnboardingProfileInput;
+      phone: string;
+    }) => {
+      await requestOtp(args.phone);
+      return args;
+    },
+    onSuccess: ({ input, phone: normalised }) => {
+      setDraft(input, normalised);
+      router.push('/(onboarding)/verify');
     },
     onError: (err) => setFormError(errorMessage(err)),
   });
-
-  /**
-   * A verified number may already belong to a finished account — the SMS check
-   * signs that user straight back in. Saving a profile over it would fail with
-   * a conflict, so route them to sign-in instead of showing an error they can
-   * do nothing about.
-   */
-  const checkExisting = async (phone: string) => {
-    const status = await fetchOnboardingStatus().catch(() => null);
-    if (!status?.submitted) return;
-
-    await useAuthStore.getState().signOut();
-    Alert.alert(t('ob.alreadyRegistered'), t('ob.alreadyRegisteredBody'));
-    router.replace({
-      pathname: '/(auth)/login',
-      params: { phone, notice: 'exists' },
-    });
-  };
 
   const onSubmit = () => {
     setFormError(null);
     setFieldErrors({});
 
-    // The saved profile is attached to the session the SMS check created, so
-    // nothing can be submitted until the number is proven.
-    if (!verifiedPhone) {
-      requestAnimationFrame(() => setFormError(t('ob.verifyPhoneFirst')));
+    const parsedPhone = bdPhoneSchema.safeParse(phone);
+    if (!parsedPhone.success) {
+      setFieldErrors({ phone: t('auth.invalidNumber') });
       return;
     }
 
@@ -152,7 +137,10 @@ export default function DetailsScreen() {
       return;
     }
 
-    save.mutate(parsed.data);
+    // The profile cannot be written yet — that endpoint needs the session the
+    // SMS check creates. Hold the form, send the code, and let the verify
+    // screen save it once the number is proven.
+    sendCode.mutate({ input: parsed.data, phone: parsedPhone.data });
   };
 
   return (
@@ -167,7 +155,7 @@ export default function DetailsScreen() {
         <ShimmerButton
           label={t('ob.registerNow')}
           onPress={onSubmit}
-          loading={save.isPending}
+          loading={sendCode.isPending}
         />
       }
     >
@@ -198,13 +186,15 @@ export default function DetailsScreen() {
         </View>
       </View>
 
-      <PhoneVerifyField
-        verified={verifiedPhone !== null}
-        onVerified={(phone) => {
-          setVerifiedPhone(phone);
+      <PhoneField
+        value={phone}
+        onChangeText={(v) => {
+          setPhone(v);
+          if (fieldErrors.phone) setFieldErrors((e) => ({ ...e, phone: '' }));
           if (formError) setFormError(null);
-          void checkExisting(phone);
         }}
+        error={fieldErrors.phone}
+        editable={!sendCode.isPending}
       />
 
       {isCompany ? (
@@ -273,10 +263,20 @@ export default function DetailsScreen() {
         </>
       ) : null}
 
-      <EmailVerifyField
-        enabled={verifiedPhone !== null}
-        verifiedEmail={email || null}
-        onVerified={setEmail}
+      {/* A plain field now. Saving the profile sends a verification code to
+          whatever is entered, and the user confirms it later from My Profile —
+          which also keeps this form submittable in one pass. */}
+      <GlassField
+        label={t('ob.emailLabel')}
+        value={email}
+        onChangeText={setEmail}
+        placeholder={t('email.placeholder')}
+        error={fieldErrors.email}
+        optional
+        icon="✉"
+        autoCapitalize="none"
+        keyboardType="email-address"
+        autoComplete="email"
       />
 
       <GlassField

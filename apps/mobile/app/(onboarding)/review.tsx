@@ -49,7 +49,7 @@ export default function ReviewScreen() {
 
   if (isLoading || !data) {
     return (
-      <StepShell step={3 + offset} total={total} title={t('ob.review.title')}>
+      <StepShell step={4 + offset} total={total} title={t('ob.review.title')}>
         <ActivityIndicator color="#BFDCFF" />
       </StepShell>
     );
@@ -60,7 +60,7 @@ export default function ReviewScreen() {
 
   return (
     <StepShell
-      step={3 + offset}
+      step={4 + offset}
       total={total}
       title={t('ob.review.title')}
       subtitle={t('ob.review.subtitle')}

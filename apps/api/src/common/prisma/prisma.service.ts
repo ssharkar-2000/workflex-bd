@@ -11,6 +11,11 @@ const RETRYABLE_CODES = new Set([
   'P1001', // Can't reach database server
   'P1002', // Server reachable but timed out
   'P1017', // Server closed the connection
+  // Pool timeout. Reads like a capacity problem but on a serverless database
+  // it is usually the same cold start as P1001 wearing a different hat: the
+  // compute is waking, individual connections are slow to establish, and the
+  // pool gives up before any of them land. Retrying rides it out.
+  'P2024',
 ]);
 
 const MAX_ATTEMPTS = 6;
