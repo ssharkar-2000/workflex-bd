@@ -57,12 +57,15 @@ export interface Palette {
   locked: string;
 
   /**
-   * The registration brand band. Sky blue in both modes — light enough that
-   * the text on it is always dark, which is why it needs its own pair rather
-   * than borrowing `primary`/`primaryText` (those invert between modes).
+   * The registration brand band: pale ice blue with black on it, taken from
+   * the supplied reference. Identical in both modes, which is why it cannot
+   * borrow `primary`/`primaryText` — those invert between light and dark.
+   * `bandBorder` draws the bottom edge, which would otherwise be invisible
+   * against the cream page in light mode.
    */
   bandBg: string;
   bandText: string;
+  bandBorder: string;
 
   /**
    * Card fills, cycled so a grid reads as the reference's pastel mix rather
@@ -127,8 +130,9 @@ const light: Palette = {
   // has to survive being the least important text on the screen.
   locked: '#6A6A82',
 
-  bandBg: '#8FD3EF',
-  bandText: '#0B2B3C',
+  bandBg: '#DFEAF4',
+  bandText: '#101010',
+  bandBorder: '#AAC4DC',
 
   // peach · mint · lavender · butter — the reference's four pastels
   tints: ['#FFEADF', '#DFF1E7', '#E6E8FA', '#FDF1DC'],
@@ -181,10 +185,11 @@ const dark: Palette = {
 
   locked: '#7A7A93',
 
-  // Stepped down from the light-mode sky so it does not glare against a
-  // near-black page. Still the same hue, still dark text on it.
-  bandBg: '#63B4D4',
-  bandText: '#08222F',
+  // Deliberately the same values as light mode: the band is the brand lockup
+  // and is meant to look identical whichever theme the phone is in.
+  bandBg: '#DFEAF4',
+  bandText: '#101010',
+  bandBorder: '#AAC4DC',
 
   // The same four hues pushed to near-black. They read as a tint against the
   // page rather than as colour — at this luminance anything stronger would
