@@ -69,13 +69,32 @@ export function StepShell({
             {
               backgroundColor: c.bandBg,
               borderBottomColor: c.bandBorder,
-              paddingTop: insets.top + 10,
+              paddingTop: insets.top + 4,
             },
           ]}
         >
-          {/* The system name and nothing else — no logo, no tagline, no back
-              control. That one stays on the page below, where it always was. */}
-          <BrandWordmark color={c.bandText} />
+          {/* Back sits in its own row so the wordmark below stays centred on
+              the band rather than on the space left over beside the arrow. */}
+          <View style={styles.bandTop}>
+            {canGoBack && router.canGoBack() ? (
+              <Pressable
+                onPress={() => router.back()}
+                hitSlop={16}
+                style={styles.bandBack}
+                accessibilityRole="button"
+                accessibilityLabel={t('ob.back')}
+              >
+                <Text style={[styles.bandBackIcon, { color: c.bandText }]}>
+                  ←
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          {/* The system name and nothing else — no logo, no tagline. */}
+          <View style={styles.bandBody}>
+            <BrandWordmark color={c.bandText} size={font.display} />
+          </View>
         </View>
       ) : null}
 
@@ -84,7 +103,8 @@ export function StepShell({
         edges={showBrand ? ['bottom'] : ['top', 'bottom']}
       >
         <View style={styles.header}>
-          {canGoBack && router.canGoBack() ? (
+          {/* The band carries its own back arrow; two would be one too many. */}
+          {canGoBack && !showBrand && router.canGoBack() ? (
             <Pressable onPress={() => router.back()} hitSlop={12}>
               <Text style={[styles.back, { color: c.textOnBrand }]}>
                 ← {t('ob.back')}
@@ -190,9 +210,8 @@ const styles = StyleSheet.create({
   centered: { textAlign: 'center' },
 
   band: {
-    paddingBottom: 14,
+    paddingBottom: 34,
     paddingHorizontal: 20,
-    alignItems: 'center',
     // Curved bottom edge, so the page below reads as a sheet lifting over the
     // band rather than two stacked rectangles.
     borderBottomLeftRadius: radius.xl,
@@ -201,6 +220,12 @@ const styles = StyleSheet.create({
     // 1.2:1 apart. Without this hairline the two just bleed together.
     borderBottomWidth: 1,
   },
+  bandTop: { height: 40, justifyContent: 'center' },
+  // Negative margin pulls the 8pt tap padding back out, so the glyph lines up
+  // with the band's 20pt gutter instead of sitting 8pt inside it.
+  bandBack: { alignSelf: 'flex-start', padding: 8, marginLeft: -8 },
+  bandBackIcon: { fontSize: 26, fontWeight: '700', lineHeight: 30 },
+  bandBody: { alignItems: 'center', paddingTop: 24, paddingBottom: 8 },
   panel: { borderRadius: 26, padding: 18 },
   footer: { paddingHorizontal: 20, paddingBottom: 8, paddingTop: 4 },
 });

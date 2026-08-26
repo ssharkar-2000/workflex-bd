@@ -16,8 +16,19 @@ const NAME = 'WorkFlex BD';
  * value and one timer per letter. Eleven timers for a wordmark would be a lot
  * of bookkeeping for an effect this small.
  */
-export function BrandWordmark({ color }: { color: string }) {
+export function BrandWordmark({
+  color,
+  size = font.lg,
+}: {
+  color: string;
+  size?: number;
+}) {
   const chars = useMemo(() => Array.from(NAME), []);
+
+  // Both moves are scaled off the type size, so the wordmark animates the same
+  // way whether it is a compact header or the full brand lockup.
+  const rise = size * 0.34;
+  const dip = size * 0.17;
 
   const enter = useRef(new Animated.Value(0)).current;
   const wave = useRef(new Animated.Value(0)).current;
@@ -80,29 +91,34 @@ export function BrandWordmark({ color }: { color: string }) {
           outputRange: [0, 1],
           extrapolate: 'clamp',
         });
-        const rise = enter.interpolate({
+        const lift = enter.interpolate({
           inputRange: [start, end],
-          outputRange: [11, 0],
+          outputRange: [rise, 0],
           extrapolate: 'clamp',
         });
 
-        // Wave: a 4px dip that travels along the word and settles.
+        // Wave: a small dip that travels along the word and settles.
         const w0 = i * 0.045;
-        const dip = wave.interpolate({
+        const bob = wave.interpolate({
           inputRange: [w0, w0 + 0.1, w0 + 0.2],
-          outputRange: [0, -4, 0],
+          outputRange: [0, -dip, 0],
           extrapolate: 'clamp',
         });
 
         return (
           <Animated.Text
             key={`${ch}-${i}`}
+            // The letters are laid out in a row and cannot wrap, so an
+            // unbounded system font scale runs the wordmark off both edges.
+            // Capped here only — the form below scales all the way.
+            maxFontSizeMultiplier={1.3}
             style={[
               styles.letter,
               {
                 color,
+                fontSize: size,
                 opacity,
-                transform: [{ translateY: Animated.add(rise, dip) }],
+                transform: [{ translateY: Animated.add(lift, bob) }],
               },
             ]}
           >
@@ -117,7 +133,6 @@ export function BrandWordmark({ color }: { color: string }) {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-end' },
   letter: {
-    fontSize: font.lg,
     fontWeight: '800',
     letterSpacing: 0.2,
   },
