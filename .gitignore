@@ -44,7 +44,13 @@ Thumbs.db
 .docker-data/
 
 # uploaded KYC documents — NID, TIN, selfies. Never commit.
-storage/
+#
+# Anchored with a leading slash. Written as a bare `storage/` it matched every
+# directory of that name at any depth, which silently excluded
+# apps/api/src/storage/ — the StorageModule source — and broke the CI build
+# while everything still compiled locally.
+/apps/api/storage/
 
-# downloaded ML weights (npm run models:fetch -w @workflex/api)
-models/
+# downloaded ML weights (npm run models:fetch -w @workflex/api).
+# Anchored for the same reason.
+/apps/api/models/
