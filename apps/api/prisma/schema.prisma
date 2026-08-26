@@ -1,0 +1,453 @@
+// WorkFlex BD — schema v1.
+//
+// Deliberately only three tables. The walking skeleton proves the pipe
+// (device -> HTTP -> auth -> Postgres -> back) before the domain is modelled.
+// Profiles, KYC, jobs, attendance and the wallet land in later phases.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum OtpPurpose {
+  LOGIN
+  PHONE_CHANGE
+  PASSWORD_RESET
+}
+
+/// Chosen at registration. A company account additionally proves the business
+/// exists; both kinds still prove the person behind it with NID + selfie.
+enum AccountType {
+  INDIVIDUAL
+  COMPANY
+}
+
+enum DocumentKind {
+  NID_FRONT
+  NID_BACK
+  SELFIE
+  TIN_CERTIFICATE
+  TRADE_LICENSE
+}
+
+/// Asked at registration of anyone looking for work. Drives which listings
+/// are worth surfacing once the jobs module exists; null for recruiters, who
+/// are never asked.
+enum ExperienceType {
+  EXPERIENCED
+  FRESHER
+}
+
+enum KycStatus {
+  NOT_STARTED
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+/// Outcome of the automated checks. These assist the human reviewer; they
+/// never approve an application on their own.
+enum AnalysisStatus {
+  QUEUED
+  RUNNING
+  PASSED
+  /// Ran, but the result is weak enough that a person should look closely.
+  NEEDS_REVIEW
+  FAILED
+  /// Could not run — usually a model weight that was never installed.
+  SKIPPED
+}
+
+model User {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// E.164, always +8801XXXXXXXXX. The primary identity in this product —
+  /// most users have no email.
+  phone           String    @unique
+  phoneVerifiedAt DateTime?
+
+  /// Optional throughout. Phone is the mandatory identity; email is a
+  /// convenience channel for notifications and account recovery, and a user
+  /// without one is fully functional.
+  email           String?   @unique
+  emailVerifiedAt DateTime?
+
+  passwordHash String?
+
+  status UserStatus @default(ACTIVE)
+
+  /// 0 = phone verified, 1 = NID verified, 2 = business verified.
+  /// Derived from KYC records once that module exists; every gated action
+  /// checks this rather than a role.
+  verificationLevel Int     @default(0)
+  isAdmin           Boolean @default(false)
+
+  /// Preferred UI language. Bangla is the majority case in this market, so it
+  /// is stored per account rather than left to device locale.
+  locale String @default("bn")
+
+  // --- registration details, filled during onboarding ---
+  accountType AccountType?
+  firstName   String?
+  lastName    String?
+  address     String?
+
+  /// Role the person holds at the company they registered. Company accounts
+  /// only — an individual answers to nobody.
+  designation String?
+
+  /// Job seekers only. Null on a recruiter account.
+  experienceType ExperienceType?
+
+  /// Set once the applicant has submitted everything the account type needs.
+  onboardingSubmittedAt DateTime?
+
+  refreshTokens      RefreshToken[]
+  emailVerifications EmailVerification[]
+  documents          Document[]
+  kycSubmissions     KycSubmission[]
+  company            Company?
+  supportTickets     SupportTicket[]
+  attendance         AttendanceRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@map("users")
+}
+
+model OtpCode {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Not a FK — a code is issued before the account exists.
+  phone   String
+  purpose OtpPurpose @default(LOGIN)
+
+  /// HMAC-SHA256(code, OTP_PEPPER). The plaintext code is never stored,
+  /// so a database leak cannot be replayed into account takeover.
+  codeHash String
+
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([phone, purpose, consumedAt])
+  @@index([expiresAt])
+  @@map("otp_codes")
+}
+
+model Company {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// The representative who registered it. They must be identity-verified
+  /// themselves before the business documents mean anything — otherwise
+  /// anyone could upload a photo of someone else's trade licence.
+  ownerId String @unique @db.Uuid
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name String
+
+  /// RJSC incorporation number. Recorded as claimed — there is no public
+  /// registry API to check it against.
+  registrationNumber String?
+
+  /// Neither the NBR (TIN) nor the city corporations (trade licence) expose a
+  /// verification API, so these are recorded as claimed and confirmed by a
+  /// human against the uploaded documents.
+  tin            String?
+  tradeLicenseNo String?
+
+  verifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("companies")
+}
+
+model Document {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kind DocumentKind
+
+  /// Path within the private storage root. Never served directly — every read
+  /// goes through an authenticated endpoint so access can be logged.
+  storageKey   String
+  mimeType     String
+  sizeBytes    Int
+  originalName String?
+
+  analysis DocumentAnalysis?
+
+  createdAt DateTime @default(now())
+
+  /// One current document per kind; re-uploading replaces the previous row.
+  @@unique([userId, kind])
+  @@index([userId])
+  @@map("documents")
+}
+
+/// Result of the automated checks for one uploaded document.
+model DocumentAnalysis {
+  id String @id @default(uuid()) @db.Uuid
+
+  documentId String   @unique @db.Uuid
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  status AnalysisStatus @default(QUEUED)
+
+  /// Which analyzers ran, with their individual verdicts and timings.
+  checks Json?
+
+  /// Text pulled off the card by Tesseract, and the fields parsed out of it.
+  ocrText       String?
+  extractedName String?
+  extractedNid  String?
+  extractedDob  String?
+
+  /// OpenCV image-quality signals, 0..1. Low sharpness or high glare is the
+  /// most common reason a reviewer cannot read a card.
+  sharpness Float?
+  glare     Float?
+  cardFound Boolean?
+
+  /// Face signals. `faceMatch` is the descriptor distance between the selfie
+  /// and the portrait on the NID — lower is more similar.
+  facesDetected Int?
+  faceMatch     Float?
+
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@map("document_analyses")
+}
+
+model KycSubmission {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  accountType AccountType
+  status      KycStatus   @default(PENDING_REVIEW)
+
+  reviewedBy   String?   @db.Uuid
+  reviewedAt   DateTime?
+  rejectReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId])
+  @@map("kyc_submissions")
+}
+
+model EmailVerification {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The address being proven, kept here rather than on User until confirmed,
+  /// so an unverified change cannot displace a working address.
+  email String
+
+  /// HMAC-SHA256(code, OTP_PEPPER), same treatment as an SMS code.
+  codeHash String
+
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, consumedAt])
+  @@index([expiresAt])
+  @@map("email_verifications")
+}
+
+model RefreshToken {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// SHA-256 of the opaque token. Never store the token itself.
+  tokenHash String @unique
+
+  /// All tokens descended from one login share a family. Presenting an already
+  /// rotated token means it leaked, so the whole family is revoked at once.
+  familyId String @db.Uuid
+
+  deviceId  String?
+  userAgent String?
+  ip        String?
+
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  /// Set when this token is rotated, for reuse forensics.
+  replacedByTokenId String? @db.Uuid
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, revokedAt])
+  @@index([familyId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+/// Deliberately not a row in User. An admin is not a job seeker or hirer who
+/// happens to have a flag set — it is a distinct identity, provisioned by
+/// script (see scripts/create-admin.mjs), signing in with email + password
+/// rather than phone + OTP. The email must end with ADMIN_EMAIL_DOMAIN, which
+/// EmailVerificationService also refuses to let any User claim, so the two
+/// namespaces can never collide.
+model Admin {
+  id String @id @default(uuid()) @db.Uuid
+
+  email        String  @unique
+  passwordHash String
+  name         String?
+
+  createdAt   DateTime  @default(now())
+  lastLoginAt DateTime?
+
+  @@map("admins")
+}
+
+/// Who a broadcast is aimed at. Kept coarse on purpose — targeting by
+/// individual account belongs in a campaign tool, not the admin console.
+enum NotificationAudience {
+  ALL
+  WORKERS
+  EMPLOYERS
+}
+
+model Notification {
+  id String @id @default(uuid()) @db.Uuid
+
+  title    String
+  body     String
+  audience NotificationAudience @default(ALL)
+
+  /// Admin.id. Not a FK: an admin who leaves should not take the record of
+  /// what they announced with them.
+  createdBy String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  /// Set when the broadcast actually goes out. Null means drafted only.
+  sentAt DateTime?
+
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model SupportTicket {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Nullable so a complaint can arrive before anyone signs in.
+  userId String? @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  subject  String
+  message  String
+  status   TicketStatus   @default(OPEN)
+  priority TicketPriority @default(NORMAL)
+
+  /// Free text rather than a thread: one reply closes the vast majority of
+  /// these, and a full messaging model can replace it when that stops being true.
+  response   String?
+  assignedTo String?   @db.Uuid
+  resolvedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@map("support_tickets")
+}
+
+/// Editable copy for the worker app — terms, help text, banner messages.
+/// Keyed by a stable slug the app looks up, so changing wording never needs
+/// an app release.
+model ContentBlock {
+  id String @id @default(uuid()) @db.Uuid
+
+  key    String @unique
+  title  String
+  body   String
+  locale String @default("bn")
+
+  updatedBy String?  @db.Uuid
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@map("content_blocks")
+}
+
+enum AttendanceStatus {
+  CHECKED_IN
+  CHECKED_OUT
+  ABSENT
+  LATE
+}
+
+/// Shift attendance. Deliberately not linked to a Job yet — that table does
+/// not exist, and adding a nullable FK now would leave a column nothing can
+/// populate. The admin console can already read and filter these records; the
+/// worker app gains check-in once the jobs module lands.
+model AttendanceRecord {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status     AttendanceStatus @default(CHECKED_IN)
+  checkInAt  DateTime
+  checkOutAt DateTime?
+
+  /// Where the check-in happened, for disputes about whether someone showed up.
+  latitude  Float?
+  longitude Float?
+  note      String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, checkInAt])
+  @@index([status])
+  @@map("attendance_records")
+}

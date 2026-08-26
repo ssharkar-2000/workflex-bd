@@ -1,0 +1,34 @@
+{
+  "name": "workflex-bd",
+  "private": true,
+  "version": "0.1.0",
+  "description": "WorkFlex BD - AI-powered workforce marketplace for Bangladesh",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "npm@11.13.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "clean": "turbo run clean",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs -f",
+    "db:migrate": "npm run db:migrate -w @workflex/api",
+    "db:studio": "npm run db:studio -w @workflex/api",
+    "api:dev": "npm run dev -w @workflex/api",
+    "mobile:dev": "npm run start -w @workflex/mobile",
+    "mobile:go": "npm run start:go -w @workflex/mobile"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,50 @@
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+*.tsbuildinfo
+
+# env — never commit real secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# expo / react-native
+.expo/
+.expo-shared/
+# Wildcard: each app has its own cache dir (.metro-cache, .metro-cache-admin).
+.metro-cache*/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+android/
+ios/
+
+# logs
+*.log
+npm-debug.log*
+logs/
+
+# python scratch files that share this folder
+__pycache__/
+*.pyc
+
+# editors / os
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# local infra volumes
+.docker-data/
+
+# uploaded KYC documents — NID, TIN, selfies. Never commit.
+storage/
+
+# downloaded ML weights (npm run models:fetch -w @workflex/api)
+models/

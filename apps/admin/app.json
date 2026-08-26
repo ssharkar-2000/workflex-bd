@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "WorkFlex BD Admin",
+    "slug": "workflex-bd-admin",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "workflexadmin",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "backgroundColor": "#f8fafc",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "bd.com.workflex.admin"
+    },
+    "android": {
+      "package": "bd.com.workflex.admin",
+      "edgeToEdgeEnabled": true,
+      "permissions": ["INTERNET"]
+    },
+    "plugins": ["expo-router", "expo-secure-store", "expo-status-bar"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
