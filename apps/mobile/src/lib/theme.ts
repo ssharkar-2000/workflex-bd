@@ -57,6 +57,14 @@ export interface Palette {
   locked: string;
 
   /**
+   * The registration brand band. Sky blue in both modes — light enough that
+   * the text on it is always dark, which is why it needs its own pair rather
+   * than borrowing `primary`/`primaryText` (those invert between modes).
+   */
+  bandBg: string;
+  bandText: string;
+
+  /**
    * Card fills, cycled so a grid reads as the reference's pastel mix rather
    * than a wall of identical white boxes. Deliberately pale: `text` has to
    * clear AA on every one of them, which rules out the saturated versions.
@@ -119,6 +127,9 @@ const light: Palette = {
   // has to survive being the least important text on the screen.
   locked: '#6A6A82',
 
+  bandBg: '#8FD3EF',
+  bandText: '#0B2B3C',
+
   // peach · mint · lavender · butter — the reference's four pastels
   tints: ['#FFEADF', '#DFF1E7', '#E6E8FA', '#FDF1DC'],
   tintBorders: ['#F8D3C0', '#C7E5D6', '#CFD3F0', '#F2DEBC'],
@@ -169,6 +180,11 @@ const dark: Palette = {
   dangerBorder: '#6B2E2A',
 
   locked: '#7A7A93',
+
+  // Stepped down from the light-mode sky so it does not glare against a
+  // near-black page. Still the same hue, still dark text on it.
+  bandBg: '#63B4D4',
+  bandText: '#08222F',
 
   // The same four hues pushed to near-black. They read as a tint against the
   // page rather than as colour — at this luminance anything stronger would
