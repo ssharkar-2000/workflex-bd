@@ -151,6 +151,7 @@ export default function DetailsScreen() {
       subtitle={t('ob.details.subtitle')}
       canGoBack={offset > 0}
       centerHeader
+      showBrand
       footer={
         <ShimmerButton
           label={t('ob.registerNow')}

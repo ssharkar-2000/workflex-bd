@@ -149,6 +149,7 @@ export default function VerifyScreen() {
         phone: phone ? maskPhone(phone) : '',
       })}
       centerHeader
+      showBrand
       footer={
         <ShimmerButton
           label={t('ob.verify.cta')}
