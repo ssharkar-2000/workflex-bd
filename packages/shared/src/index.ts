@@ -11,4 +11,5 @@ export * from './admin-sections';
 export * from './notifications';
 export * from './support';
 export * from './job-categories';
+export * from './bd-geography';
 export * from './jobs';

@@ -509,10 +509,70 @@ enum JobCategory {
 enum JobType {
   FULL_TIME
   PART_TIME
+  PERMANENT
   CONTRACT
-  TEMPORARY
+  FREELANCE
   INTERNSHIP
+  TEMPORARY
+  SEASONAL
+  SHIFT_BASED
   ONE_TIME
+}
+
+enum PaymentType {
+  HOURLY
+  DAILY
+  WEEKLY
+  MONTHLY
+  FIXED_PROJECT
+  NEGOTIABLE
+}
+
+enum WorkingTime {
+  MORNING
+  AFTERNOON
+  EVENING
+  NIGHT
+  FLEXIBLE
+}
+
+/// Hours per day as bands — postings quote a range, not a figure.
+enum HoursBand {
+  H2_3
+  H4_6
+  H6_8
+  H8_PLUS
+}
+
+enum JobDuration {
+  ONE_TIME
+  ONE_DAY
+  FEW_DAYS
+  ONE_WEEK
+  ONE_MONTH
+  THREE_TO_SIX_MONTHS
+  LONG_TERM
+}
+
+/// How soon the employer needs someone. Drives the 🔥 badge on urgent cards.
+enum Urgency {
+  IMMEDIATE
+  WITHIN_24H
+  WITHIN_3_DAYS
+  THIS_WEEK
+  NONE
+}
+
+/// The country's eight administrative divisions.
+enum Division {
+  BARISHAL
+  CHATTOGRAM
+  DHAKA
+  KHULNA
+  MYMENSINGH
+  RAJSHAHI
+  RANGPUR
+  SYLHET
 }
 
 enum WorkplaceType {
@@ -550,9 +610,30 @@ model Job {
   workplaceType   WorkplaceType   @default(ONSITE)
   experienceLevel ExperienceLevel @default(ENTRY)
 
+  /// As the recruiter typed it — "Mirpur 10, Dhaka". Searched free-text.
   location String
-  /// Free text: postings quote ranges, daily rates, or "negotiable".
+  /// Structured location, for the division/district filters. Nullable because
+  /// an imported or hastily-written posting may only have the free text.
+  division Division?
+  district String?
+
+  paymentType PaymentType @default(MONTHLY)
+  /// Numeric so the range filter can compare. Null means unstated, which is
+  /// common — "negotiable" postings carry neither bound.
+  salaryMin Int?
+  salaryMax Int?
+  /// Optional human-written override for the card, e.g. "৳500/day + lunch".
+  /// Falls back to a label formatted from the bounds above.
   salaryRange String?
+
+  workingTime WorkingTime @default(FLEXIBLE)
+  hoursBand   HoursBand?
+  duration    JobDuration @default(LONG_TERM)
+  urgency     Urgency     @default(NONE)
+
+  /// When the work begins. Null with flexibleStart means "whenever suits".
+  startDate     DateTime?
+  flexibleStart Boolean   @default(true)
 
   /// Null means the posting stays open until it is closed by hand.
   deadline DateTime?
@@ -567,6 +648,9 @@ model Job {
   @@index([isOpen, createdAt])
   @@index([category])
   @@index([jobType])
+  @@index([urgency])
+  @@index([duration])
+  @@index([division, district])
   @@map("jobs")
 }
 

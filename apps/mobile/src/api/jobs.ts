@@ -1,25 +1,34 @@
 import {
   jobListSchema,
   jobListingSchema,
+  type JobFilterState,
   type JobList,
   type JobListing,
-  type JobQuery,
 } from '@workflex/shared';
 import { api } from './client';
 
-/** Query params, minus the paging fields the caller does not set by hand. */
-export type JobFilters = Partial<
-  Pick<JobQuery, 'q' | 'category' | 'jobType' | 'workplaceType' | 'savedOnly'>
->;
-
 export async function fetchJobs(
-  filters: JobFilters,
+  filters: JobFilterState,
   cursor?: string,
 ): Promise<JobList> {
   const { data } = await api.get('/jobs', {
     // Undefined entries are dropped by axios, so an unset filter never
     // reaches the server as the string "undefined".
     params: { ...filters, cursor },
+    // Multi-select values go as one comma-joined parameter rather than
+    // repeated keys — the server accepts both, and a single key keeps the
+    // URL short enough to read in a log.
+    paramsSerializer: {
+      indexes: null,
+      serialize: (params) =>
+        Object.entries(params)
+          .filter(([, v]) => v !== undefined && v !== null && v !== '')
+          .map(([k, v]) => {
+            const value = Array.isArray(v) ? v.join(',') : String(v);
+            return `${encodeURIComponent(k)}=${encodeURIComponent(value)}`;
+          })
+          .join('&'),
+    },
   });
   return jobListSchema.parse(data);
 }

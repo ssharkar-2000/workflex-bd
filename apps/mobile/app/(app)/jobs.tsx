@@ -22,6 +22,7 @@ import {
   JOB_CATEGORIES,
   jobCategoryName,
   type JobCategory,
+  type JobFilterState,
   type JobListing,
   type JobType,
   type WorkplaceType,
@@ -30,8 +31,8 @@ import {
   fetchCategoryCounts,
   fetchJobs,
   toggleSavedJob,
-  type JobFilters,
 } from '../../src/api/jobs';
+import { JobFilterSheet } from '../../src/components/jobs/JobFilterSheet';
 import { NotificationBell } from '../../src/components/NotificationBell';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { useErrorMessage } from '../../src/lib/error-message';
@@ -42,16 +43,47 @@ import { font, radius, space } from '../../src/lib/theme';
 const JOB_TYPE_KEYS: Record<JobType, TranslationKey> = {
   FULL_TIME: 'jobs.type.FULL_TIME',
   PART_TIME: 'jobs.type.PART_TIME',
+  PERMANENT: 'jobs.type.PERMANENT',
   CONTRACT: 'jobs.type.CONTRACT',
-  TEMPORARY: 'jobs.type.TEMPORARY',
+  FREELANCE: 'jobs.type.FREELANCE',
   INTERNSHIP: 'jobs.type.INTERNSHIP',
+  TEMPORARY: 'jobs.type.TEMPORARY',
+  SEASONAL: 'jobs.type.SEASONAL',
+  SHIFT_BASED: 'jobs.type.SHIFT_BASED',
   ONE_TIME: 'jobs.type.ONE_TIME',
+};
+
+const PAYMENT_KEYS: Record<JobListing['paymentType'], TranslationKey> = {
+  HOURLY: 'jobs.pay.HOURLY',
+  DAILY: 'jobs.pay.DAILY',
+  WEEKLY: 'jobs.pay.WEEKLY',
+  MONTHLY: 'jobs.pay.MONTHLY',
+  FIXED_PROJECT: 'jobs.pay.FIXED_PROJECT',
+  NEGOTIABLE: 'jobs.pay.NEGOTIABLE',
 };
 
 const WORKPLACE_KEYS: Record<WorkplaceType, TranslationKey> = {
   ONSITE: 'jobs.place.ONSITE',
   REMOTE: 'jobs.place.REMOTE',
   HYBRID: 'jobs.place.HYBRID',
+};
+
+const URGENCY_KEYS: Record<JobListing['urgency'], TranslationKey> = {
+  IMMEDIATE: 'jobs.urg.IMMEDIATE',
+  WITHIN_24H: 'jobs.urg.WITHIN_24H',
+  WITHIN_3_DAYS: 'jobs.urg.WITHIN_3_DAYS',
+  THIS_WEEK: 'jobs.urg.THIS_WEEK',
+  NONE: 'jobs.urg.NONE',
+};
+
+const DURATION_KEYS: Record<JobListing['duration'], TranslationKey> = {
+  ONE_TIME: 'jobs.dur.ONE_TIME',
+  ONE_DAY: 'jobs.dur.ONE_DAY',
+  FEW_DAYS: 'jobs.dur.FEW_DAYS',
+  ONE_WEEK: 'jobs.dur.ONE_WEEK',
+  ONE_MONTH: 'jobs.dur.ONE_MONTH',
+  THREE_TO_SIX_MONTHS: 'jobs.dur.THREE_TO_SIX_MONTHS',
+  LONG_TERM: 'jobs.dur.LONG_TERM',
 };
 
 const EXPERIENCE_KEYS: Record<JobListing['experienceLevel'], TranslationKey> = {
@@ -70,20 +102,16 @@ export default function JobsScreen() {
 
   const [search, setSearch] = useState('');
   const [applied, setApplied] = useState('');
-  const [category, setCategory] = useState<JobCategory | null>(null);
-  const [jobType, setJobType] = useState<JobType | null>(null);
-  const [workplace, setWorkplace] = useState<WorkplaceType | null>(null);
-  const [savedOnly, setSavedOnly] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
-  const filters: JobFilters = useMemo(
-    () => ({
-      q: applied || undefined,
-      category: category ?? undefined,
-      jobType: jobType ?? undefined,
-      workplaceType: workplace ?? undefined,
-      savedOnly: savedOnly || undefined,
-    }),
-    [applied, category, jobType, workplace, savedOnly],
+  // Everything the sheet owns. The search box and the two shortcut chips
+  // stay outside it, because those are reached constantly and a sheet for
+  // one tap is friction.
+  const [sheet, setSheet] = useState<JobFilterState>({});
+
+  const filters: JobFilterState = useMemo(
+    () => ({ ...sheet, q: applied || undefined }),
+    [sheet, applied],
   );
 
   const {
@@ -121,16 +149,27 @@ export default function JobsScreen() {
   const total = data?.pages[0]?.total ?? 0;
 
   const clearFilters = useCallback(() => {
-    setCategory(null);
-    setJobType(null);
-    setWorkplace(null);
-    setSavedOnly(false);
+    setSheet({});
     setSearch('');
     setApplied('');
   }, []);
 
-  const filterCount =
-    (category ? 1 : 0) + (jobType ? 1 : 0) + (workplace ? 1 : 0) + (savedOnly ? 1 : 0);
+  // Counts selected *values*, not groups — picking three job types reads as
+  // three active filters, which is what the number on the button implies.
+  const filterCount = Object.entries(sheet).reduce((n, [key, value]) => {
+    if (key === 'q' || value === undefined) return n;
+    if (Array.isArray(value)) return n + value.length;
+    return n + 1;
+  }, 0);
+
+  const toggleCategory = (key: JobCategory) =>
+    setSheet((d) => {
+      const current = d.categories ?? [];
+      const next = current.includes(key)
+        ? current.filter((k) => k !== key)
+        : [...current, key];
+      return { ...d, categories: next.length > 0 ? next : undefined };
+    });
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
@@ -187,30 +226,39 @@ export default function JobsScreen() {
         style={styles.chipScroll}
         contentContainerStyle={styles.chipRow}
       >
-        {filterCount > 0 ? (
-          <Chip label={`✕ ${t('jobs.clearAll')}`} active onPress={clearFilters} />
+        <Chip
+          label={
+            filterCount > 0
+              ? `⚙ ${t('filter.title')} · ${filterCount}`
+              : `⚙ ${t('filter.title')}`
+          }
+          active={filterCount > 0}
+          onPress={() => setSheetOpen(true)}
+        />
+
+        {filterCount > 0 || applied ? (
+          <Chip label={`✕ ${t('jobs.clearAll')}`} active={false} onPress={clearFilters} />
         ) : null}
 
         <Chip
           label={`🔖 ${t('jobs.saved')}`}
-          active={savedOnly}
-          onPress={() => setSavedOnly((v) => !v)}
+          active={sheet.savedOnly === true}
+          onPress={() =>
+            setSheet((d) => ({ ...d, savedOnly: d.savedOnly ? undefined : true }))
+          }
         />
 
-        <Cycler
-          value={jobType}
-          options={Object.keys(JOB_TYPE_KEYS) as JobType[]}
-          onChange={setJobType}
-          render={(v) => t(JOB_TYPE_KEYS[v])}
-          placeholder={t('jobs.anyType')}
-        />
-
-        <Cycler
-          value={workplace}
-          options={Object.keys(WORKPLACE_KEYS) as WorkplaceType[]}
-          onChange={setWorkplace}
-          render={(v) => t(WORKPLACE_KEYS[v])}
-          placeholder={t('jobs.anyPlace')}
+        <Chip
+          label={`🔥 ${t('jobs.urgentOnly')}`}
+          active={(sheet.urgencies?.length ?? 0) > 0}
+          onPress={() =>
+            setSheet((d) => ({
+              ...d,
+              urgencies: d.urgencies?.length
+                ? undefined
+                : ['IMMEDIATE', 'WITHIN_24H', 'WITHIN_3_DAYS'],
+            }))
+          }
         />
       </ScrollView>
 
@@ -227,10 +275,8 @@ export default function JobsScreen() {
             key={cat.key}
             info={cat}
             count={counts?.[cat.key]}
-            active={category === cat.key}
-            onPress={() =>
-              setCategory((current) => (current === cat.key ? null : cat.key))
-            }
+            active={(sheet.categories ?? []).includes(cat.key)}
+            onPress={() => toggleCategory(cat.key)}
           />
         ))}
       </ScrollView>
@@ -287,6 +333,16 @@ export default function JobsScreen() {
           )}
         />
       )}
+
+      <JobFilterSheet
+        visible={sheetOpen}
+        initial={sheet}
+        onClose={() => setSheetOpen(false)}
+        onApply={(next) => {
+          setSheet(next);
+          setSheetOpen(false);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -320,44 +376,6 @@ function Chip({
         {label}
       </Text>
     </Pressable>
-  );
-}
-
-/**
- * A chip that steps through its options on each tap and then back to "any".
- *
- * A dropdown would be the obvious control, but it needs a modal, a backdrop
- * and a list for what is at most six choices — and the row already scrolls
- * horizontally, so an open menu would fight it. Tapping through is one
- * gesture and shows the current value in the chip itself.
- */
-function Cycler<T extends string>({
-  value,
-  options,
-  onChange,
-  render,
-  placeholder,
-}: {
-  value: T | null;
-  options: T[];
-  onChange: (next: T | null) => void;
-  render: (value: T) => string;
-  placeholder: string;
-}) {
-  const next = () => {
-    if (value === null) return onChange(options[0] ?? null);
-    const i = options.indexOf(value);
-    // Past the last option, back to unset — so the filter is always clearable
-    // by tapping, without a separate reset control per chip.
-    onChange(i === options.length - 1 ? null : (options[i + 1] ?? null));
-  };
-
-  return (
-    <Chip
-      label={`${value ? render(value) : placeholder} ⌄`}
-      active={value !== null}
-      onPress={next}
-    />
   );
 }
 
@@ -431,6 +449,19 @@ function JobCard({
         </Pressable>
       </View>
 
+      {job.urgency !== 'NONE' ? (
+        <View
+          style={[
+            styles.urgent,
+            { backgroundColor: c.dangerSoft, borderColor: c.dangerBorder },
+          ]}
+        >
+          <Text style={[styles.urgentText, { color: c.danger }]}>
+            🔥 {t(URGENCY_KEYS[job.urgency])}
+          </Text>
+        </View>
+      ) : null}
+
       <Text style={[styles.jobTitle, { color: c.text }]} numberOfLines={2}>
         {job.title}
       </Text>
@@ -444,6 +475,7 @@ function JobCard({
         ) : null}
         <Meta text={t(EXPERIENCE_KEYS[job.experienceLevel])} />
         <Meta text={t(WORKPLACE_KEYS[job.workplaceType])} />
+        <Meta text={t(DURATION_KEYS[job.duration])} />
       </View>
 
       <View style={styles.tagRow}>
@@ -464,21 +496,37 @@ function JobCard({
             {t(JOB_TYPE_KEYS[job.jobType])}
           </Text>
         </View>
-        {job.salaryRange ? (
-          <View
-            style={[
-              styles.tag,
-              { backgroundColor: c.successSoft, borderColor: c.success },
-            ]}
-          >
-            <Text style={[styles.tagText, { color: c.success }]}>
-              {job.salaryRange}
-            </Text>
-          </View>
-        ) : null}
+        <View
+          style={[
+            styles.tag,
+            { backgroundColor: c.successSoft, borderColor: c.success },
+          ]}
+        >
+          <Text style={[styles.tagText, { color: c.success }]}>
+            {formatPay(job, t(PAYMENT_KEYS[job.paymentType]))}
+          </Text>
+        </View>
       </View>
     </View>
   );
+}
+
+/**
+ * Turns the numeric bounds into the label on the card.
+ *
+ * The cadence has to be on it — "৳500 – ৳900" is meaningless without knowing
+ * whether that is a day or a month, and in this marketplace both are common.
+ * A posting with no figures shows its payment type alone, which at least says
+ * "negotiable" or "hourly" rather than leaving the tile blank.
+ */
+function formatPay(job: JobListing, cadence: string): string {
+  const money = (n: number) => `৳${n.toLocaleString('en-US')}`;
+  if (job.salaryMin !== null && job.salaryMax !== null) {
+    return `${money(job.salaryMin)} – ${money(job.salaryMax)} · ${cadence}`;
+  }
+  if (job.salaryMin !== null) return `${money(job.salaryMin)}+ · ${cadence}`;
+  if (job.salaryMax !== null) return `up to ${money(job.salaryMax)} · ${cadence}`;
+  return cadence;
 }
 
 function Meta({ text }: { text: string }) {
@@ -567,7 +615,16 @@ const styles = StyleSheet.create({
   bookmark: { fontSize: 18 },
   bookmarkOff: { opacity: 0.3 },
 
-  jobTitle: { fontSize: font.md, fontWeight: '800', marginTop: 10 },
+  urgent: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginTop: 10,
+  },
+  urgentText: { fontSize: font.xs - 1, fontWeight: '800' },
+  jobTitle: { fontSize: font.md, fontWeight: '800', marginTop: 8 },
   company: { fontSize: font.sm, marginTop: 3 },
 
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8 },

@@ -40,26 +40,77 @@ const EMPLOYERS: Record<string, string[]> = {
   EMERGENCY: ['Shomoy On-Demand', 'Quick Hands BD', 'Relief Network'],
 };
 
-const LOCATIONS = [
-  'Gulshan, Dhaka',
-  'Dhanmondi, Dhaka',
-  'Mirpur, Dhaka',
-  'Uttara, Dhaka',
-  'Banani, Dhaka',
-  'Agrabad, Chattogram',
-  'Zindabazar, Sylhet',
-  'Rajshahi Sadar',
-  'Khulna Sadar',
-];
+const PLACES = [
+  { area: 'Gulshan, Dhaka', division: 'DHAKA', district: 'Dhaka' },
+  { area: 'Dhanmondi, Dhaka', division: 'DHAKA', district: 'Dhaka' },
+  { area: 'Mirpur, Dhaka', division: 'DHAKA', district: 'Dhaka' },
+  { area: 'Uttara, Dhaka', division: 'DHAKA', district: 'Dhaka' },
+  { area: 'Tongi, Gazipur', division: 'DHAKA', district: 'Gazipur' },
+  { area: 'Agrabad, Chattogram', division: 'CHATTOGRAM', district: 'Chattogram' },
+  { area: "Cox's Bazar Sadar", division: 'CHATTOGRAM', district: "Cox's Bazar" },
+  { area: 'Zindabazar, Sylhet', division: 'SYLHET', district: 'Sylhet' },
+  { area: 'Rajshahi Sadar', division: 'RAJSHAHI', district: 'Rajshahi' },
+  { area: 'Khulna Sadar', division: 'KHULNA', district: 'Khulna' },
+  { area: 'Barishal Sadar', division: 'BARISHAL', district: 'Barishal' },
+  { area: 'Rangpur Sadar', division: 'RANGPUR', district: 'Rangpur' },
+  { area: 'Mymensingh Sadar', division: 'MYMENSINGH', district: 'Mymensingh' },
+] as const;
 
 const JOB_TYPES = [
   'FULL_TIME',
   'PART_TIME',
+  'PERMANENT',
   'CONTRACT',
-  'TEMPORARY',
+  'FREELANCE',
   'INTERNSHIP',
+  'TEMPORARY',
+  'SEASONAL',
+  'SHIFT_BASED',
   'ONE_TIME',
 ] as const;
+
+const PAYMENT_TYPES = [
+  'HOURLY',
+  'DAILY',
+  'WEEKLY',
+  'MONTHLY',
+  'FIXED_PROJECT',
+  'NEGOTIABLE',
+] as const;
+
+const WORKING_TIMES = ['MORNING', 'AFTERNOON', 'EVENING', 'NIGHT', 'FLEXIBLE'] as const;
+const HOURS_BANDS = ['H2_3', 'H4_6', 'H6_8', 'H8_PLUS'] as const;
+const DURATIONS = [
+  'ONE_TIME',
+  'ONE_DAY',
+  'FEW_DAYS',
+  'ONE_WEEK',
+  'ONE_MONTH',
+  'THREE_TO_SIX_MONTHS',
+  'LONG_TERM',
+] as const;
+const URGENCIES = [
+  'IMMEDIATE',
+  'WITHIN_24H',
+  'WITHIN_3_DAYS',
+  'THIS_WEEK',
+  'NONE',
+  'NONE',
+  'NONE',
+] as const;
+
+/**
+ * Pay bands per cadence, so an hourly job is not seeded at ৳40,000 an hour.
+ * Realistic Bangladeshi figures, low to high.
+ */
+const PAY_BANDS: Record<string, [number, number][]> = {
+  HOURLY: [[80, 150], [150, 300], [300, 600]],
+  DAILY: [[500, 900], [900, 1500], [1500, 2500]],
+  WEEKLY: [[3000, 6000], [6000, 10000]],
+  MONTHLY: [[12000, 18000], [18000, 25000], [25000, 40000], [40000, 70000]],
+  FIXED_PROJECT: [[5000, 15000], [15000, 50000]],
+  NEGOTIABLE: [],
+};
 
 const WORKPLACE = ['ONSITE', 'REMOTE', 'HYBRID'] as const;
 const EXPERIENCE = ['ENTRY', 'ONE_TO_THREE', 'THREE_TO_FIVE', 'FIVE_PLUS'] as const;
@@ -78,17 +129,6 @@ const ALWAYS_ONSITE = new Set([
   'SECURITY',
   'EMERGENCY',
 ]);
-
-const SALARIES = [
-  '৳12,000 – ৳18,000 / month',
-  '৳18,000 – ৳25,000 / month',
-  '৳25,000 – ৳40,000 / month',
-  '৳40,000 – ৳70,000 / month',
-  '৳600 – ৳900 / day',
-  '৳1,200 / shift',
-  'Negotiable',
-  null,
-];
 
 /**
  * Deterministic pseudo-random, seeded off the index.
@@ -121,20 +161,49 @@ async function main() {
       const companyName = pick(employers, i);
       const onsiteOnly = ALWAYS_ONSITE.has(category.key);
 
+      const place = pick(PLACES, n);
+      const paymentType = pick(PAYMENT_TYPES, n);
+      const band = pick(PAY_BANDS[paymentType] ?? [], n);
+      const duration = pick(DURATIONS, n);
+
+      // Short engagements are the ones people need filled at short notice; a
+      // long-term permanent hire is almost never urgent. Correlating the two
+      // keeps the seeded catalogue plausible when both filters are applied.
+      const shortJob = ['ONE_TIME', 'ONE_DAY', 'FEW_DAYS'].includes(duration);
+
       data.push({
         title: role,
         description:
           `${companyName} is hiring a ${role.toLowerCase()} in ` +
-          `${pick(LOCATIONS, n)}. Apply through WorkFlex BD — the employer ` +
+          `${place.area}. Apply through WorkFlex BD — the employer ` +
           `will contact shortlisted candidates directly.`,
         companyName,
         postedBy: SEED_TAG,
         category: category.key as JobCategory,
+
         jobType: pick(JOB_TYPES, n),
         workplaceType: onsiteOnly ? 'ONSITE' : pick(WORKPLACE, n),
         experienceLevel: pick(EXPERIENCE, n),
-        location: pick(LOCATIONS, n),
-        salaryRange: pick(SALARIES, n),
+
+        location: place.area,
+        division: place.division,
+        district: place.district,
+
+        paymentType,
+        salaryMin: band?.[0] ?? null,
+        salaryMax: band?.[1] ?? null,
+
+        workingTime: pick(WORKING_TIMES, n),
+        hoursBand: pick(HOURS_BANDS, n),
+        duration,
+        urgency: shortJob ? pick(URGENCIES, n) : 'NONE',
+
+        // Short work starts within days; longer roles are open-ended.
+        startDate: shortJob
+          ? new Date(now + (n % 7) * 86_400_000)
+          : null,
+        flexibleStart: !shortJob,
+
         // 5 to 45 days out, so "days left" varies across the list.
         deadline: new Date(now + ((n % 41) + 5) * 86_400_000),
       });

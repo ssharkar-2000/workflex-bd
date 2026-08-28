@@ -31,11 +31,27 @@ export class JobsService {
       companyName: job.companyName,
       companyInitials: this.initials(job.companyName),
       category: job.category,
+
       jobType: job.jobType,
       workplaceType: job.workplaceType,
       experienceLevel: job.experienceLevel,
+
+      division: job.division,
+      district: job.district,
       location: job.location,
-      salaryRange: job.salaryRange,
+
+      paymentType: job.paymentType,
+      salaryMin: job.salaryMin,
+      salaryMax: job.salaryMax,
+
+      workingTime: job.workingTime,
+      hoursBand: job.hoursBand,
+      duration: job.duration,
+      urgency: job.urgency,
+
+      startDate: job.startDate?.toISOString() ?? null,
+      flexibleStart: job.flexibleStart,
+
       description: job.description,
       deadline: job.deadline?.toISOString() ?? null,
       // Rounded up, so a job closing later today reads "1 day left" rather
@@ -51,6 +67,51 @@ export class JobsService {
     };
   }
 
+  /**
+   * Turns "this week" into a date range.
+   *
+   * Resolved on the server, not the client: a phone with a wrong clock or a
+   * different timezone would otherwise ask for a window that does not match
+   * what anyone else sees, and the same filter would return different jobs on
+   * two devices at the same moment.
+   *
+   * A flexible-start posting matches every window except FLEXIBLE itself,
+   * which asks for exactly those. Someone filtering for work starting today
+   * is served by an employer who does not mind when you begin.
+   */
+  private startWindowFilter(
+    window: NonNullable<JobQuery['startWindow']>,
+  ): Prisma.JobWhereInput {
+    if (window === 'FLEXIBLE') return { flexibleStart: true };
+
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+
+    switch (window) {
+      case 'TODAY':
+        end.setDate(end.getDate() + 1);
+        break;
+      case 'TOMORROW':
+        start.setDate(start.getDate() + 1);
+        end.setDate(end.getDate() + 2);
+        break;
+      case 'THIS_WEEK':
+        end.setDate(end.getDate() + 7);
+        break;
+      case 'THIS_MONTH':
+        end.setMonth(end.getMonth() + 1);
+        break;
+    }
+
+    return {
+      OR: [
+        { flexibleStart: true },
+        { startDate: { gte: start, lt: end } },
+      ],
+    };
+  }
+
   private where(query: JobQuery, userId: string): Prisma.JobWhereInput {
     const where: Prisma.JobWhereInput = {
       isOpen: true,
@@ -58,25 +119,65 @@ export class JobsService {
       OR: [{ deadline: null }, { deadline: { gte: new Date() } }],
     };
 
-    if (query.category) where.category = query.category;
-    if (query.jobType) where.jobType = query.jobType;
-    if (query.workplaceType) where.workplaceType = query.workplaceType;
+    // Every axis is an "in" over the selected values, and the axes AND
+    // together: picking Part-Time and Hourly means part-time jobs that pay
+    // hourly, not the union of the two.
+    if (query.categories) where.category = { in: query.categories };
+    if (query.jobTypes) where.jobType = { in: query.jobTypes };
+    if (query.workplaceTypes) where.workplaceType = { in: query.workplaceTypes };
+    if (query.experienceLevels) {
+      where.experienceLevel = { in: query.experienceLevels };
+    }
+    if (query.paymentTypes) where.paymentType = { in: query.paymentTypes };
+    if (query.workingTimes) where.workingTime = { in: query.workingTimes };
+    if (query.hoursBands) where.hoursBand = { in: query.hoursBands };
+    if (query.durations) where.duration = { in: query.durations };
+    if (query.urgencies) where.urgency = { in: query.urgencies };
+    if (query.divisions) where.division = { in: query.divisions };
+    if (query.districts) where.district = { in: query.districts };
     if (query.savedOnly) where.savedBy = { some: { userId } };
+
+    const and: Prisma.JobWhereInput[] = [];
+
+    /**
+     * Salary is an overlap test, not containment.
+     *
+     * A posting offering ৳15,000–25,000 should match someone asking for at
+     * least ৳20,000, because part of what is offered clears their floor.
+     * Requiring the posting's whole range to sit inside the filter would hide
+     * most listings, and postings with one bound unstated would vanish
+     * entirely — hence the nulls being treated as "no objection".
+     */
+    if (query.salaryMin !== undefined) {
+      and.push({
+        OR: [{ salaryMax: null }, { salaryMax: { gte: query.salaryMin } }],
+      });
+    }
+    if (query.salaryMax !== undefined) {
+      and.push({
+        OR: [{ salaryMin: null }, { salaryMin: { lte: query.salaryMax } }],
+      });
+    }
+
+    if (query.startWindow) {
+      and.push(this.startWindowFilter(query.startWindow));
+    }
 
     if (query.q) {
       // AND-ed with the OR above rather than merged into it — putting the
       // search terms in the same OR array would make a keyword match override
       // the expiry filter and resurrect closed jobs.
-      where.AND = [
-        {
-          OR: [
-            { title: { contains: query.q, mode: 'insensitive' } },
-            { companyName: { contains: query.q, mode: 'insensitive' } },
-            { location: { contains: query.q, mode: 'insensitive' } },
-          ],
-        },
-      ];
+      and.push({
+        OR: [
+          { title: { contains: query.q, mode: 'insensitive' } },
+          { companyName: { contains: query.q, mode: 'insensitive' } },
+          { location: { contains: query.q, mode: 'insensitive' } },
+          { district: { contains: query.q, mode: 'insensitive' } },
+        ],
+      });
     }
+
+    if (and.length > 0) where.AND = and;
 
     return where;
   }
