@@ -88,6 +88,7 @@ export class UsersService {
       status: user.status,
       verificationLevel: user.verificationLevel as 0 | 1 | 2,
       isAdmin: user.isAdmin,
+      accountType: user.accountType,
       profiles,
       recruiterKind,
       createdAt: user.createdAt.toISOString(),

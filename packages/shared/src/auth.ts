@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isValidBdPhone, normalizeBdPhone } from './phone';
 import { localeSchema } from './locale';
+import { accountTypeSchema } from './onboarding';
 import {
   otpPurposeSchema,
   profileKindSchema,
@@ -81,6 +82,12 @@ export const authUserSchema = z.object({
   status: userStatusSchema,
   verificationLevel: verificationLevelSchema,
   isAdmin: z.boolean(),
+  /**
+   * Null until the account type is chosen during onboarding. The dashboard
+   * menu keys off this to show hiring items or job-seeking items rather than
+   * both — `profiles` below is still a placeholder and always empty.
+   */
+  accountType: accountTypeSchema.nullable(),
   /** Which profiles exist on this account — drives the role switcher. */
   profiles: z.array(profileKindSchema),
   recruiterKind: recruiterKindSchema.nullable(),

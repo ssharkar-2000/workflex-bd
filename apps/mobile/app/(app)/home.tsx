@@ -159,10 +159,7 @@ function Header({
       </View>
 
       <NotificationBell />
-      <DashboardMenu
-        verificationLevel={user.verificationLevel}
-        onSignOut={onSignOut}
-      />
+      <DashboardMenu user={user} onSignOut={onSignOut} />
     </View>
   );
 }

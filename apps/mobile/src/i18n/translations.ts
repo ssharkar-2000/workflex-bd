@@ -210,6 +210,27 @@ export const en = {
     'Announcements from the WorkFlex BD team will show up here.',
 
   'menu.open': 'Menu',
+  'menu.close': 'Close menu',
+  'menu.viewEditProfile': 'View & edit profile',
+
+  'menu.sec.work': 'Find work',
+  'menu.sec.hiring': 'Hiring',
+  'menu.sec.money': 'Money',
+  'menu.sec.standing': 'My standing',
+
+  'menu.findJobs': 'Find jobs',
+  'menu.myApplications': 'My applications',
+  'menu.savedJobs': 'Saved jobs',
+  'menu.myShifts': 'My shifts',
+
+  'menu.postJob': 'Post a job',
+  'menu.myPostedJobs': 'My posted jobs',
+  'menu.applicants': 'Applicants',
+  'menu.hiredWorkers': 'Hired workers',
+
+  'menu.wallet': 'Wallet',
+  'menu.ratings': 'Ratings & reviews',
+
   'menu.profile': 'My profile',
   'menu.verification': 'Verification',
   'menu.verificationDone': 'Verified',
@@ -600,6 +621,27 @@ export const bn: Record<TranslationKey, string> = {
     'WorkFlex BD টিমের ঘোষণা এখানে দেখা যাবে।',
 
   'menu.open': 'মেনু',
+  'menu.close': 'মেনু বন্ধ করুন',
+  'menu.viewEditProfile': 'প্রোফাইল দেখুন ও সম্পাদনা করুন',
+
+  'menu.sec.work': 'কাজ খুঁজুন',
+  'menu.sec.hiring': 'নিয়োগ',
+  'menu.sec.money': 'আর্থিক',
+  'menu.sec.standing': 'আমার অবস্থান',
+
+  'menu.findJobs': 'কাজ খুঁজুন',
+  'menu.myApplications': 'আমার আবেদন',
+  'menu.savedJobs': 'সংরক্ষিত কাজ',
+  'menu.myShifts': 'আমার শিফট',
+
+  'menu.postJob': 'কাজের বিজ্ঞপ্তি দিন',
+  'menu.myPostedJobs': 'আমার দেওয়া বিজ্ঞপ্তি',
+  'menu.applicants': 'আবেদনকারী',
+  'menu.hiredWorkers': 'নিয়োগপ্রাপ্ত কর্মী',
+
+  'menu.wallet': 'ওয়ালেট',
+  'menu.ratings': 'রেটিং ও রিভিউ',
+
   'menu.profile': 'আমার প্রোফাইল',
   'menu.verification': 'যাচাইকরণ',
   'menu.verificationDone': 'যাচাই সম্পন্ন',
