@@ -12,6 +12,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { SmsModule } from './sms/sms.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { JobsModule } from './jobs/jobs.module';
 import { SupportModule } from './support/support.module';
 import { AdminModule } from './admin/admin.module';
 import { MailModule } from './mail/mail.module';
@@ -53,6 +54,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
     OnboardingModule,
     NotificationsModule,
     SupportModule,
+    JobsModule,
     AdminModule,
   ],
   providers: [

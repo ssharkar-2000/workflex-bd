@@ -10,3 +10,5 @@ export * from './admin';
 export * from './admin-sections';
 export * from './notifications';
 export * from './support';
+export * from './job-categories';
+export * from './jobs';

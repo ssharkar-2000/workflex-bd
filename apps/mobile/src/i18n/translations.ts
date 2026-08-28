@@ -220,6 +220,38 @@ export const en = {
     'Your browser has no voice for this language. On a phone the app uses the system voices instead.',
   'speech.hint.dismiss': 'Got it',
 
+  'home.role.browse': 'Browse jobs',
+
+  'jobs.title': 'Find your next job',
+  'jobs.searchHint': 'Job title, company or area',
+  'jobs.clearSearch': 'Clear search',
+  'jobs.clearAll': 'Clear filters',
+  'jobs.saved': 'Saved',
+  'jobs.anyType': 'Any job type',
+  'jobs.anyPlace': 'Anywhere',
+  'jobs.available': '{count} jobs available',
+  'jobs.daysLeft': '{count} days left',
+  'jobs.save': 'Save this job',
+  'jobs.unsave': 'Remove from saved',
+  'jobs.emptyTitle': 'Nothing matches',
+  'jobs.emptyBody': 'Try a different keyword, or clear the filters.',
+
+  'jobs.type.FULL_TIME': 'Full time',
+  'jobs.type.PART_TIME': 'Part time',
+  'jobs.type.CONTRACT': 'Contract',
+  'jobs.type.TEMPORARY': 'Temporary',
+  'jobs.type.INTERNSHIP': 'Internship',
+  'jobs.type.ONE_TIME': 'One-off',
+
+  'jobs.place.ONSITE': 'On-site',
+  'jobs.place.REMOTE': 'Remote',
+  'jobs.place.HYBRID': 'Hybrid',
+
+  'jobs.exp.ENTRY': 'No experience',
+  'jobs.exp.ONE_TO_THREE': '1–3 years',
+  'jobs.exp.THREE_TO_FIVE': '3–5 years',
+  'jobs.exp.FIVE_PLUS': '5+ years',
+
   'speak.listen': 'Listen',
   'speak.stop': 'Stop',
   'speak.startLabel': 'Read aloud: {label}',
@@ -646,6 +678,38 @@ export const bn: Record<TranslationKey, string> = {
   'speech.hint.stepsWeb':
     'আপনার ব্রাউজারে এই ভাষার কোনো ভয়েস নেই। ফোনে অ্যাপটি সিস্টেমের ভয়েস ব্যবহার করে।',
   'speech.hint.dismiss': 'বুঝেছি',
+
+  'home.role.browse': 'কাজ দেখুন',
+
+  'jobs.title': 'পরবর্তী কাজ খুঁজুন',
+  'jobs.searchHint': 'কাজের নাম, প্রতিষ্ঠান বা এলাকা',
+  'jobs.clearSearch': 'সার্চ মুছুন',
+  'jobs.clearAll': 'ফিল্টার মুছুন',
+  'jobs.saved': 'সংরক্ষিত',
+  'jobs.anyType': 'যেকোনো ধরন',
+  'jobs.anyPlace': 'যেকোনো জায়গা',
+  'jobs.available': '{count}টি কাজ পাওয়া যাচ্ছে',
+  'jobs.daysLeft': '{count} দিন বাকি',
+  'jobs.save': 'কাজটি সংরক্ষণ করুন',
+  'jobs.unsave': 'সংরক্ষণ থেকে সরান',
+  'jobs.emptyTitle': 'কিছু মেলেনি',
+  'jobs.emptyBody': 'অন্য শব্দ দিয়ে খুঁজুন, অথবা ফিল্টার মুছে দিন।',
+
+  'jobs.type.FULL_TIME': 'ফুল টাইম',
+  'jobs.type.PART_TIME': 'পার্ট টাইম',
+  'jobs.type.CONTRACT': 'চুক্তিভিত্তিক',
+  'jobs.type.TEMPORARY': 'অস্থায়ী',
+  'jobs.type.INTERNSHIP': 'ইন্টার্নশিপ',
+  'jobs.type.ONE_TIME': 'একদিনের কাজ',
+
+  'jobs.place.ONSITE': 'সরাসরি',
+  'jobs.place.REMOTE': 'রিমোট',
+  'jobs.place.HYBRID': 'হাইব্রিড',
+
+  'jobs.exp.ENTRY': 'অভিজ্ঞতা লাগবে না',
+  'jobs.exp.ONE_TO_THREE': '১–৩ বছর',
+  'jobs.exp.THREE_TO_FIVE': '৩–৫ বছর',
+  'jobs.exp.FIVE_PLUS': '৫+ বছর',
 
   'speak.listen': 'শুনুন',
   'speak.stop': 'বন্ধ করুন',

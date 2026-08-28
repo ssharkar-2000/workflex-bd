@@ -218,6 +218,7 @@ function RolePicker() {
           title="home.role.find"
           body="home.role.findBody"
           tint={0}
+          href="/(app)/jobs"
         />
         <RoleCard
           emoji="📋"
@@ -238,40 +239,57 @@ function RoleCard({
   title,
   body,
   tint,
+  href,
 }: {
   emoji: string;
   title: TranslationKey;
   body: TranslationKey;
   /** Index into the palette's tint set — peach, mint, lavender, butter. */
   tint: number;
+  /** Omitted while the destination does not exist; the card then shows "soon". */
+  href?: string;
 }) {
   const t = useT();
+  const router = useRouter();
   const { c } = useTheme();
 
+  // A card with somewhere to go is a button and dips on press; one without is
+  // not, so it never offers a tap that does nothing.
+  const Wrapper = href ? Pressable : View;
+
   return (
-    <View
-      style={[
+    <Wrapper
+      onPress={href ? () => router.push(href as never) : undefined}
+      accessibilityRole={href ? 'button' : undefined}
+      style={({ pressed }: { pressed?: boolean } = {}) => [
         styles.roleCard,
         {
           backgroundColor: c.tints[tint % c.tints.length],
           borderColor: c.tintBorders[tint % c.tintBorders.length],
         },
+        pressed && styles.rolePressed,
       ]}
     >
       <Text style={styles.roleEmoji}>{emoji}</Text>
       <Text style={[styles.roleTitle, { color: c.text }]}>{t(title)}</Text>
       <Text style={[styles.roleBody, { color: c.textMuted }]}>{t(body)}</Text>
-      <View
-        style={[
-          styles.soonPill,
-          { backgroundColor: c.surfaceAlt, borderColor: c.border },
-        ]}
-      >
-        <Text style={[styles.soonPillText, { color: c.textMuted }]}>
-          {t('common.comingNext')}
+      {href ? (
+        <Text style={[styles.roleGo, { color: c.primary }]}>
+          {t('home.role.browse')} →
         </Text>
-      </View>
-    </View>
+      ) : (
+        <View
+          style={[
+            styles.soonPill,
+            { backgroundColor: c.surfaceAlt, borderColor: c.border },
+          ]}
+        >
+          <Text style={[styles.soonPillText, { color: c.textMuted }]}>
+            {t('common.comingNext')}
+          </Text>
+        </View>
+      )}
+    </Wrapper>
   );
 }
 
@@ -382,6 +400,8 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   soonPillText: { fontSize: font.xs, fontWeight: '600' },
+  rolePressed: { opacity: 0.72 },
+  roleGo: { fontSize: font.xs, fontWeight: '800', marginTop: 8 },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
   tile: {

@@ -120,6 +120,7 @@ model User {
   supportTickets     SupportTicket[]
   attendance         AttendanceRecord[]
   notificationReads  NotificationRead[]
+  savedJobs          SavedJob[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -172,6 +173,8 @@ model Company {
   tradeLicenseNo String?
 
   verifiedAt DateTime?
+
+  jobs Job[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -473,4 +476,112 @@ model AttendanceRecord {
   @@index([userId, checkInAt])
   @@index([status])
   @@map("attendance_records")
+}
+
+// --- jobs ---
+
+/// Mirrors `jobCategorySchema` in @workflex/shared, which is the source of
+/// truth for names, emoji and example roles. Kept as an enum here so the
+/// database rejects a category the product does not have.
+enum JobCategory {
+  HOUSEHOLD
+  DELIVERY
+  HOSPITALITY
+  RETAIL
+  OFFICE
+  IT
+  EDUCATION
+  TRADES
+  BEAUTY
+  HEALTHCARE
+  CONSTRUCTION
+  AGRICULTURE
+  EVENTS
+  TRANSPORT
+  MANUFACTURING
+  SECURITY
+  PROFESSIONAL
+  CREATIVE
+  VOLUNTEER
+  EMERGENCY
+}
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  TEMPORARY
+  INTERNSHIP
+  ONE_TIME
+}
+
+enum WorkplaceType {
+  ONSITE
+  REMOTE
+  HYBRID
+}
+
+enum ExperienceLevel {
+  ENTRY
+  ONE_TO_THREE
+  THREE_TO_FIVE
+  FIVE_PLUS
+}
+
+model Job {
+  id String @id @default(uuid()) @db.Uuid
+
+  title       String
+  description String
+
+  /// Denormalised rather than joined to Company. Most postings in this market
+  /// come from small employers with no registered company record, and a
+  /// listing has to render whether or not one exists.
+  companyName String
+  /// Optional link for the postings that *do* belong to a registered company.
+  companyId   String?  @db.Uuid
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  /// Who posted it. Null on seeded and imported listings.
+  postedBy String? @db.Uuid
+
+  category        JobCategory
+  jobType         JobType         @default(FULL_TIME)
+  workplaceType   WorkplaceType   @default(ONSITE)
+  experienceLevel ExperienceLevel @default(ENTRY)
+
+  location String
+  /// Free text: postings quote ranges, daily rates, or "negotiable".
+  salaryRange String?
+
+  /// Null means the posting stays open until it is closed by hand.
+  deadline DateTime?
+  /// Hidden from the seeker feed without deleting the record.
+  isOpen   Boolean   @default(true)
+
+  savedBy SavedJob[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isOpen, createdAt])
+  @@index([category])
+  @@index([jobType])
+  @@map("jobs")
+}
+
+/// A seeker's bookmark. Same shape as NotificationRead — the absence of a row
+/// is "not saved", so nothing has to be written when a job is merely seen.
+model SavedJob {
+  jobId  String @db.Uuid
+  userId String @db.Uuid
+
+  savedAt DateTime @default(now())
+
+  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([jobId, userId])
+  @@index([userId, savedAt])
+  @@map("saved_jobs")
 }

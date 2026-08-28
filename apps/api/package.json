@@ -18,7 +18,8 @@
     "models:fetch": "node scripts/fetch-models.mjs",
     "admin:create": "dotenv -e ../../.env -- node scripts/create-admin.mjs",
     "clean": "rimraf dist .turbo *.tsbuildinfo",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "db:seed:jobs": "dotenv -e ../../.env -- ts-node --project tsconfig.json prisma/seed-jobs.ts"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.0.1",
