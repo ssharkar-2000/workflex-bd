@@ -153,11 +153,14 @@ export function JobFilterBar({
   onClear,
   /** Total selected values, for the clear button's badge. */
   activeCount,
+  /** Open listings per category, shown beside each name. */
+  categoryCounts,
 }: {
   value: JobFilterState;
   onChange: (next: JobFilterState) => void;
   onClear: () => void;
   activeCount: number;
+  categoryCounts?: Record<string, number>;
 }) {
   const t = useT();
   const { c } = useTheme();
@@ -359,14 +362,22 @@ export function JobFilterBar({
 
               {open === 'category' ? (
                 <Group title={t('filter.category')}>
-                  {JOB_CATEGORIES.map((cat) => (
-                    <Option
-                      key={cat.key}
-                      label={`${cat.emoji} ${jobCategoryName(cat.key, locale)}`}
-                      on={isOn('categories', cat.key)}
-                      onPress={() => toggle('categories', cat.key)}
-                    />
-                  ))}
+                  {JOB_CATEGORIES.map((cat) => {
+                    const n = categoryCounts?.[cat.key];
+                    return (
+                      <Option
+                        key={cat.key}
+                        // The count is what a separate category strip used to
+                        // contribute; it belongs next to the name, not on its
+                        // own row duplicating this list.
+                        label={`${cat.emoji} ${jobCategoryName(cat.key, locale)}${
+                          n ? `  ${n}` : ''
+                        }`}
+                        on={isOn('categories', cat.key)}
+                        onPress={() => toggle('categories', cat.key)}
+                      />
+                    );
+                  })}
                 </Group>
               ) : null}
 

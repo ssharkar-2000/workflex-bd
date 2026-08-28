@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -19,9 +18,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import {
-  JOB_CATEGORIES,
   jobCategoryName,
-  type JobCategory,
   type JobFilterState,
   type JobListing,
   type JobType,
@@ -161,15 +158,6 @@ export default function JobsScreen() {
     return n + 1;
   }, 0);
 
-  const toggleCategory = (key: JobCategory) =>
-    setSheet((d) => {
-      const current = d.categories ?? [];
-      const next = current.includes(key)
-        ? current.filter((k) => k !== key)
-        : [...current, key];
-      return { ...d, categories: next.length > 0 ? next : undefined };
-    });
-
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
@@ -223,26 +211,8 @@ export default function JobsScreen() {
         onChange={setSheet}
         onClear={clearFilters}
         activeCount={filterCount + (applied ? 1 : 0)}
+        categoryCounts={counts}
       />
-
-      {/* Categories get their own row: twenty of them would swamp the filters
-          above, and this is the axis people actually browse by. */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.chipScroll}
-        contentContainerStyle={styles.chipRow}
-      >
-        {JOB_CATEGORIES.map((cat) => (
-          <CategoryChip
-            key={cat.key}
-            info={cat}
-            count={counts?.[cat.key]}
-            active={(sheet.categories ?? []).includes(cat.key)}
-            onPress={() => toggleCategory(cat.key)}
-          />
-        ))}
-      </ScrollView>
 
       <Text style={[styles.count, { color: c.textMuted }]}>
         {t('jobs.available', { count: total })}
@@ -297,61 +267,6 @@ export default function JobsScreen() {
         />
       )}
     </SafeAreaView>
-  );
-}
-
-function Chip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const { c } = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      style={[
-        styles.chip,
-        {
-          backgroundColor: active ? c.primary : c.surface,
-          borderColor: active ? c.primary : c.border,
-        },
-      ]}
-    >
-      <Text
-        style={[styles.chipText, { color: active ? c.primaryText : c.text }]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-function CategoryChip({
-  info,
-  count,
-  active,
-  onPress,
-}: {
-  info: (typeof JOB_CATEGORIES)[number];
-  count?: number;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const [locale] = useLocale();
-  return (
-    <Chip
-      label={`${info.emoji} ${jobCategoryName(info.key, locale)}${
-        count ? ` ${count}` : ''
-      }`}
-      active={active}
-      onPress={onPress}
-    />
   );
 }
 
@@ -516,28 +431,6 @@ const styles = StyleSheet.create({
   searchIcon: { fontSize: 14 },
   searchInput: { flex: 1, fontSize: font.md, paddingVertical: 0 },
   clear: { fontSize: 15, fontWeight: '700', paddingHorizontal: 2 },
-
-  /**
-   * ScrollView's own base style is { flexGrow: 1, flexShrink: 1 }, so a
-   * horizontal one placed in a flex column competes with its siblings for
-   * height — and the job list, having far more content, wins and crushes the
-   * chips to a few pixels. Opting these rows out of the flex negotiation
-   * makes them size to their content instead.
-   */
-  chipScroll: { flexGrow: 0, flexShrink: 0 },
-  chipRow: {
-    paddingHorizontal: space.md,
-    gap: 8,
-    paddingBottom: 8,
-    alignItems: 'center',
-  },
-  chip: {
-    borderWidth: 1,
-    borderRadius: radius.pill,
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-  },
-  chipText: { fontSize: font.xs + 1, fontWeight: '700' },
 
   count: {
     fontSize: font.sm,
