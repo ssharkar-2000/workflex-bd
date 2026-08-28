@@ -131,6 +131,27 @@ const ALWAYS_ONSITE = new Set([
 ]);
 
 /**
+ * Requirement and benefit lines, drawn from what postings in this market
+ * actually ask for and offer. Kept as bullet text rather than structured
+ * fields — a recruiter writes prose, and the detail screen renders it as-is.
+ */
+const REQUIREMENTS = [
+  ['• Minimum SSC / HSC pass', '• Punctual and presentable', '• Able to start immediately', '• National ID required'].join('\n'),
+  ['• Relevant experience in a similar role', '• Basic Bangla and English', '• Comfortable working in a team', '• National ID required'].join('\n'),
+  ['• Prior experience preferred but not essential', '• Willing to work flexible hours', '• Own transport an advantage', '• Two references'].join('\n'),
+  ['• Graduate in any discipline', '• Good communication skills', '• Familiar with MS Office', '• National ID and academic certificates'].join('\n'),
+  ['• Physically fit for the work involved', '• Reliable and honest', '• Local to the area preferred', '• National ID required'].join('\n'),
+];
+
+const BENEFITS = [
+  ['• Payment on completion, via bKash or cash', '• Lunch provided', '• Friendly working environment'].join('\n'),
+  ['• Weekly payment', '• Transport allowance', '• Overtime paid at agreed rate'].join('\n'),
+  ['• Monthly salary with two festival bonuses', '• Paid weekly holiday', '• Annual increment based on performance'].join('\n'),
+  ['• Flexible working hours', '• Work-from-home options where the role allows', '• Performance bonus'].join('\n'),
+  ['• On-the-job training provided', '• Opportunity for permanent placement', '• Payment through the WorkFlex BD wallet'].join('\n'),
+];
+
+/**
  * Deterministic pseudo-random, seeded off the index.
  *
  * Re-running the seed should produce the same catalogue — otherwise every run
@@ -203,6 +224,12 @@ async function main() {
           ? new Date(now + (n % 7) * 86_400_000)
           : null,
         flexibleStart: !shortJob,
+
+        requirements: pick(REQUIREMENTS, n),
+        benefits: pick(BENEFITS, n),
+        // Every fourth posting leaves it unsaid, which is realistic and gives
+        // the detail screen its "Not specified" case to render.
+        vacancies: n % 4 === 0 ? null : (n % 6) + 1,
 
         // 5 to 45 days out, so "days left" varies across the list.
         deadline: new Date(now + ((n % 41) + 5) * 86_400_000),

@@ -53,6 +53,9 @@ export class JobsService {
       flexibleStart: job.flexibleStart,
 
       description: job.description,
+      requirements: job.requirements,
+      benefits: job.benefits,
+      vacancies: job.vacancies,
       deadline: job.deadline?.toISOString() ?? null,
       // Rounded up, so a job closing later today reads "1 day left" rather
       // than "0" — which looks expired to someone deciding whether to apply.

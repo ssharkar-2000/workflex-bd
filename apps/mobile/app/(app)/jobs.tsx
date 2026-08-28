@@ -261,6 +261,9 @@ export default function JobsScreen() {
             <JobCard
               job={item}
               index={index}
+              onOpen={() =>
+                router.push({ pathname: '/(app)/job/[id]', params: { id: item.id } })
+              }
               onToggleSave={() => save.mutate(item.id)}
             />
           )}
@@ -273,10 +276,12 @@ export default function JobsScreen() {
 function JobCard({
   job,
   index,
+  onOpen,
   onToggleSave,
 }: {
   job: JobListing;
   index: number;
+  onOpen: () => void;
   onToggleSave: () => void;
 }) {
   const t = useT();
@@ -287,8 +292,15 @@ function JobCard({
   const tintBorder = c.tintBorders[index % c.tintBorders.length];
 
   return (
-    <View
-      style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}
+    <Pressable
+      onPress={onOpen}
+      accessibilityRole="button"
+      accessibilityLabel={`${job.title}, ${job.companyName}`}
+      style={({ pressed }) => [
+        styles.card,
+        { backgroundColor: c.surface, borderColor: c.border },
+        pressed && styles.cardPressed,
+      ]}
     >
       <View style={styles.cardTop}>
         {/* Initials, not a logo: postings carry no image yet, and an empty
@@ -375,7 +387,7 @@ function JobCard({
           </Text>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -444,6 +456,7 @@ const styles = StyleSheet.create({
   more: { marginVertical: space.md },
 
   card: { borderWidth: 1, borderRadius: radius.lg, padding: 14 },
+  cardPressed: { opacity: 0.72 },
   cardTop: {
     flexDirection: 'row',
     alignItems: 'flex-start',

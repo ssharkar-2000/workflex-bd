@@ -593,6 +593,14 @@ model Job {
 
   title       String
   description String
+  /// What the employer asks for, free text. Null on a posting that only has
+  /// a description — most informal listings in this market do.
+  requirements String?
+  /// What the job offers beyond pay: meals, transport, accommodation.
+  benefits     String?
+  /// How many people are being hired. Null reads as "not specified", which is
+  /// honest — plenty of employers genuinely do not say.
+  vacancies    Int?
 
   /// Denormalised rather than joined to Company. Most postings in this market
   /// come from small employers with no registered company record, and a

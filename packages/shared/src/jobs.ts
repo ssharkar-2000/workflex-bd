@@ -143,6 +143,11 @@ export const jobListingSchema = z.object({
   flexibleStart: z.boolean(),
 
   description: z.string(),
+  /** Free text; null on postings that only carry a description. */
+  requirements: z.string().nullable(),
+  benefits: z.string().nullable(),
+  /** Null means the employer did not say, which the screen states plainly. */
+  vacancies: z.number().int().nullable(),
   deadline: z.string().nullable(),
   /** Whole days remaining; expired listings are filtered out, never negative. */
   daysLeft: z.number().int().nullable(),
