@@ -25,7 +25,8 @@
     "db:studio": "npm run db:studio -w @workflex/api",
     "api:dev": "npm run dev -w @workflex/api",
     "mobile:dev": "npm run start -w @workflex/mobile",
-    "mobile:go": "npm run start:go -w @workflex/mobile"
+    "mobile:go": "npm run start:go -w @workflex/mobile",
+    "mobile:web": "npm run web -w @workflex/mobile"
   },
   "devDependencies": {
     "turbo": "^2.5.4",

@@ -37,4 +37,27 @@ config.cacheStores = [
 // Fewer workers means less contention and a bundle that lands inside the window.
 config.maxWorkers = 3;
 
+// 6. expo-secure-store has no web implementation — it wraps the iOS Keychain
+// and the Android Keystore, and every call throws in a browser. Four modules
+// import it directly, so rather than teaching each one about platforms, swap
+// the whole module for a localStorage-backed stand-in when bundling for web.
+// Native builds never see this branch.
+const secureStoreWebShim = path.resolve(
+  projectRoot,
+  'src/lib/secure-store.web.ts',
+);
+
+const defaultResolveRequest = config.resolver.resolveRequest;
+
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (platform === 'web' && moduleName === 'expo-secure-store') {
+    return { type: 'sourceFile', filePath: secureStoreWebShim };
+  }
+  return (defaultResolveRequest ?? context.resolveRequest)(
+    context,
+    moduleName,
+    platform,
+  );
+};
+
 module.exports = config;
