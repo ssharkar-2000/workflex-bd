@@ -292,17 +292,16 @@ function JobCard({
   const tintBorder = c.tintBorders[index % c.tintBorders.length];
 
   return (
-    <Pressable
-      onPress={onOpen}
-      accessibilityRole="button"
-      accessibilityLabel={`${job.title}, ${job.companyName}`}
-      style={({ pressed }) => [
-        styles.card,
-        { backgroundColor: c.surface, borderColor: c.border },
-        pressed && styles.cardPressed,
-      ]}
-    >
-      <View style={styles.cardTop}>
+    <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
+      {/* Opening the job and bookmarking it are siblings, not nested. A
+          button inside a button is invalid DOM on web and an ambiguous hit
+          target on native. */}
+      <Pressable
+        onPress={onOpen}
+        accessibilityRole="button"
+        accessibilityLabel={`${job.title}, ${job.companyName}`}
+        style={({ pressed }) => [styles.cardBody, pressed && styles.cardPressed]}
+      >
         {/* Initials, not a logo: postings carry no image yet, and an empty
             square reads as a failed load. */}
         <View
@@ -312,22 +311,6 @@ function JobCard({
             {job.companyInitials}
           </Text>
         </View>
-
-        <Pressable
-          onPress={onToggleSave}
-          hitSlop={12}
-          accessibilityRole="button"
-          accessibilityState={{ selected: job.saved }}
-          accessibilityLabel={t(job.saved ? 'jobs.unsave' : 'jobs.save')}
-        >
-          {/* Same glyph in both states, faded when unsaved. Two different
-              emoji read as two different actions — the 🏷 outline variant in
-              particular renders as a price tag, not a bookmark. */}
-          <Text style={[styles.bookmark, !job.saved && styles.bookmarkOff]}>
-            🔖
-          </Text>
-        </Pressable>
-      </View>
 
       {job.urgency !== 'NONE' ? (
         <View
@@ -387,7 +370,26 @@ function JobCard({
           </Text>
         </View>
       </View>
-    </Pressable>
+      </Pressable>
+
+      <Pressable
+        onPress={onToggleSave}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityState={{ selected: job.saved }}
+        accessibilityLabel={t(job.saved ? 'jobs.unsave' : 'jobs.save')}
+        // Sits over the card's top-right corner, where it was when it lived
+        // inside the header row.
+        style={styles.bookmarkButton}
+      >
+        {/* Same glyph in both states, faded when unsaved. Two different emoji
+            read as two different actions — the 🏷 outline variant in
+            particular renders as a price tag, not a bookmark. */}
+        <Text style={[styles.bookmark, !job.saved && styles.bookmarkOff]}>
+          🔖
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -455,13 +457,12 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: space.md, paddingBottom: space.xl, gap: 10 },
   more: { marginVertical: space.md },
 
-  card: { borderWidth: 1, borderRadius: radius.lg, padding: 14 },
+  card: { borderWidth: 1, borderRadius: radius.lg },
+  // Padding moved onto the inner button so the whole padded area is tappable,
+  // not just the text inside it.
+  cardBody: { padding: 14, paddingRight: 44 },
   cardPressed: { opacity: 0.72 },
-  cardTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
+  bookmarkButton: { position: 'absolute', top: 10, right: 10, padding: 6 },
   logo: {
     width: 42,
     height: 42,

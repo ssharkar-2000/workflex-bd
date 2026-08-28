@@ -166,9 +166,7 @@ function NotificationRow({
   const tintBorder = c.tintBorders[index % c.tintBorders.length];
 
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
+    <View
       style={[
         styles.row,
         {
@@ -177,6 +175,13 @@ function NotificationRow({
         },
       ]}
     >
+      {/* Marking read and reading aloud are siblings, not nested — a button
+          inside a button is invalid DOM on web. */}
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={item.title}
+      >
       <View style={styles.rowTop}>
         {/* An unread dot as well as the fill: colour alone should not be the
             only thing separating read from unread. */}
@@ -195,6 +200,7 @@ function NotificationRow({
       </View>
 
       <Text style={[styles.rowBody, { color: c.textMuted }]}>{item.body}</Text>
+      </Pressable>
 
       <View style={styles.rowFoot}>
         <SpeakButton
@@ -212,7 +218,7 @@ function NotificationRow({
           { day: 'numeric', month: 'short', year: 'numeric' },
         )}
       </Text>
-    </Pressable>
+    </View>
   );
 }
 
