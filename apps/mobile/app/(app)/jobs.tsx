@@ -32,7 +32,7 @@ import {
   fetchJobs,
   toggleSavedJob,
 } from '../../src/api/jobs';
-import { JobFilterSheet } from '../../src/components/jobs/JobFilterSheet';
+import { JobFilterBar } from '../../src/components/jobs/JobFilterBar';
 import { NotificationBell } from '../../src/components/NotificationBell';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { useErrorMessage } from '../../src/lib/error-message';
@@ -102,7 +102,6 @@ export default function JobsScreen() {
 
   const [search, setSearch] = useState('');
   const [applied, setApplied] = useState('');
-  const [sheetOpen, setSheetOpen] = useState(false);
 
   // Everything the sheet owns. The search box and the two shortcut chips
   // stay outside it, because those are reached constantly and a sheet for
@@ -218,49 +217,13 @@ export default function JobsScreen() {
         </View>
       </View>
 
-      {/* Filter row. Horizontal because there are more chips than fit, and
-          wrapping them would push the first job card off the screen. */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.chipScroll}
-        contentContainerStyle={styles.chipRow}
-      >
-        <Chip
-          label={
-            filterCount > 0
-              ? `⚙ ${t('filter.title')} · ${filterCount}`
-              : `⚙ ${t('filter.title')}`
-          }
-          active={filterCount > 0}
-          onPress={() => setSheetOpen(true)}
-        />
-
-        {filterCount > 0 || applied ? (
-          <Chip label={`✕ ${t('jobs.clearAll')}`} active={false} onPress={clearFilters} />
-        ) : null}
-
-        <Chip
-          label={`🔖 ${t('jobs.saved')}`}
-          active={sheet.savedOnly === true}
-          onPress={() =>
-            setSheet((d) => ({ ...d, savedOnly: d.savedOnly ? undefined : true }))
-          }
-        />
-
-        <Chip
-          label={`🔥 ${t('jobs.urgentOnly')}`}
-          active={(sheet.urgencies?.length ?? 0) > 0}
-          onPress={() =>
-            setSheet((d) => ({
-              ...d,
-              urgencies: d.urgencies?.length
-                ? undefined
-                : ['IMMEDIATE', 'WITHIN_24H', 'WITHIN_3_DAYS'],
-            }))
-          }
-        />
-      </ScrollView>
+      {/* Every filter named on screen, each opening its own dropdown. */}
+      <JobFilterBar
+        value={sheet}
+        onChange={setSheet}
+        onClear={clearFilters}
+        activeCount={filterCount + (applied ? 1 : 0)}
+      />
 
       {/* Categories get their own row: twenty of them would swamp the filters
           above, and this is the axis people actually browse by. */}
@@ -333,16 +296,6 @@ export default function JobsScreen() {
           )}
         />
       )}
-
-      <JobFilterSheet
-        visible={sheetOpen}
-        initial={sheet}
-        onClose={() => setSheetOpen(false)}
-        onApply={(next) => {
-          setSheet(next);
-          setSheetOpen(false);
-        }}
-      />
     </SafeAreaView>
   );
 }

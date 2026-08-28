@@ -237,6 +237,10 @@ export const en = {
   'jobs.emptyBody': 'Try a different keyword, or clear the filters.',
 
   'filter.title': 'Filters',
+  'filter.location': 'Location',
+  'filter.pay': 'Pay',
+  'filter.done': 'Done',
+  'filter.districtHint': 'Choose a division first to narrow by district.',
   'filter.clear': 'Clear all',
   'filter.apply': 'Show results',
   'filter.category': 'Job category',
@@ -762,6 +766,10 @@ export const bn: Record<TranslationKey, string> = {
   'jobs.emptyBody': 'অন্য শব্দ দিয়ে খুঁজুন, অথবা ফিল্টার মুছে দিন।',
 
   'filter.title': 'ফিল্টার',
+  'filter.location': 'এলাকা',
+  'filter.pay': 'পারিশ্রমিক',
+  'filter.done': 'সম্পন্ন',
+  'filter.districtHint': 'জেলা বেছে নিতে আগে বিভাগ নির্বাচন করুন।',
   'filter.clear': 'সব মুছুন',
   'filter.apply': 'ফলাফল দেখুন',
   'filter.category': 'কাজের ধরন',
