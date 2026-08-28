@@ -184,6 +184,7 @@ export default function JobsScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.chipScroll}
         contentContainerStyle={styles.chipRow}
       >
         {filterCount > 0 ? (
@@ -218,6 +219,7 @@ export default function JobsScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.chipScroll}
         contentContainerStyle={styles.chipRow}
       >
         {JOB_CATEGORIES.map((cat) => (
@@ -420,8 +422,11 @@ function JobCard({
           accessibilityState={{ selected: job.saved }}
           accessibilityLabel={t(job.saved ? 'jobs.unsave' : 'jobs.save')}
         >
-          <Text style={[styles.bookmark, { color: job.saved ? c.primary : c.textMuted }]}>
-            {job.saved ? '🔖' : '🏷'}
+          {/* Same glyph in both states, faded when unsaved. Two different
+              emoji read as two different actions — the 🏷 outline variant in
+              particular renders as a price tag, not a bookmark. */}
+          <Text style={[styles.bookmark, !job.saved && styles.bookmarkOff]}>
+            🔖
           </Text>
         </Pressable>
       </View>
@@ -511,7 +516,20 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: font.md, paddingVertical: 0 },
   clear: { fontSize: 15, fontWeight: '700', paddingHorizontal: 2 },
 
-  chipRow: { paddingHorizontal: space.md, gap: 8, paddingBottom: 8 },
+  /**
+   * ScrollView's own base style is { flexGrow: 1, flexShrink: 1 }, so a
+   * horizontal one placed in a flex column competes with its siblings for
+   * height — and the job list, having far more content, wins and crushes the
+   * chips to a few pixels. Opting these rows out of the flex negotiation
+   * makes them size to their content instead.
+   */
+  chipScroll: { flexGrow: 0, flexShrink: 0 },
+  chipRow: {
+    paddingHorizontal: space.md,
+    gap: 8,
+    paddingBottom: 8,
+    alignItems: 'center',
+  },
   chip: {
     borderWidth: 1,
     borderRadius: radius.pill,
@@ -547,6 +565,7 @@ const styles = StyleSheet.create({
   },
   logoText: { fontSize: font.sm, fontWeight: '800' },
   bookmark: { fontSize: 18 },
+  bookmarkOff: { opacity: 0.3 },
 
   jobTitle: { fontSize: font.md, fontWeight: '800', marginTop: 10 },
   company: { fontSize: font.sm, marginTop: 3 },
