@@ -18,9 +18,8 @@ import { updateLocale } from '../../src/api/email';
 import { useErrorMessage } from '../../src/lib/error-message';
 import { Avatar } from '../../src/components/Avatar';
 import { NotificationBell } from '../../src/components/NotificationBell';
+import { DashboardMenu } from '../../src/components/DashboardMenu';
 import { useAuthStore } from '../../src/store/auth-store';
-import { LanguageToggle } from '../../src/components/LanguageToggle';
-import { ThemeToggle } from '../../src/components/ThemeToggle';
 import { useLocale, useT, type TranslationKey } from '../../src/i18n';
 import { useTheme } from '../../src/lib/use-theme';
 import { font, radius, space } from '../../src/lib/theme';
@@ -97,30 +96,27 @@ export default function HomeScreen() {
           />
         }
       >
-        <Header user={data} />
-
-        <View style={styles.prefRow}>
-          <LanguageToggle tone="dark" />
-          <ThemeToggle tone="dark" />
-        </View>
+        {/* Language, theme and sign out all moved into the header menu — the
+            dashboard body is for work, not settings. */}
+        <Header user={data} onSignOut={() => void onSignOut()} />
 
         <RolePicker />
         <ActionGrid
           unlocked={data.verificationLevel >= VerificationLevel.L1_IDENTITY}
         />
         <MyProfileSection />
-
-        <Pressable style={styles.signOut} onPress={() => void onSignOut()}>
-          <Text style={[styles.signOutText, { color: c.danger }]}>
-            {t('home.signOut')}
-          </Text>
-        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function Header({ user }: { user: AuthUser }) {
+function Header({
+  user,
+  onSignOut,
+}: {
+  user: AuthUser;
+  onSignOut: () => void;
+}) {
   const t = useT();
   const router = useRouter();
   const { c } = useTheme();
@@ -163,6 +159,10 @@ function Header({ user }: { user: AuthUser }) {
       </View>
 
       <NotificationBell />
+      <DashboardMenu
+        verificationLevel={user.verificationLevel}
+        onSignOut={onSignOut}
+      />
     </View>
   );
 }
@@ -354,19 +354,12 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.md,
+    gap: space.sm,
     marginBottom: space.md,
   },
   headerText: { flex: 1, flexShrink: 1 },
   greeting: { fontSize: font.lg, fontWeight: '700' },
   phone: { fontSize: font.sm },
-
-  prefRow: {
-    flexDirection: 'row',
-    gap: space.sm,
-    marginBottom: space.lg,
-    flexWrap: 'wrap',
-  },
 
   section: { marginTop: space.lg },
   sectionTitle: { fontSize: font.md, fontWeight: '700', marginBottom: space.md },
@@ -442,7 +435,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   errorBody: { fontSize: font.sm, textAlign: 'center' },
-
-  signOut: { marginTop: space.xl, alignItems: 'center' },
-  signOutText: { fontSize: font.md, fontWeight: '600' },
 });

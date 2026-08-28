@@ -40,6 +40,9 @@ export const ApiErrorCode = {
   /** Account exists but predates passwords — sign in with an SMS code. */
   PASSWORD_NOT_SET: 'PASSWORD_NOT_SET',
 
+  /** Too many of this account's support requests are still awaiting a reply. */
+  TOO_MANY_OPEN_TICKETS: 'TOO_MANY_OPEN_TICKETS',
+
   ACCOUNT_SUSPENDED: 'ACCOUNT_SUSPENDED',
   /** Action needs a higher verification level; `details.required` says which. */
   VERIFICATION_REQUIRED: 'VERIFICATION_REQUIRED',

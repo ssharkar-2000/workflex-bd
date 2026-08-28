@@ -209,6 +209,35 @@ export const en = {
   'notif.emptyBody':
     'Announcements from the WorkFlex BD team will show up here.',
 
+  'menu.open': 'Menu',
+  'menu.profile': 'My profile',
+  'menu.verification': 'Verification',
+  'menu.verificationDone': 'Verified',
+  'menu.verificationTodo': 'Not finished',
+  'menu.support': 'Help & support',
+  'menu.language': 'Language',
+  'menu.appearance': 'Appearance',
+
+  'support.title': 'Help & support',
+  'support.subtitle':
+    'Tell us what went wrong and our team will reply here.',
+  'support.subject': 'Subject',
+  'support.subjectHint': 'What is this about?',
+  'support.message': 'Describe the problem',
+  'support.messageHint': 'Include anything that would help us understand.',
+  'support.submit': 'Send request',
+  'support.sent': 'Sent. We will reply here as soon as we can.',
+  'support.mine': 'Your requests',
+  'support.noneYet': 'You have not sent us anything yet.',
+  'support.reply': 'OUR REPLY',
+  'support.status.OPEN': 'Waiting',
+  'support.status.IN_PROGRESS': 'Being looked at',
+  'support.status.RESOLVED': 'Answered',
+  'support.status.CLOSED': 'Closed',
+
+  'error.TOO_MANY_OPEN_TICKETS':
+    'You already have several requests waiting for a reply. Please wait for us to answer those first.',
+
   'admin.title': 'Admin dashboard',
   'admin.queue.title': 'Pending review',
   'admin.queue.count': '{count} waiting',
@@ -569,6 +598,35 @@ export const bn: Record<TranslationKey, string> = {
   'notif.emptyTitle': 'এখনও কিছু নেই',
   'notif.emptyBody':
     'WorkFlex BD টিমের ঘোষণা এখানে দেখা যাবে।',
+
+  'menu.open': 'মেনু',
+  'menu.profile': 'আমার প্রোফাইল',
+  'menu.verification': 'যাচাইকরণ',
+  'menu.verificationDone': 'যাচাই সম্পন্ন',
+  'menu.verificationTodo': 'অসম্পূর্ণ',
+  'menu.support': 'সহায়তা',
+  'menu.language': 'ভাষা',
+  'menu.appearance': 'থিম',
+
+  'support.title': 'সহায়তা',
+  'support.subtitle':
+    'কী সমস্যা হয়েছে জানান, আমাদের টিম এখানেই উত্তর দেবে।',
+  'support.subject': 'বিষয়',
+  'support.subjectHint': 'কী নিয়ে সমস্যা?',
+  'support.message': 'সমস্যাটি বর্ণনা করুন',
+  'support.messageHint': 'বুঝতে সাহায্য করে এমন সব কিছু লিখুন।',
+  'support.submit': 'পাঠান',
+  'support.sent': 'পাঠানো হয়েছে। আমরা যত দ্রুত সম্ভব উত্তর দেব।',
+  'support.mine': 'আপনার অনুরোধ',
+  'support.noneYet': 'আপনি এখনও কিছু পাঠাননি।',
+  'support.reply': 'আমাদের উত্তর',
+  'support.status.OPEN': 'অপেক্ষমাণ',
+  'support.status.IN_PROGRESS': 'দেখা হচ্ছে',
+  'support.status.RESOLVED': 'উত্তর দেওয়া হয়েছে',
+  'support.status.CLOSED': 'বন্ধ',
+
+  'error.TOO_MANY_OPEN_TICKETS':
+    'আপনার কয়েকটি অনুরোধ ইতিমধ্যে উত্তরের অপেক্ষায় আছে। আগে সেগুলোর উত্তর পাওয়া পর্যন্ত অপেক্ষা করুন।',
 
   'admin.title': 'অ্যাডমিন ড্যাশবোর্ড',
   'admin.queue.title': 'পর্যালোচনার অপেক্ষায়',

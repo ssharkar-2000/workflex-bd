@@ -9,3 +9,4 @@ export * from './errors';
 export * from './admin';
 export * from './admin-sections';
 export * from './notifications';
+export * from './support';

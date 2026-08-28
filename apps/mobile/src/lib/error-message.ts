@@ -33,6 +33,8 @@ const MESSAGE_KEYS: Record<string, TranslationKey> = {
   [ApiErrorCode.UPLOAD_TOO_LARGE]: 'error.UPLOAD_TOO_LARGE',
   [ApiErrorCode.UPLOAD_INVALID_TYPE]: 'error.UPLOAD_INVALID_TYPE',
 
+  [ApiErrorCode.TOO_MANY_OPEN_TICKETS]: 'error.TOO_MANY_OPEN_TICKETS',
+
   [ApiErrorCode.EMAIL_IN_USE]: 'error.EMAIL_IN_USE',
   [ApiErrorCode.EMAIL_RESERVED]: 'error.EMAIL_RESERVED',
   [ApiErrorCode.EMAIL_CODE_INVALID]: 'error.EMAIL_CODE_INVALID',
