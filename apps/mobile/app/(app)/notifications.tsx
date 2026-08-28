@@ -18,6 +18,8 @@ import {
   markNotificationRead,
 } from '../../src/api/notifications';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
+import { SpeakButton } from '../../src/components/SpeakButton';
+import { useSpeech } from '../../src/lib/speech';
 import { useErrorMessage } from '../../src/lib/error-message';
 import { useLocale, useT } from '../../src/i18n';
 import { useTheme } from '../../src/lib/use-theme';
@@ -29,6 +31,7 @@ export default function NotificationsScreen() {
   const { c, isDark } = useTheme();
   const queryClient = useQueryClient();
   const errorMessage = useErrorMessage();
+  const speech = useSpeech();
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['notifications'],
@@ -124,6 +127,7 @@ export default function NotificationsScreen() {
             <NotificationRow
               item={item}
               index={index}
+              speech={speech}
               onPress={() => {
                 if (!item.read) readOne.mutate(item.id);
               }}
@@ -138,10 +142,12 @@ export default function NotificationsScreen() {
 function NotificationRow({
   item,
   index,
+  speech,
   onPress,
 }: {
   item: UserNotification;
   index: number;
+  speech: ReturnType<typeof useSpeech>;
   onPress: () => void;
 }) {
   const { c } = useTheme();
@@ -182,6 +188,16 @@ function NotificationRow({
       </View>
 
       <Text style={[styles.rowBody, { color: c.textMuted }]}>{item.body}</Text>
+
+      <View style={styles.rowFoot}>
+        <SpeakButton
+          speaking={speech.speakingId === item.id}
+          supported={speech.supported}
+          label={item.title}
+          // Title then body, so listening gives the same order as reading.
+          onPress={() => speech.speak(item.id, `${item.title}. ${item.body}`)}
+        />
+      </View>
 
       <Text style={[styles.rowDate, { color: c.textMuted }]}>
         {new Date(item.sentAt).toLocaleDateString(
@@ -228,6 +244,7 @@ const styles = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: radius.pill },
   rowTitle: { flex: 1, fontSize: font.md },
   rowBody: { fontSize: font.sm, lineHeight: 20, marginTop: 6 },
+  rowFoot: { marginTop: 10 },
   rowDate: { fontSize: font.xs, marginTop: 8 },
 
   emptyWrap: { flexGrow: 1, justifyContent: 'center' },

@@ -209,6 +209,11 @@ export const en = {
   'notif.emptyBody':
     'Announcements from the WorkFlex BD team will show up here.',
 
+  'speak.listen': 'Listen',
+  'speak.stop': 'Stop',
+  'speak.startLabel': 'Read aloud: {label}',
+  'speak.stopLabel': 'Stop reading',
+
   'menu.open': 'Menu',
   'menu.close': 'Close menu',
   'menu.viewEditProfile': 'View & edit profile',
@@ -619,6 +624,11 @@ export const bn: Record<TranslationKey, string> = {
   'notif.emptyTitle': 'এখনও কিছু নেই',
   'notif.emptyBody':
     'WorkFlex BD টিমের ঘোষণা এখানে দেখা যাবে।',
+
+  'speak.listen': 'শুনুন',
+  'speak.stop': 'বন্ধ করুন',
+  'speak.startLabel': 'পড়ে শোনান: {label}',
+  'speak.stopLabel': 'পড়া বন্ধ করুন',
 
   'menu.open': 'মেনু',
   'menu.close': 'মেনু বন্ধ করুন',

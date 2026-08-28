@@ -21,6 +21,8 @@ import {
 import { createTicket, fetchMyTickets } from '../../src/api/support';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { ShimmerButton } from '../../src/components/ShimmerButton';
+import { SpeakButton } from '../../src/components/SpeakButton';
+import { useSpeech } from '../../src/lib/speech';
 import { useErrorMessage } from '../../src/lib/error-message';
 import { useLocale, useT, type TranslationKey } from '../../src/i18n';
 import { useTheme } from '../../src/lib/use-theme';
@@ -40,6 +42,7 @@ export default function SupportScreen() {
   const { c, isDark } = useTheme();
   const queryClient = useQueryClient();
   const errorMessage = useErrorMessage();
+  const speech = useSpeech();
 
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
@@ -200,7 +203,7 @@ export default function SupportScreen() {
             </Text>
           ) : (
             tickets.map((ticket) => (
-              <TicketCard key={ticket.id} ticket={ticket} />
+              <TicketCard key={ticket.id} ticket={ticket} speech={speech} />
             ))
           )}
         </ScrollView>
@@ -209,7 +212,13 @@ export default function SupportScreen() {
   );
 }
 
-function TicketCard({ ticket }: { ticket: MySupportTicket }) {
+function TicketCard({
+  ticket,
+  speech,
+}: {
+  ticket: MySupportTicket;
+  speech: ReturnType<typeof useSpeech>;
+}) {
   const t = useT();
   const { c } = useTheme();
   const [locale] = useLocale();
@@ -256,6 +265,14 @@ function TicketCard({ ticket }: { ticket: MySupportTicket }) {
           <Text style={[styles.replyText, { color: c.text }]}>
             {ticket.response}
           </Text>
+          <View style={styles.replySpeak}>
+            <SpeakButton
+              speaking={speech.speakingId === ticket.id}
+              supported={speech.supported}
+              label={ticket.subject}
+              onPress={() => speech.speak(ticket.id, ticket.response ?? '')}
+            />
+          </View>
         </View>
       ) : null}
 
@@ -338,6 +355,7 @@ const styles = StyleSheet.create({
   },
   replyLabel: { fontSize: font.xs, fontWeight: '800', letterSpacing: 0.4 },
   replyText: { fontSize: font.sm, lineHeight: 20, marginTop: 3 },
+  replySpeak: { marginTop: 8 },
 
   ticketDate: { fontSize: font.xs, marginTop: 10 },
 });
