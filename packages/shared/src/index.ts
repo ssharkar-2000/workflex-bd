@@ -8,3 +8,4 @@ export * from './onboarding';
 export * from './errors';
 export * from './admin';
 export * from './admin-sections';
+export * from './notifications';

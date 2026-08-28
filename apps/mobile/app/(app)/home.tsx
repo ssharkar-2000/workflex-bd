@@ -17,6 +17,7 @@ import { fetchMe, logout } from '../../src/api/auth';
 import { updateLocale } from '../../src/api/email';
 import { useErrorMessage } from '../../src/lib/error-message';
 import { Avatar } from '../../src/components/Avatar';
+import { NotificationBell } from '../../src/components/NotificationBell';
 import { useAuthStore } from '../../src/store/auth-store';
 import { LanguageToggle } from '../../src/components/LanguageToggle';
 import { ThemeToggle } from '../../src/components/ThemeToggle';
@@ -160,6 +161,8 @@ function Header({ user }: { user: AuthUser }) {
           {fullName || maskPhone(user.phone)}
         </Text>
       </View>
+
+      <NotificationBell />
     </View>
   );
 }

@@ -119,6 +119,7 @@ model User {
   company            Company?
   supportTickets     SupportTicket[]
   attendance         AttendanceRecord[]
+  notificationReads  NotificationRead[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -358,8 +359,30 @@ model Notification {
   /// Set when the broadcast actually goes out. Null means drafted only.
   sentAt DateTime?
 
+  reads NotificationRead[]
+
   @@index([createdAt])
   @@map("notifications")
+}
+
+/// One row per person who has opened a notice.
+///
+/// Unread is the absence of a row, not a flag on the notice — a notice goes
+/// out to a whole audience, so "read" cannot live on the notice itself. It
+/// also means a newly created account starts with every past notice unread
+/// without anyone having to fan rows out at broadcast time.
+model NotificationRead {
+  notificationId String @db.Uuid
+  userId         String @db.Uuid
+
+  readAt DateTime @default(now())
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([notificationId, userId])
+  @@index([userId])
+  @@map("notification_reads")
 }
 
 enum TicketStatus {

@@ -200,6 +200,15 @@ export const en = {
   'home.myProfile': 'My Profile',
   'home.myProfileBody': 'Update the details you gave when registering',
 
+  'notif.title': 'Notifications',
+  'notif.back': 'Dashboard',
+  'notif.bell': 'Notifications',
+  'notif.bellWithCount': 'Notifications, {count} unread',
+  'notif.markAllRead': 'Mark all read',
+  'notif.emptyTitle': 'Nothing yet',
+  'notif.emptyBody':
+    'Announcements from the WorkFlex BD team will show up here.',
+
   'admin.title': 'Admin dashboard',
   'admin.queue.title': 'Pending review',
   'admin.queue.count': '{count} waiting',
@@ -551,6 +560,15 @@ export const bn: Record<TranslationKey, string> = {
   'profile.nameLockedReview': 'নথি পর্যালোচনার সময় নাম বদলানো যাবে না।',
   'home.myProfile': 'আমার প্রোফাইল',
   'home.myProfileBody': 'নিবন্ধনের সময় দেওয়া তথ্য হালনাগাদ করুন',
+
+  'notif.title': 'বিজ্ঞপ্তি',
+  'notif.back': 'ড্যাশবোর্ড',
+  'notif.bell': 'বিজ্ঞপ্তি',
+  'notif.bellWithCount': 'বিজ্ঞপ্তি, {count}টি অপঠিত',
+  'notif.markAllRead': 'সব পঠিত করুন',
+  'notif.emptyTitle': 'এখনও কিছু নেই',
+  'notif.emptyBody':
+    'WorkFlex BD টিমের ঘোষণা এখানে দেখা যাবে।',
 
   'admin.title': 'অ্যাডমিন ড্যাশবোর্ড',
   'admin.queue.title': 'পর্যালোচনার অপেক্ষায়',

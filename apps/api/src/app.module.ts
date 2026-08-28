@@ -11,6 +11,7 @@ import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { SmsModule } from './sms/sms.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { AdminModule } from './admin/admin.module';
 import { MailModule } from './mail/mail.module';
 import { StorageModule } from './storage/storage.module';
@@ -49,6 +50,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
     UsersModule,
     AuthModule,
     OnboardingModule,
+    NotificationsModule,
     AdminModule,
   ],
   providers: [
