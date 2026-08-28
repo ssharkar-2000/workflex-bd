@@ -209,6 +209,17 @@ export const en = {
   'notif.emptyBody':
     'Announcements from the WorkFlex BD team will show up here.',
 
+  'speech.hint.title': 'Read aloud is unavailable',
+  'speech.hint.body':
+    'This phone has no voice installed for the language you are using, so notices cannot be read out. Adding one is free and takes a minute.',
+  'speech.hint.stepsAndroid':
+    'Settings → Accessibility → Text-to-speech output → Google Text-to-speech → Install voice data → choose your language',
+  'speech.hint.stepsIos':
+    'Settings → Accessibility → Spoken Content → Voices → choose your language',
+  'speech.hint.stepsWeb':
+    'Your browser has no voice for this language. On a phone the app uses the system voices instead.',
+  'speech.hint.dismiss': 'Got it',
+
   'speak.listen': 'Listen',
   'speak.stop': 'Stop',
   'speak.startLabel': 'Read aloud: {label}',
@@ -624,6 +635,17 @@ export const bn: Record<TranslationKey, string> = {
   'notif.emptyTitle': 'এখনও কিছু নেই',
   'notif.emptyBody':
     'WorkFlex BD টিমের ঘোষণা এখানে দেখা যাবে।',
+
+  'speech.hint.title': 'পড়ে শোনানো যাচ্ছে না',
+  'speech.hint.body':
+    'আপনি যে ভাষা ব্যবহার করছেন, এই ফোনে সেই ভাষার কোনো ভয়েস ইনস্টল করা নেই, তাই বিজ্ঞপ্তি পড়ে শোনানো যাচ্ছে না। ভয়েসটি বিনামূল্যে, ইনস্টল করতে এক মিনিট লাগে।',
+  'speech.hint.stepsAndroid':
+    'সেটিংস → অ্যাক্সেসিবিলিটি → টেক্সট-টু-স্পিচ আউটপুট → Google Text-to-speech → Install voice data → আপনার ভাষা বেছে নিন',
+  'speech.hint.stepsIos':
+    'সেটিংস → অ্যাক্সেসিবিলিটি → স্পোকেন কনটেন্ট → ভয়েস → আপনার ভাষা বেছে নিন',
+  'speech.hint.stepsWeb':
+    'আপনার ব্রাউজারে এই ভাষার কোনো ভয়েস নেই। ফোনে অ্যাপটি সিস্টেমের ভয়েস ব্যবহার করে।',
+  'speech.hint.dismiss': 'বুঝেছি',
 
   'speak.listen': 'শুনুন',
   'speak.stop': 'বন্ধ করুন',

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import * as Speech from 'expo-speech';
+import * as SecureStore from 'expo-secure-store';
 import type { Locale } from '@workflex/shared';
 import { useLocale } from '../i18n';
 
@@ -41,6 +43,9 @@ interface VoiceSupport {
  * they cannot do without leaving the app.
  */
 const cache = new Map<Locale, VoiceSupport>();
+
+/** Remembers that the missing-voice hint has been shown and waved away. */
+const HINT_KEY = 'workflex.speechHintDismissed';
 
 async function resolveVoice(locale: Locale): Promise<VoiceSupport> {
   const cached = cache.get(locale);
@@ -89,6 +94,10 @@ export function useSpeech() {
   const [locale] = useLocale();
   const [support, setSupport] = useState<VoiceSupport>({});
   const [speakingId, setSpeakingId] = useState<string | null>(null);
+  const [hintDismissed, setHintDismissed] = useState(true);
+
+  // Bumped to force a re-check; see the AppState listener below.
+  const [recheck, setRecheck] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -98,7 +107,44 @@ export function useSpeech() {
     return () => {
       active = false;
     };
-  }, [locale]);
+  }, [locale, recheck]);
+
+  /**
+   * Re-ask on foreground.
+   *
+   * The hint below tells people to go to system settings and install a voice.
+   * They then come back to an app that cached "no voice" on launch and would
+   * keep saying so until a full restart — making the instruction look like it
+   * did not work. Dropping the cache here is what makes that advice true.
+   */
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        cache.clear();
+        setRecheck((n) => n + 1);
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Starts hidden and appears only once storage confirms it was never
+  // dismissed — the opposite would flash the hint on every launch.
+  useEffect(() => {
+    let active = true;
+    SecureStore.getItemAsync(HINT_KEY)
+      .then((v) => {
+        if (active) setHintDismissed(v === '1');
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const dismissHint = useCallback(() => {
+    setHintDismissed(true);
+    void SecureStore.setItemAsync(HINT_KEY, '1').catch(() => undefined);
+  }, []);
 
   // Nothing should keep talking after the screen is gone.
   useEffect(() => {
@@ -145,5 +191,12 @@ export function useSpeech() {
     speakingId,
     /** False once the device has been asked and has no voice for this locale. */
     supported: support.available !== false,
+    /**
+     * True only when we know a voice is missing *and* nobody has dismissed the
+     * explanation yet. Without this the feature simply vanishes and the user
+     * never learns a free download would bring it back.
+     */
+    showHint: support.available === false && !hintDismissed,
+    dismissHint,
   };
 }

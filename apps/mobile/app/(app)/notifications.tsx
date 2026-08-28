@@ -19,6 +19,7 @@ import {
 } from '../../src/api/notifications';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { SpeakButton } from '../../src/components/SpeakButton';
+import { SpeechHint } from '../../src/components/SpeechHint';
 import { useSpeech } from '../../src/lib/speech';
 import { useErrorMessage } from '../../src/lib/error-message';
 import { useLocale, useT } from '../../src/i18n';
@@ -91,6 +92,12 @@ export default function NotificationsScreen() {
       {error ? (
         <View style={styles.pad}>
           <ErrorBanner message={errorMessage(error)} />
+        </View>
+      ) : null}
+
+      {speech.showHint ? (
+        <View style={styles.pad}>
+          <SpeechHint onDismiss={speech.dismissHint} />
         </View>
       ) : null}
 
