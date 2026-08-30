@@ -51,7 +51,7 @@ interface Row {
 
 const WORKER_ROWS: Row[] = [
   { icon: '🔍', label: 'menu.findJobs', href: '/(app)/jobs' },
-  { icon: '📄', label: 'menu.myApplications' },
+  { icon: '📄', label: 'menu.myApplications', href: '/(app)/applications' },
   // Same screen, opened with its Saved filter already on — see the `saved`
   // parameter in app/(app)/jobs.tsx.
   { icon: '🔖', label: 'menu.savedJobs', href: '/(app)/jobs?saved=1' },

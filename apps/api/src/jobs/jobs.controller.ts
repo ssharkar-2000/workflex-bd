@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -10,8 +11,10 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
+  applyToJobSchema,
   createJobSchema,
   jobQuerySchema,
+  type ApplyToJobDto,
   type CreateJobDto,
   type JobQuery,
 } from '@workflex/shared';
@@ -65,6 +68,12 @@ export class JobsController {
     return this.jobs.mine(userId);
   }
 
+  @Get('applications')
+  @ApiOperation({ summary: 'Jobs this account has applied to' })
+  async myApplications(@CurrentUser('userId') userId: string) {
+    return this.jobs.myApplications(userId);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Post a job as yourself or as your company' })
   async create(
@@ -100,5 +109,24 @@ export class JobsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.jobs.toggleSaved(userId, id);
+  }
+
+  @Post(':id/apply')
+  @ApiOperation({ summary: 'Apply to a listing' })
+  async apply(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(applyToJobSchema)) dto: ApplyToJobDto,
+  ) {
+    return this.jobs.apply(userId, id, dto);
+  }
+
+  @Delete(':id/apply')
+  @ApiOperation({ summary: 'Withdraw an application' })
+  async withdraw(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.jobs.withdraw(userId, id);
   }
 }

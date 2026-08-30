@@ -49,6 +49,11 @@ export const ApiErrorCode = {
   /** Posting as a company needs an approved trade licence (level 2). */
   COMPANY_VERIFICATION_REQUIRED: 'COMPANY_VERIFICATION_REQUIRED',
 
+  /** The posting was closed or its deadline passed before applying. */
+  JOB_CLOSED: 'JOB_CLOSED',
+  /** You cannot apply to a posting you created. */
+  CANNOT_APPLY_OWN_JOB: 'CANNOT_APPLY_OWN_JOB',
+
   ACCOUNT_SUSPENDED: 'ACCOUNT_SUSPENDED',
   /** Action needs a higher verification level; `details.required` says which. */
   VERIFICATION_REQUIRED: 'VERIFICATION_REQUIRED',

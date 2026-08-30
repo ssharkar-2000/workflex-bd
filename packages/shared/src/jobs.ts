@@ -154,6 +154,16 @@ export const jobListingSchema = z.object({
   daysLeft: z.number().int().nullable(),
   postedAt: z.string(),
   saved: z.boolean(),
+  /**
+   * Whether this account has an open application. Withdrawing sets it back to
+   * false, so the button always reflects what pressing it will do.
+   */
+  applied: z.boolean(),
+  /**
+   * True on a posting this account created. Applying to your own job is
+   * refused server-side; the screen uses this to not offer the button at all.
+   */
+  isMine: z.boolean(),
 
   /**
    * Null when the account has no parsed CV, or when CV parsing is switched
@@ -360,6 +370,12 @@ export type CreateJobInput = z.input<typeof createJobSchema>;
 export const myJobSchema = jobListingSchema.extend({
   isOpen: z.boolean(),
   savedByCount: z.number().int().nonnegative(),
+  /**
+   * People who applied and have not withdrawn. This is how a poster finds out
+   * anyone applied at all — notifications here are admin broadcasts to an
+   * audience, so there is no per-user event to send.
+   */
+  applicantCount: z.number().int().nonnegative(),
 });
 export type MyJob = z.infer<typeof myJobSchema>;
 

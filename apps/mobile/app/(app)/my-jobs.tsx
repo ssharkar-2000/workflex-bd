@@ -148,6 +148,14 @@ function JobRow({
         <Text style={[styles.saved, { color: c.textMuted }]}>
           {t('myJobs.savedBy', { count: job.savedByCount })}
         </Text>
+
+        {/* Applicants are highlighted rather than muted like the save count:
+            someone applying is the thing a poster actually has to act on. */}
+        {job.applicantCount > 0 ? (
+          <Text style={[styles.applicants, { color: c.primary }]}>
+            👤 {t('myJobs.applicants', { count: job.applicantCount })}
+          </Text>
+        ) : null}
       </Pressable>
 
       <Pressable
@@ -200,6 +208,7 @@ const styles = StyleSheet.create({
   pillText: { fontSize: font.xs - 1, fontWeight: '800' },
   meta: { fontSize: font.xs, marginTop: 6 },
   saved: { fontSize: font.xs, marginTop: 6, fontWeight: '600' },
+  applicants: { fontSize: font.sm, marginTop: 6, fontWeight: '800' },
   toggle: { marginTop: 12 },
   toggleText: { fontSize: font.sm, fontWeight: '700' },
 

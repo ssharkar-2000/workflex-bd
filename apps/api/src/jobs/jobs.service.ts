@@ -2,7 +2,10 @@ import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { CvProfile, Job, Prisma } from '@prisma/client';
 import {
   ApiErrorCode,
+  type ApplicationState,
+  type ApplyToJobDto,
   type CreateJobDto,
+  type JobApplicationList,
   type JobHighlights,
   type JobList,
   type JobListing,
@@ -56,6 +59,9 @@ export class JobsService {
     job: Job,
     saved: boolean,
     profile: CvProfile | null,
+    applied = false,
+    /** Whose view this is, for `isMine`. Null on contexts with no viewer. */
+    viewerId: string | null = null,
   ): JobListing {
     return {
       id: job.id,
@@ -99,6 +105,8 @@ export class JobsService {
         : null,
       postedAt: job.createdAt.toISOString(),
       saved,
+      applied,
+      isMine: viewerId !== null && job.postedBy === viewerId,
       // Null, not zero, when there is no CV — see the field's comment in
       // the shared schema. Scoring nothing as "0% match" would tell someone
       // they are a poor fit for work they never asked to be measured against.
@@ -232,7 +240,13 @@ export class JobsService {
         ...(query.cursor
           ? { cursor: { id: query.cursor }, skip: 1 }
           : {}),
-        include: { savedBy: { where: { userId }, select: { userId: true } } },
+        include: {
+          savedBy: { where: { userId }, select: { userId: true } },
+          applications: {
+            where: { userId, status: { not: 'WITHDRAWN' } },
+            select: { userId: true },
+          },
+        },
       }),
       this.prisma.job.count({ where }),
       this.cvProfile(userId),
@@ -243,7 +257,13 @@ export class JobsService {
 
     return {
       items: page.map((job) =>
-        this.toListing(job, job.savedBy.length > 0, profile),
+        this.toListing(
+          job,
+          job.savedBy.length > 0,
+          profile,
+          job.applications.length > 0,
+          userId,
+        ),
       ),
       total,
       nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
@@ -362,14 +382,24 @@ export class JobsService {
       where: { postedBy: userId },
       orderBy: { createdAt: 'desc' },
       take: 100,
-      include: { _count: { select: { savedBy: true } } },
+      include: {
+        _count: {
+          select: {
+            savedBy: true,
+            // Withdrawn applications are excluded: the count is what the
+            // poster still has to act on, not everyone who ever tapped apply.
+            applications: { where: { status: { not: 'WITHDRAWN' } } },
+          },
+        },
+      },
     });
 
     return {
       jobs: rows.map((job) => ({
-        ...this.toListing(job, false, null),
+        ...this.toListing(job, false, null, false, userId),
         isOpen: job.isOpen,
         savedByCount: job._count.savedBy,
+        applicantCount: job._count.applications,
       })),
     };
   }
@@ -391,12 +421,24 @@ export class JobsService {
     const [job, profile] = await Promise.all([
       this.prisma.job.findUnique({
         where: { id },
-        include: { savedBy: { where: { userId }, select: { userId: true } } },
+        include: {
+          savedBy: { where: { userId }, select: { userId: true } },
+          applications: {
+            where: { userId, status: { not: 'WITHDRAWN' } },
+            select: { userId: true },
+          },
+        },
       }),
       this.cvProfile(userId),
     ]);
     if (!job) throw AppException.notFound('That job is no longer listed');
-    return this.toListing(job, job.savedBy.length > 0, profile);
+    return this.toListing(
+      job,
+      job.savedBy.length > 0,
+      profile,
+      job.applications.length > 0,
+      userId,
+    );
   }
 
   /** Returns the resulting state, so the client does not have to guess. */
@@ -420,6 +462,143 @@ export class JobsService {
 
     await this.prisma.savedJob.create({ data: { jobId, userId } });
     return { saved: true };
+  }
+
+  /**
+   * Applying to a posting.
+   *
+   * Gated on verification level 1 — NID and selfie. Employers here are hiring
+   * strangers for shift work, often paying cash on the day; an application
+   * from an unverified account is worth nothing to them and erodes trust in
+   * every other one. Checked against the database rather than the token, for
+   * the same reason company posting is: a revoked verification has to bite
+   * immediately, not fifteen minutes later.
+   */
+  async apply(
+    userId: string,
+    jobId: string,
+    dto: ApplyToJobDto,
+  ): Promise<ApplicationState> {
+    const [job, user] = await Promise.all([
+      this.prisma.job.findUnique({
+        where: { id: jobId },
+        select: { id: true, postedBy: true, isOpen: true, deadline: true },
+      }),
+      this.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { verificationLevel: true },
+      }),
+    ]);
+
+    if (!job) throw AppException.notFound('That job is no longer listed');
+
+    if (job.postedBy === userId) {
+      throw new AppException(
+        ApiErrorCode.CANNOT_APPLY_OWN_JOB,
+        'You cannot apply to your own posting',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    if (!job.isOpen || (job.deadline && job.deadline.getTime() < Date.now())) {
+      throw new AppException(
+        ApiErrorCode.JOB_CLOSED,
+        'This posting has closed',
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    if (user.verificationLevel < 1) {
+      throw new AppException(
+        ApiErrorCode.VERIFICATION_REQUIRED,
+        'Verify your NID and selfie before applying for work',
+        HttpStatus.FORBIDDEN,
+        { required: 1 },
+      );
+    }
+
+    const existing = await this.prisma.jobApplication.findUnique({
+      where: { jobId_userId: { jobId, userId } },
+    });
+
+    // Applying twice is a no-op, not an error. On a slow connection people
+    // tap again; answering that with a failure they have to interpret would
+    // be punishing them for the network.
+    if (existing && existing.status !== 'WITHDRAWN') {
+      return { applied: true, status: existing.status };
+    }
+
+    const message = dto.message?.trim() ? dto.message.trim() : null;
+
+    // Upsert rather than create: withdrawing leaves the row in place, so
+    // re-applying has to revive it instead of colliding with it.
+    const row = await this.prisma.jobApplication.upsert({
+      where: { jobId_userId: { jobId, userId } },
+      create: { jobId, userId, message },
+      update: { status: 'SUBMITTED', message, appliedAt: new Date() },
+    });
+
+    return { applied: true, status: row.status };
+  }
+
+  /**
+   * Withdrawing.
+   *
+   * Sets the status rather than deleting the row, so a recruiter who has
+   * already read the application sees that it was pulled instead of watching
+   * it disappear without explanation.
+   */
+  async withdraw(userId: string, jobId: string): Promise<ApplicationState> {
+    const existing = await this.prisma.jobApplication.findUnique({
+      where: { jobId_userId: { jobId, userId } },
+    });
+
+    if (!existing || existing.status === 'WITHDRAWN') {
+      return { applied: false, status: existing?.status ?? null };
+    }
+
+    const row = await this.prisma.jobApplication.update({
+      where: { jobId_userId: { jobId, userId } },
+      data: { status: 'WITHDRAWN' },
+    });
+
+    return { applied: false, status: row.status };
+  }
+
+  /**
+   * The applicant's own list.
+   *
+   * Closed and expired postings stay on it. Dropping them would read as the
+   * application having been lost, and someone who applied is entitled to see
+   * that they did — `jobIsOpen` lets the screen say so instead.
+   */
+  async myApplications(userId: string): Promise<JobApplicationList> {
+    const rows = await this.prisma.jobApplication.findMany({
+      where: { userId },
+      orderBy: { appliedAt: 'desc' },
+      take: 100,
+      include: { job: true },
+    });
+
+    return {
+      applications: rows.map(({ job, ...row }) => ({
+        jobId: job.id,
+        jobTitle: job.title,
+        companyName: job.companyName,
+        companyInitials: this.initials(job.companyName),
+        category: job.category,
+        location: job.location,
+        paymentType: job.paymentType,
+        salaryMin: job.salaryMin,
+        salaryMax: job.salaryMax,
+        status: row.status,
+        message: row.message,
+        appliedAt: row.appliedAt.toISOString(),
+        jobIsOpen:
+          job.isOpen &&
+          (!job.deadline || job.deadline.getTime() >= Date.now()),
+      })),
+    };
   }
 
   /** The open-listing predicate, shared by every aggregate below. */

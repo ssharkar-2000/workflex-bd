@@ -133,6 +133,7 @@ model User {
   attendance         AttendanceRecord[]
   notificationReads  NotificationRead[]
   savedJobs          SavedJob[]
+  applications       JobApplication[]
   cvProfile          CvProfile?
   reports            Report[]
 
@@ -648,8 +649,8 @@ enum ExperienceLevel {
 model Job {
   id String @id @default(uuid()) @db.Uuid
 
-  title       String
-  description String
+  title        String
+  description  String
   /// What the employer asks for, free text. Null on a posting that only has
   /// a description — most informal listings in this market do.
   requirements String?
@@ -685,8 +686,8 @@ model Job {
   paymentType PaymentType @default(MONTHLY)
   /// Numeric so the range filter can compare. Null means unstated, which is
   /// common — "negotiable" postings carry neither bound.
-  salaryMin Int?
-  salaryMax Int?
+  salaryMin   Int?
+  salaryMax   Int?
   /// Optional human-written override for the card, e.g. "৳500/day + lunch".
   /// Falls back to a label formatted from the bounds above.
   salaryRange String?
@@ -705,7 +706,8 @@ model Job {
   /// Hidden from the seeker feed without deleting the record.
   isOpen   Boolean   @default(true)
 
-  savedBy SavedJob[]
+  savedBy      SavedJob[]
+  applications JobApplication[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -733,6 +735,46 @@ model SavedJob {
   @@id([jobId, userId])
   @@index([userId, savedAt])
   @@map("saved_jobs")
+}
+
+/// Where an application has got to.
+///
+/// Ordered as the applicant experiences it. WITHDRAWN is kept as a status
+/// rather than deleting the row: a recruiter who has already read someone's
+/// application should see that it was pulled, not watch it vanish.
+enum ApplicationStatus {
+  SUBMITTED
+  VIEWED
+  SHORTLISTED
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+/// Someone applying to a posting.
+///
+/// Keyed like SavedJob — one row per person per job, so applying twice is
+/// impossible at the database level rather than by a check that can race.
+/// Re-applying after withdrawing reuses the row.
+model JobApplication {
+  jobId  String @db.Uuid
+  userId String @db.Uuid
+
+  status  ApplicationStatus @default(SUBMITTED)
+  /// Optional note to the employer. Most people send nothing, which is fine —
+  /// the CV and profile carry the substance.
+  message String?
+
+  appliedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([jobId, userId])
+  @@index([userId, appliedAt])
+  @@index([jobId, status])
+  @@map("job_applications")
 }
 
 // --- reports ---

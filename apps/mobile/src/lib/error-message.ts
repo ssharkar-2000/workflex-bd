@@ -37,6 +37,8 @@ const MESSAGE_KEYS: Record<string, TranslationKey> = {
   [ApiErrorCode.TOO_MANY_OPEN_REPORTS]: 'error.TOO_MANY_OPEN_REPORTS',
   [ApiErrorCode.COMPANY_VERIFICATION_REQUIRED]:
     'error.COMPANY_VERIFICATION_REQUIRED',
+  [ApiErrorCode.JOB_CLOSED]: 'error.JOB_CLOSED',
+  [ApiErrorCode.CANNOT_APPLY_OWN_JOB]: 'error.CANNOT_APPLY_OWN_JOB',
 
   [ApiErrorCode.EMAIL_IN_USE]: 'error.EMAIL_IN_USE',
   [ApiErrorCode.EMAIL_RESERVED]: 'error.EMAIL_RESERVED',

@@ -17,7 +17,12 @@ import {
   type JobListing,
   type PaymentType,
 } from '@workflex/shared';
-import { fetchJob, toggleSavedJob } from '../../../src/api/jobs';
+import {
+  applyToJob,
+  fetchJob,
+  toggleSavedJob,
+  withdrawApplication,
+} from '../../../src/api/jobs';
 import { ErrorBanner } from '../../../src/components/ErrorBanner';
 import { ShimmerButton } from '../../../src/components/ShimmerButton';
 import { MatchBadge } from '../../../src/components/jobs/MatchBadge';
@@ -120,6 +125,28 @@ export default function JobDetailScreen() {
       void queryClient.invalidateQueries({ queryKey: ['jobs'] });
     },
   });
+
+  const refreshAfterApply = () => {
+    void queryClient.invalidateQueries({ queryKey: ['job', id] });
+    void queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    void queryClient.invalidateQueries({ queryKey: ['my-applications'] });
+  };
+
+  const apply = useMutation({
+    mutationFn: () => applyToJob(id),
+    onSuccess: refreshAfterApply,
+  });
+
+  const withdraw = useMutation({
+    mutationFn: () => withdrawApplication(id),
+    onSuccess: refreshAfterApply,
+  });
+
+  /**
+   * Expired. `daysLeft` rounds up, so it only reaches zero once the deadline
+   * has actually passed — a posting closing later today still reads as 1.
+   */
+  const closed = job ? job.deadline !== null && job.daysLeft === 0 : false;
 
   const date = (iso: string) =>
     new Date(iso).toLocaleDateString(locale === 'bn' ? 'bn-BD' : 'en-GB', {
@@ -374,14 +401,80 @@ export default function JobDetailScreen() {
         </Pressable>
       </ScrollView>
 
-      {/* Save is the only action that exists — applying needs an applications
-          module, and a button that does nothing is worse than no button. */}
       <View style={[styles.foot, { borderTopColor: c.border, backgroundColor: c.bg }]}>
-        <ShimmerButton
-          label={job.saved ? t('jobs.unsave') : t('jobs.save')}
-          onPress={() => save.mutate()}
-          loading={save.isPending}
-        />
+        {apply.error ? <ErrorBanner message={errorMessage(apply.error)} /> : null}
+
+        {job.isMine ? (
+          // Your own posting. Applying is refused server-side, so the button
+          // is not offered at all rather than shown and then rejected.
+          <Pressable
+            onPress={() => router.push('/(app)/my-jobs')}
+            accessibilityRole="button"
+            style={[styles.ownBar, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+          >
+            <Text style={[styles.ownText, { color: c.textMuted }]}>
+              {t('job.yourPosting')}
+            </Text>
+          </Pressable>
+        ) : job.applied ? (
+          // Applied. Withdrawing is deliberately not the same button — a
+          // mis-tap on the thing you just pressed should not undo it.
+          <View>
+            <View
+              style={[
+                styles.appliedBar,
+                { backgroundColor: c.successSoft, borderColor: c.success },
+              ]}
+            >
+              <Text style={[styles.appliedText, { color: c.success }]}>
+                ✓ {t('job.applied')}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => withdraw.mutate()}
+              disabled={withdraw.isPending}
+              hitSlop={8}
+              accessibilityRole="button"
+              style={styles.withdraw}
+            >
+              <Text style={[styles.withdrawText, { color: c.danger }]}>
+                {t('job.withdraw')}
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.actions}>
+            <Pressable
+              onPress={() => save.mutate()}
+              disabled={save.isPending}
+              accessibilityRole="button"
+              accessibilityLabel={job.saved ? t('jobs.unsave') : t('jobs.save')}
+              style={[
+                styles.saveBtn,
+                { borderColor: job.saved ? c.primary : c.border },
+              ]}
+            >
+              <Text style={styles.saveIcon}>{job.saved ? '🔖' : '📑'}</Text>
+              <Text
+                style={[
+                  styles.saveLabelText,
+                  { color: job.saved ? c.primary : c.textMuted },
+                ]}
+              >
+                {job.saved ? t('jobs.unsave') : t('jobs.save')}
+              </Text>
+            </Pressable>
+
+            <View style={styles.applyBtn}>
+              <ShimmerButton
+                label={closed ? t('job.closed') : t('job.apply')}
+                onPress={() => apply.mutate()}
+                loading={apply.isPending}
+                disabled={closed}
+              />
+            </View>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -634,4 +727,37 @@ const styles = StyleSheet.create({
   reportText: { fontSize: font.sm, fontWeight: '700' },
 
   foot: { padding: space.md, borderTopWidth: 1 },
+
+  // Save keeps its own width and Apply takes the rest: applying is the whole
+  // point of the screen, and the two should not read as equal choices.
+  actions: { flexDirection: 'row', alignItems: 'stretch', gap: 10 },
+  saveBtn: {
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  saveIcon: { fontSize: 16 },
+  saveLabelText: { fontSize: font.xs, fontWeight: '700' },
+  applyBtn: { flex: 1 },
+
+  appliedBar: {
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  appliedText: { fontSize: font.md, fontWeight: '800' },
+  withdraw: { alignItems: 'center', paddingTop: 10 },
+  withdrawText: { fontSize: font.sm, fontWeight: '700' },
+
+  ownBar: {
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  ownText: { fontSize: font.sm, fontWeight: '700' },
 });

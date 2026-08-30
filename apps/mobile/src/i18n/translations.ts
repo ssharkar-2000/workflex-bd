@@ -257,11 +257,15 @@ export const en = {
   'myJobs.close': 'Close this job',
   'myJobs.reopen': 'Reopen',
   'myJobs.savedBy': 'Saved by {count} people',
+  'myJobs.applicants': '{count} applied',
   'myJobs.emptyTitle': 'Nothing posted yet',
   'myJobs.emptyBody': 'Post a job and it will show up here.',
 
   'error.COMPANY_VERIFICATION_REQUIRED':
     'Posting for a company needs a verified trade licence. Upload one from your documents and our team will check it.',
+  'error.JOB_CLOSED':
+    'This posting has closed. It is no longer accepting applications.',
+  'error.CANNOT_APPLY_OWN_JOB': 'This is your own posting.',
 
   'jobs.title': 'Find your next job',
   'jobs.searchHint': 'Job title, company or area',
@@ -320,6 +324,21 @@ export const en = {
   'menu.reportHint': 'Fraud, unpaid work, misconduct',
 
   'job.report': 'Report this job',
+  'job.apply': 'Apply now',
+  'job.applied': 'Applied',
+  'job.withdraw': 'Withdraw application',
+  'job.closed': 'Applications closed',
+  'job.yourPosting': 'Your posting — view applicants',
+  'app.status.SUBMITTED': 'Sent',
+  'app.status.VIEWED': 'Seen',
+  'app.status.SHORTLISTED': 'Shortlisted',
+  'app.status.ACCEPTED': 'Accepted',
+  'app.status.REJECTED': 'Not selected',
+  'app.status.WITHDRAWN': 'Withdrawn',
+  'app.appliedOn': 'Applied {date}',
+  'app.jobClosed': 'This posting has since closed',
+  'app.emptyTitle': 'No applications yet',
+  'app.emptyBody': 'When you apply for a job it will appear here, with where it stands.',
 
   'report.title': 'Report a problem',
   'report.subtitle':
@@ -936,11 +955,14 @@ export const bn: Record<TranslationKey, string> = {
   'myJobs.close': 'কাজটি বন্ধ করুন',
   'myJobs.reopen': 'আবার চালু করুন',
   'myJobs.savedBy': '{count} জন সংরক্ষণ করেছেন',
+  'myJobs.applicants': '{count} জন আবেদন করেছেন',
   'myJobs.emptyTitle': 'এখনও কিছু দেওয়া হয়নি',
   'myJobs.emptyBody': 'কাজের বিজ্ঞপ্তি দিলে এখানে দেখা যাবে।',
 
   'error.COMPANY_VERIFICATION_REQUIRED':
     'কোম্পানির হয়ে বিজ্ঞপ্তি দিতে যাচাইকৃত ট্রেড লাইসেন্স লাগবে। নথি থেকে আপলোড করুন, আমাদের টিম যাচাই করবে।',
+  'error.JOB_CLOSED': 'এই বিজ্ঞপ্তিটি বন্ধ হয়ে গেছে। এখানে আর আবেদন নেওয়া হচ্ছে না।',
+  'error.CANNOT_APPLY_OWN_JOB': 'এটি আপনার নিজের দেওয়া বিজ্ঞপ্তি।',
 
   'jobs.title': 'পরবর্তী কাজ খুঁজুন',
   'jobs.searchHint': 'কাজের নাম, প্রতিষ্ঠান বা এলাকা',
@@ -999,6 +1021,21 @@ export const bn: Record<TranslationKey, string> = {
   'menu.reportHint': 'প্রতারণা, বকেয়া মজুরি, অসদাচরণ',
 
   'job.report': 'এই কাজের বিরুদ্ধে অভিযোগ',
+  'job.apply': 'এখনই আবেদন করুন',
+  'job.applied': 'আবেদন করা হয়েছে',
+  'job.withdraw': 'আবেদন প্রত্যাহার করুন',
+  'job.closed': 'আবেদন বন্ধ',
+  'job.yourPosting': 'আপনার বিজ্ঞপ্তি — আবেদনকারী দেখুন',
+  'app.status.SUBMITTED': 'পাঠানো হয়েছে',
+  'app.status.VIEWED': 'দেখা হয়েছে',
+  'app.status.SHORTLISTED': 'বাছাই তালিকায়',
+  'app.status.ACCEPTED': 'গৃহীত',
+  'app.status.REJECTED': 'নির্বাচিত হননি',
+  'app.status.WITHDRAWN': 'প্রত্যাহার করা',
+  'app.appliedOn': 'আবেদন {date}',
+  'app.jobClosed': 'এই বিজ্ঞপ্তিটি এখন বন্ধ',
+  'app.emptyTitle': 'এখনো কোনো আবেদন নেই',
+  'app.emptyBody': 'কোনো কাজে আবেদন করলে সেটি এখানে দেখা যাবে, সঙ্গে অবস্থাও।',
 
   'report.title': 'অভিযোগ জানান',
   'report.subtitle':

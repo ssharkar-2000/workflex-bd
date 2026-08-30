@@ -1,8 +1,12 @@
 import {
+  applicationStateSchema,
+  jobApplicationListSchema,
   jobHighlightsSchema,
   jobListSchema,
   myJobListSchema,
   jobListingSchema,
+  type ApplicationState,
+  type JobApplicationList,
   type JobFilterState,
   type CreateJobDto,
   type JobHighlights,
@@ -75,4 +79,28 @@ export async function fetchMyJobs(): Promise<MyJobList> {
 export async function setJobOpen(id: string, isOpen: boolean): Promise<MyJobList> {
   const { data } = await api.patch(`/jobs/${id}/open`, { isOpen });
   return myJobListSchema.parse(data);
+}
+
+/**
+ * Applying. Returns the resulting state rather than assuming it landed, the
+ * same contract as saving — the button reflects the server, not the tap.
+ */
+export async function applyToJob(
+  id: string,
+  message?: string,
+): Promise<ApplicationState> {
+  const { data } = await api.post(`/jobs/${id}/apply`, {
+    message: message ?? '',
+  });
+  return applicationStateSchema.parse(data);
+}
+
+export async function withdrawApplication(id: string): Promise<ApplicationState> {
+  const { data } = await api.delete(`/jobs/${id}/apply`);
+  return applicationStateSchema.parse(data);
+}
+
+export async function fetchMyApplications(): Promise<JobApplicationList> {
+  const { data } = await api.get('/jobs/applications');
+  return jobApplicationListSchema.parse(data);
 }
