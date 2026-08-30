@@ -160,13 +160,6 @@ const tinSchema = z
   .regex(/^\d{9,15}$/, 'A TIN is 9 to 15 digits');
 
 /**
- * Registration details.
- *
- * `companyName` is required only for a company account, which is enforced by
- * the discriminated union rather than by a runtime check in the controller,
- * so the API and the app cannot disagree about when it is mandatory.
- */
-/**
  * One registration form for everyone.
  *
  * This used to be a discriminated union on `accountType`, with a company

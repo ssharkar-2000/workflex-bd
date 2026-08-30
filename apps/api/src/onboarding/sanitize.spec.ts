@@ -59,8 +59,8 @@ describe('passwordSchema', () => {
 });
 
 describe('onboardingProfileSchema', () => {
-  const individual = {
-    accountType: 'INDIVIDUAL' as const,
+  // One form for everyone — there is no account type to vary here any more.
+  const profile = {
     firstName: 'Rahim',
     lastName: 'Uddin',
     address: 'House 12, Road 5, Dhanmondi, Dhaka',
@@ -70,19 +70,19 @@ describe('onboardingProfileSchema', () => {
 
   it('rejects a mismatched confirmation', () => {
     const result = onboardingProfileSchema.safeParse({
-      ...individual,
+      ...profile,
       confirmPassword: 'Different@2026',
     });
     expect(result.success).toBe(false);
   });
 
-  it('accepts a valid individual without an email', () => {
-    expect(onboardingProfileSchema.safeParse(individual).success).toBe(true);
+  it('accepts a valid profile without an email', () => {
+    expect(onboardingProfileSchema.safeParse(profile).success).toBe(true);
   });
 
   it('rejects a name containing digits', () => {
     const result = onboardingProfileSchema.safeParse({
-      ...individual,
+      ...profile,
       firstName: 'Rahim2',
     });
     expect(result.success).toBe(false);
@@ -90,48 +90,53 @@ describe('onboardingProfileSchema', () => {
 
   it('rejects an address that is too short', () => {
     const result = onboardingProfileSchema.safeParse({
-      ...individual,
+      ...profile,
       address: 'Dhk',
     });
     expect(result.success).toBe(false);
   });
 
-  it('requires registration number and designation for a company', () => {
-    const result = onboardingProfileSchema.safeParse({
-      accountType: 'COMPANY',
-      firstName: 'Rahim',
-      lastName: 'Uddin',
-      companyName: 'ACME Foods Ltd',
-      address: 'House 12, Road 5, Dhanmondi, Dhaka',
-      password: 'Workflex@2026',
-      confirmPassword: 'Workflex@2026',
-    });
-    expect(result.success).toBe(false);
+  it('treats email as optional, and blank as absent', () => {
+    expect(
+      onboardingProfileSchema.safeParse({
+        ...profile,
+        email: 'rahim@example.com',
+      }).success,
+    ).toBe(true);
+    expect(
+      onboardingProfileSchema.safeParse({ ...profile, email: '' }).success,
+    ).toBe(true);
   });
 
-  it('rejects a TIN that is not 9 to 15 digits', () => {
-    const base = {
-      accountType: 'COMPANY' as const,
-      firstName: 'Rahim',
-      lastName: 'Uddin',
+  it('rejects a malformed email', () => {
+    expect(
+      onboardingProfileSchema.safeParse({ ...profile, email: 'not-an-email' })
+        .success,
+    ).toBe(false);
+  });
+
+  it('no longer collects company details at registration', () => {
+    // The trade name, registration number and job title moved to the company
+    // job-post form, which is the only place they are needed. Registration
+    // asks nobody to declare at the front door whether they came to work or
+    // to hire.
+    //
+    // Extra keys are stripped rather than rejected, so a client still sending
+    // the old shape registers successfully instead of erroring — worth
+    // pinning, because it is what makes the change safe to roll out.
+    const result = onboardingProfileSchema.safeParse({
+      ...profile,
+      accountType: 'COMPANY',
       companyName: 'ACME Foods Ltd',
       companyRegistrationNumber: 'C-123456',
       designation: 'HR Manager',
-      address: 'House 12, Road 5, Dhanmondi, Dhaka',
-      password: 'Workflex@2026',
-      confirmPassword: 'Workflex@2026',
-    };
+      tin: '1234',
+    });
 
-    expect(
-      onboardingProfileSchema.safeParse({ ...base, tin: '1234' }).success,
-    ).toBe(false);
-    expect(
-      onboardingProfileSchema.safeParse({ ...base, tin: '123456789012' })
-        .success,
-    ).toBe(true);
-    // Blank stays acceptable: TIN is optional at this step.
-    expect(
-      onboardingProfileSchema.safeParse({ ...base, tin: '' }).success,
-    ).toBe(true);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).not.toHaveProperty('companyName');
+      expect(result.data).not.toHaveProperty('accountType');
+    }
   });
 });
