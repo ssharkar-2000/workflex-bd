@@ -13,23 +13,32 @@ export const documentKindSchema = z.enum([
 ]);
 export type DocumentKind = z.infer<typeof documentKindSchema>;
 
-/** Everyone proves who they are; only companies also prove the business. */
-export const INDIVIDUAL_DOCUMENTS: DocumentKind[] = [
+/**
+ * What everyone must prove, regardless of what they intend to do here.
+ *
+ * There is one kind of account. Someone can look for shift work in the
+ * morning and hire a cleaner in the afternoon, so splitting the requirements
+ * by a role chosen at signup asked a question nobody could answer honestly
+ * and then held them to the answer.
+ */
+export const REQUIRED_DOCUMENTS: DocumentKind[] = [
   'NID_FRONT',
   'NID_BACK',
   'SELFIE',
 ];
 
-export const COMPANY_DOCUMENTS: DocumentKind[] = [
-  'NID_FRONT',
-  'NID_BACK',
-  'SELFIE',
-  'TIN_CERTIFICATE',
+/**
+ * Never blocks registration. A verified trade licence is what unlocks posting
+ * jobs *as a company* — it is a capability someone earns later, not a hurdle
+ * in front of the front door.
+ */
+export const OPTIONAL_DOCUMENTS: DocumentKind[] = [
   'TRADE_LICENSE',
+  'TIN_CERTIFICATE',
 ];
 
-export function requiredDocuments(type: AccountType): DocumentKind[] {
-  return type === 'COMPANY' ? COMPANY_DOCUMENTS : INDIVIDUAL_DOCUMENTS;
+export function requiredDocuments(): DocumentKind[] {
+  return REQUIRED_DOCUMENTS;
 }
 
 /**
@@ -157,10 +166,18 @@ const tinSchema = z
  * the discriminated union rather than by a runtime check in the controller,
  * so the API and the app cannot disagree about when it is mandatory.
  */
+/**
+ * One registration form for everyone.
+ *
+ * This used to be a discriminated union on `accountType`, with a company
+ * branch asking for a trade name, registration number and job title. Those
+ * questions have moved to the point where they are actually needed — posting
+ * a job as a company — because asking them at signup forced a person to
+ * declare at the front door whether they were here to work or to hire, and
+ * most people are eventually both.
+ */
 export const onboardingProfileSchema = z
-  .discriminatedUnion('accountType', [
-  z.object({
-    accountType: z.literal('INDIVIDUAL'),
+  .object({
     firstName: nameSchema,
     lastName: nameSchema,
     address: addressSchema,
@@ -168,32 +185,9 @@ export const onboardingProfileSchema = z
     confirmPassword: z.string(),
     /** Optional throughout — phone remains the mandatory identity. */
     email: emailSchema.optional().or(z.literal('')),
-    /**
-     * Asked of job seekers only. Optional here because an individual
-     * *recruiter* also lands in this branch and is never shown the question —
-     * the form enforces it for the job-seeker path instead.
-     */
+    /** Used for job matching; everyone is a potential job seeker now. */
     experienceType: experienceTypeSchema.optional(),
-  }),
-  z.object({
-    accountType: z.literal('COMPANY'),
-    firstName: nameSchema,
-    lastName: nameSchema,
-    companyName: organisationNameSchema,
-    /** RJSC incorporation number. */
-    companyRegistrationNumber: referenceNumberSchema
-      .min(3, 'Enter the company registration number')
-      .max(60),
-    /** The person's role at the company — reviewers use it to sanity-check authority. */
-    designation: designationSchema,
-    address: addressSchema,
-    password: passwordSchema,
-    confirmPassword: z.string(),
-    email: emailSchema.optional().or(z.literal('')),
-    tin: tinSchema.optional().or(z.literal('')),
-    tradeLicenseNo: referenceNumberSchema.max(60).optional().or(z.literal('')),
-  }),
-  ])
+  })
   .superRefine((value, ctx) => {
     if (value.password !== value.confirmPassword) {
       ctx.addIssue({

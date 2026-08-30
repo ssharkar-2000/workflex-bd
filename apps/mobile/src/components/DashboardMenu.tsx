@@ -50,15 +50,17 @@ interface Row {
 }
 
 const WORKER_ROWS: Row[] = [
-  { icon: '🔍', label: 'menu.findJobs' },
+  { icon: '🔍', label: 'menu.findJobs', href: '/(app)/jobs' },
   { icon: '📄', label: 'menu.myApplications' },
-  { icon: '🔖', label: 'menu.savedJobs' },
+  // Same screen, opened with its Saved filter already on — see the `saved`
+  // parameter in app/(app)/jobs.tsx.
+  { icon: '🔖', label: 'menu.savedJobs', href: '/(app)/jobs?saved=1' },
   { icon: '📅', label: 'menu.myShifts' },
 ];
 
 const RECRUITER_ROWS: Row[] = [
-  { icon: '➕', label: 'menu.postJob' },
-  { icon: '📋', label: 'menu.myPostedJobs' },
+  { icon: '➕', label: 'menu.postJob', href: '/(app)/post-job' },
+  { icon: '📋', label: 'menu.myPostedJobs', href: '/(app)/my-jobs' },
   { icon: '👥', label: 'menu.applicants' },
   { icon: '🤝', label: 'menu.hiredWorkers' },
 ];
@@ -112,10 +114,6 @@ export function DashboardMenu({
   const fullName =
     [user.firstName, user.lastName].filter(Boolean).join(' ') || user.phone;
 
-  // COMPANY hires, INDIVIDUAL works. An account that has not finished
-  // onboarding has neither yet, and job seeking is the majority case in this
-  // market — so that is what an undecided account sees.
-  const hiring = user.accountType === 'COMPANY';
 
   return (
     <>
@@ -203,8 +201,20 @@ export function DashboardMenu({
 
               <Divider />
 
-              <Section title={t(hiring ? 'menu.sec.hiring' : 'menu.sec.work')}>
-                {(hiring ? RECRUITER_ROWS : WORKER_ROWS).map((row) => (
+              {/* Both sections, always. The drawer used to show one or the
+                  other based on an account type chosen at signup; there is no
+                  such choice now, and the same person may look for a shift in
+                  the morning and hire a cleaner in the afternoon. */}
+              <Section title={t('menu.sec.work')}>
+                {WORKER_ROWS.map((row) => (
+                  <MenuRow key={row.label} row={row} onGo={go} />
+                ))}
+              </Section>
+
+              <Divider />
+
+              <Section title={t('menu.sec.hiring')}>
+                {RECRUITER_ROWS.map((row) => (
                   <MenuRow key={row.label} row={row} onGo={go} />
                 ))}
               </Section>
@@ -231,6 +241,15 @@ export function DashboardMenu({
                   }}
                   onGo={go}
                 />
+                <MenuRow
+                  row={{
+                    icon: '📄',
+                    label: 'menu.cv',
+                    hint: 'menu.cvHint',
+                    href: '/(app)/cv',
+                  }}
+                  onGo={go}
+                />
                 <MenuRow row={{ icon: '⭐', label: 'menu.ratings' }} onGo={go} />
               </Section>
 
@@ -245,6 +264,15 @@ export function DashboardMenu({
 
               <MenuRow
                 row={{ icon: '❓', label: 'menu.support', href: '/(app)/support' }}
+                onGo={go}
+              />
+              <MenuRow
+                row={{
+                  icon: '🚩',
+                  label: 'menu.report',
+                  hint: 'menu.reportHint',
+                  href: '/(app)/report',
+                }}
                 onGo={go}
               />
 

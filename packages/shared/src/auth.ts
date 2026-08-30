@@ -83,11 +83,19 @@ export const authUserSchema = z.object({
   verificationLevel: verificationLevelSchema,
   isAdmin: z.boolean(),
   /**
-   * Null until the account type is chosen during onboarding. The dashboard
-   * menu keys off this to show hiring items or job-seeking items rather than
-   * both — `profiles` below is still a placeholder and always empty.
+   * Retained for existing records and admin reporting. It is no longer asked
+   * at registration and no longer decides what anyone may do — every account
+   * can both look for work and hire.
    */
   accountType: accountTypeSchema.nullable(),
+  /**
+   * Whether this account may post jobs *as a company*.
+   *
+   * Earned by uploading a trade licence and having an admin verify it, which
+   * is what level 2 means. Anyone may post an individual job — needing help
+   * at home should not require a business.
+   */
+  canPostCompanyJobs: z.boolean(),
   /** Which profiles exist on this account — drives the role switcher. */
   profiles: z.array(profileKindSchema),
   recruiterKind: recruiterKindSchema.nullable(),

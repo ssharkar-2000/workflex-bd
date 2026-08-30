@@ -21,12 +21,14 @@ import {
   sanitizeOrganisationName,
   sanitizePersonName,
   sanitizeReferenceNumber,
+  type AuthUser,
   type MyProfile,
 } from '@workflex/shared';
 import { fetchMyProfile, updateMyProfile } from '../../src/api/profile';
 import { fetchMe } from '../../src/api/auth';
 import { removeEmail } from '../../src/api/email';
 import { useErrorMessage } from '../../src/lib/error-message';
+import { Avatar } from '../../src/components/Avatar';
 import { EmailCard } from '../../src/components/EmailCard';
 import { KycStatusCard } from '../../src/components/KycStatusCard';
 import { VerificationCard } from '../../src/components/VerificationCard';
@@ -89,6 +91,11 @@ export default function ProfileScreen() {
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
         >
+          {/* The verification selfie, shown where someone looks for their
+              own photo. `me` carries hasPhoto; MyProfile does not, and the
+              dashboard has already warmed this query. */}
+          {me ? <ProfilePhoto user={me} profile={data} /> : null}
+
           <InformationCard profile={data} />
           <UpdateSection profile={data} />
           <EmailCard />
@@ -97,6 +104,56 @@ export default function ProfileScreen() {
         </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+/**
+ * The account's own face, from the verification step.
+ *
+ * Falls back to initials when no selfie has been uploaded — the same
+ * component the dashboard uses, so a photo taken during verification appears
+ * in both places without either screen knowing how it is fetched.
+ */
+function ProfilePhoto({
+  user,
+  profile,
+}: {
+  user: AuthUser;
+  profile: MyProfile;
+}) {
+  const t = useT();
+  const { c } = useTheme();
+
+  const fullName =
+    [profile.firstName, profile.lastName].filter(Boolean).join(' ') || null;
+  const initials = fullName
+    ? fullName
+        .split(/s+/)
+        .slice(0, 2)
+        .map((part) => part[0])
+        .join('')
+        .toUpperCase()
+    : profile.phone.slice(-2);
+
+  return (
+    <View style={styles.photoWrap}>
+      <Avatar
+        hasPhoto={user.hasPhoto}
+        initials={initials}
+        size={92}
+        // Re-fetches when the photo state flips, so a selfie taken during
+        // verification shows up without restarting the app.
+        version={String(user.hasPhoto)}
+      />
+      <Text style={[styles.photoName, { color: c.text }]} numberOfLines={1}>
+        {fullName || maskPhone(profile.phone)}
+      </Text>
+      {!user.hasPhoto ? (
+        <Text style={[styles.photoHint, { color: c.textMuted }]}>
+          {t('profile.noPhoto')}
+        </Text>
+      ) : null}
+    </View>
   );
 }
 
@@ -626,6 +683,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: space.lg,
   },
+
+  photoWrap: { alignItems: 'center', paddingBottom: 18 },
+  photoName: { fontSize: 17, fontWeight: '800', marginTop: 10 },
+  photoHint: { fontSize: 12, marginTop: 4, textAlign: 'center' },
 
   card: { borderRadius: radius.lg, borderWidth: 1, padding: space.md },
   cardSpaced: { marginTop: space.lg },

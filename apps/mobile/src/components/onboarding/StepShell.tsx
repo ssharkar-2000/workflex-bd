@@ -11,7 +11,6 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import { MeshBackground } from '../MeshBackground';
 import { GlassCard } from '../GlassCard';
 import { BrandWordmark } from './BrandWordmark';
 import { useT } from '../../i18n';
@@ -93,28 +92,24 @@ export function StepShell({
         </View>
       ) : null}
 
-      {/* The page content is a sheet that laps *up* over the band, rather than
-          the band rounding its own bottom corners. Same curve, opposite
-          direction — the band stays a full-width rectangle and the sheet's
-          corners cut into it, which is what the reference does. */}
-      <View
-        style={[
-          styles.sheet,
-          showBrand && {
-            marginTop: -radius.xl,
-            borderTopLeftRadius: radius.xl,
-            borderTopRightRadius: radius.xl,
-            // On the sheet, not the band: here it follows the curve and reads
-            // as the lip of a card. On the band it would cut straight across
-            // and the corners would sit on top of it.
-            borderTopWidth: 1,
-            borderTopColor: c.bandBorder,
-            overflow: 'hidden',
-          },
-        ]}
-      >
-        {/* Inside the sheet so the rounded corners clip it. */}
-        <MeshBackground />
+      {/* The page laps *up* over the band, rather than the band rounding its
+          own bottom corners — same curve, opposite direction.
+
+          Only this lip is painted, not the whole sheet. The animated
+          background now lives once at the root and shows through every
+          screen; giving the sheet an opaque fill would cover it on exactly
+          these screens. The lip is the page colour the mesh is drawn over
+          anyway, so at the mesh's opacity the join is invisible. */}
+      {showBrand ? (
+        <View
+          style={[
+            styles.lip,
+            { backgroundColor: c.bg, borderTopColor: c.bandBorder },
+          ]}
+        />
+      ) : null}
+
+      <View style={styles.sheet}>
 
         <SafeAreaView
           style={styles.safe}
@@ -194,6 +189,15 @@ export function StepShell({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   sheet: { flex: 1 },
+  lip: {
+    height: radius.xl,
+    marginTop: -radius.xl,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    borderTopWidth: 1,
+    // Above the band it cuts into, below the content that follows it.
+    zIndex: 1,
+  },
   safe: { flex: 1 },
   flex: { flex: 1 },
   header: {

@@ -13,3 +13,5 @@ export * from './support';
 export * from './job-categories';
 export * from './bd-geography';
 export * from './jobs';
+export * from './matching';
+export * from './reports';

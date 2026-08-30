@@ -3,7 +3,6 @@ import { Redirect, Stack } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { fetchOnboardingStatus } from '../../src/api/onboarding';
 import { useLaunchStore } from '../../src/store/launch-store';
-import { useIntentStore } from '../../src/store/intent-store';
 import { useTheme } from '../../src/lib/use-theme';
 
 /**
@@ -22,7 +21,6 @@ import { useTheme } from '../../src/lib/use-theme';
  */
 export default function AppLayout() {
   const gateOpen = useLaunchStore((s) => s.gateOpen);
-  const intent = useIntentStore((s) => s.intent);
   const { c } = useTheme();
 
   const { data, isLoading, isError } = useQuery({
@@ -46,32 +44,9 @@ export default function AppLayout() {
 
   // On a failed status call, let the user through rather than trapping them in
   // a spinner; the home screen surfaces its own error state.
+  // One registration form, so there is exactly one place to resume from.
   if (!isError && data && !data.profileComplete) {
-    // Resume from what the account already holds, not from whatever the
-    // intent store happens to say — the stored account type is the answer to
-    // "individual or company", so asking again would be asking twice.
-    if (data.accountType) {
-      return (
-        <Redirect
-          href={{
-            pathname: '/(onboarding)/details',
-            params: { accountType: data.accountType },
-          }}
-        />
-      );
-    }
-
-    // Genuinely unanswered: a job seeker is always an individual, so only a
-    // recruiter is worth asking.
-    return (
-      <Redirect
-        href={
-          intent === 'HIRE'
-            ? '/(onboarding)/account-type'
-            : '/(onboarding)/details'
-        }
-      />
-    );
+    return <Redirect href="/(onboarding)/details" />;
   }
 
   return <Stack screenOptions={{ headerShown: false }} />;

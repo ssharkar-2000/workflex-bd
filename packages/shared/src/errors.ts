@@ -43,6 +43,12 @@ export const ApiErrorCode = {
   /** Too many of this account's support requests are still awaiting a reply. */
   TOO_MANY_OPEN_TICKETS: 'TOO_MANY_OPEN_TICKETS',
 
+  /** Too many of this account's reports are still awaiting review. */
+  TOO_MANY_OPEN_REPORTS: 'TOO_MANY_OPEN_REPORTS',
+
+  /** Posting as a company needs an approved trade licence (level 2). */
+  COMPANY_VERIFICATION_REQUIRED: 'COMPANY_VERIFICATION_REQUIRED',
+
   ACCOUNT_SUSPENDED: 'ACCOUNT_SUSPENDED',
   /** Action needs a higher verification level; `details.required` says which. */
   VERIFICATION_REQUIRED: 'VERIFICATION_REQUIRED',

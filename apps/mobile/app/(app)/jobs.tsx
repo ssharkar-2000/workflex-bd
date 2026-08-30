@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   useInfiniteQuery,
   useMutation,
@@ -30,6 +30,8 @@ import {
   toggleSavedJob,
 } from '../../src/api/jobs';
 import { JobFilterBar } from '../../src/components/jobs/JobFilterBar';
+import { JobHighlights } from '../../src/components/jobs/JobHighlights';
+import { MatchBadge } from '../../src/components/jobs/MatchBadge';
 import { NotificationBell } from '../../src/components/NotificationBell';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { useErrorMessage } from '../../src/lib/error-message';
@@ -100,10 +102,17 @@ export default function JobsScreen() {
   const [search, setSearch] = useState('');
   const [applied, setApplied] = useState('');
 
-  // Everything the sheet owns. The search box and the two shortcut chips
-  // stay outside it, because those are reached constantly and a sheet for
-  // one tap is friction.
-  const [sheet, setSheet] = useState<JobFilterState>({});
+  // Opened from the drawer's "Saved jobs" row, which is this same screen
+  // with one filter pre-applied rather than a second screen listing the same
+  // cards. Read once as the initial state — the filter is the user's after
+  // that, and re-applying it on every render would fight them clearing it.
+  const { saved } = useLocalSearchParams<{ saved?: string }>();
+
+  // Everything the drawer owns. The search box stays outside it, because it
+  // is reached constantly and a sheet for one tap is friction.
+  const [sheet, setSheet] = useState<JobFilterState>(() =>
+    saved === '1' ? { savedOnly: true } : {},
+  );
 
   const filters: JobFilterState = useMemo(
     () => ({ ...sheet, q: applied || undefined }),
@@ -158,6 +167,41 @@ export default function JobsScreen() {
     return n + 1;
   }, 0);
 
+  const listHeader = (
+    <View>
+      {/* What the marketplace currently holds, and the listings worth acting
+          on now. Above the filters, because it frames what they narrow. */}
+      <JobHighlights
+        onSeeAll={() =>
+          setSheet((d) => ({
+            ...d,
+            urgencies: ['IMMEDIATE', 'WITHIN_24H', 'WITHIN_3_DAYS', 'THIS_WEEK'],
+          }))
+        }
+        onOpenJob={(id) =>
+          router.push({ pathname: '/(app)/job/[id]', params: { id } })
+        }
+      />
+
+      {/* Every filter named on screen, each opening its own dropdown. */}
+      <View style={styles.filterWrap}>
+        <JobFilterBar
+          value={sheet}
+          onChange={setSheet}
+          onClear={clearFilters}
+          activeCount={filterCount + (applied ? 1 : 0)}
+          categoryCounts={counts}
+        />
+      </View>
+
+      <Text style={[styles.count, { color: c.textMuted }]}>
+        {t('jobs.available', { count: total })}
+      </Text>
+
+      {error ? <ErrorBanner message={errorMessage(error)} /> : null}
+    </View>
+  );
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
@@ -205,25 +249,6 @@ export default function JobsScreen() {
         </View>
       </View>
 
-      {/* Every filter named on screen, each opening its own dropdown. */}
-      <JobFilterBar
-        value={sheet}
-        onChange={setSheet}
-        onClear={clearFilters}
-        activeCount={filterCount + (applied ? 1 : 0)}
-        categoryCounts={counts}
-      />
-
-      <Text style={[styles.count, { color: c.textMuted }]}>
-        {t('jobs.available', { count: total })}
-      </Text>
-
-      {error ? (
-        <View style={styles.pad}>
-          <ErrorBanner message={errorMessage(error)} />
-        </View>
-      ) : null}
-
       {isLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={c.primary} />
@@ -235,6 +260,7 @@ export default function JobsScreen() {
           contentContainerStyle={
             items.length === 0 ? styles.emptyWrap : styles.list
           }
+          ListHeaderComponent={listHeader}
           refreshing={isRefetching}
           onRefresh={() => void refetch()}
           onEndReachedThreshold={0.4}
@@ -342,6 +368,7 @@ function JobCard({
       </View>
 
       <View style={styles.tagRow}>
+        <MatchBadge match={job.match} />
         <View
           style={[styles.tag, { backgroundColor: tint, borderColor: tintBorder }]}
         >
@@ -454,10 +481,11 @@ const styles = StyleSheet.create({
     paddingBottom: space.sm,
   },
 
-  list: { paddingHorizontal: space.md, paddingBottom: space.xl, gap: 10 },
+  list: { paddingBottom: space.xl, gap: 10 },
+  filterWrap: { marginTop: space.md },
   more: { marginVertical: space.md },
 
-  card: { borderWidth: 1, borderRadius: radius.lg },
+  card: { borderWidth: 1, borderRadius: radius.lg, marginHorizontal: space.md },
   // Padding moved onto the inner button so the whole padded area is tappable,
   // not just the text inside it.
   cardBody: { padding: 14, paddingRight: 44 },

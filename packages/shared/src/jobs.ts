@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { jobCategorySchema } from './job-categories';
 import { divisionSchema } from './bd-geography';
+import { jobMatchSchema } from './matching';
 
 /**
  * Job listings and the filters over them.
@@ -153,8 +154,39 @@ export const jobListingSchema = z.object({
   daysLeft: z.number().int().nullable(),
   postedAt: z.string(),
   saved: z.boolean(),
+
+  /**
+   * Null when the account has no parsed CV, or when CV parsing is switched
+   * off on the server. Deliberately not zero — "no score" and "scored zero"
+   * are different things, and conflating them would tell someone they are a
+   * poor fit for work they never asked to be measured against.
+   */
+  match: jobMatchSchema.nullable(),
 });
 export type JobListing = z.infer<typeof jobListingSchema>;
+
+/**
+ * The discovery strip at the top of the job feed.
+ *
+ * Counted over open listings only — a total that included expired postings
+ * would flatter the number and mislead someone deciding whether the app is
+ * worth using.
+ */
+export const jobStatsSchema = z.object({
+  activeJobs: z.number().int().nonnegative(),
+  /** Summed across postings that state a figure; the rest count as one each. */
+  vacancies: z.number().int().nonnegative(),
+  /** Distinct employers currently hiring. */
+  organizations: z.number().int().nonnegative(),
+});
+export type JobStats = z.infer<typeof jobStatsSchema>;
+
+export const jobHighlightsSchema = z.object({
+  stats: jobStatsSchema,
+  /** Ranked by how soon someone is needed, not by a fabricated match score. */
+  jobs: z.array(jobListingSchema),
+});
+export type JobHighlights = z.infer<typeof jobHighlightsSchema>;
 
 export const jobListSchema = z.object({
   items: z.array(jobListingSchema),
@@ -218,3 +250,118 @@ export type JobQuery = z.output<typeof jobQuerySchema>;
 
 /** Fields the filter sheet owns — everything except paging. */
 export type JobFilterState = Omit<JobQuery, 'cursor' | 'limit'>;
+
+// --- posting ---
+
+/**
+ * Who the job is being posted on behalf of.
+ *
+ * Anyone may post as themselves — needing help at home should not require a
+ * business. Posting as a company requires an approved trade licence, which is
+ * what verification level 2 records.
+ */
+export const postAsSchema = z.enum(['INDIVIDUAL', 'COMPANY']);
+export type PostAs = z.infer<typeof postAsSchema>;
+
+/**
+ * What both forms ask.
+ *
+ * Everything here is something the person hiring genuinely knows: what the
+ * work is, where, when, and what it pays. The company form adds what a
+ * business posting needs on top.
+ */
+const jobPostBase = {
+  title: z.string().trim().min(4, 'Give the job a title').max(120),
+  category: jobCategorySchema,
+  description: z
+    .string()
+    .trim()
+    .min(20, 'Describe the work in a little more detail')
+    .max(4000),
+
+  location: z.string().trim().min(3, 'Where is the work?').max(120),
+  division: divisionSchema,
+  district: z.string().trim().min(1).max(60),
+
+  jobType: jobTypeSchema,
+  duration: jobDurationSchema,
+  workingTime: workingTimeSchema.default('FLEXIBLE'),
+  hoursBand: hoursBandSchema.optional(),
+
+  paymentType: paymentTypeSchema,
+  salaryMin: z.number().int().min(0).max(10_000_000).optional(),
+  salaryMax: z.number().int().min(0).max(10_000_000).optional(),
+
+  urgency: urgencySchema.default('NONE'),
+  /** ISO date. Omitted means the employer is flexible about the start. */
+  startDate: z.string().datetime().optional(),
+  vacancies: z.number().int().min(1).max(999).optional(),
+};
+
+/**
+ * A pay range that runs backwards is a typo, not a preference, and it would
+ * silently match nothing in the seeker's filter. Checked on both branches.
+ */
+function checkPayOrder(
+  value: { salaryMin?: number; salaryMax?: number },
+  ctx: z.RefinementCtx,
+) {
+  if (
+    value.salaryMin !== undefined &&
+    value.salaryMax !== undefined &&
+    value.salaryMin > value.salaryMax
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['salaryMax'],
+      message: 'Maximum pay cannot be less than the minimum',
+    });
+  }
+}
+
+export const createJobSchema = z
+  .discriminatedUnion('postAs', [
+    z.object({
+      postAs: z.literal('INDIVIDUAL'),
+      ...jobPostBase,
+    }),
+    z.object({
+      postAs: z.literal('COMPANY'),
+      ...jobPostBase,
+
+      /**
+       * Asked here rather than at registration. Most people never post a
+       * company job, and making everyone name a business at signup forced a
+       * choice at the front door that the product no longer needs.
+       */
+      companyName: z.string().trim().min(2, 'Enter the company name').max(120),
+      companyRegistrationNumber: z
+        .string()
+        .trim()
+        .min(3, 'Enter the registration number')
+        .max(60),
+      /** The poster's role there — reviewers use it to sanity-check authority. */
+      designation: z.string().trim().min(2, 'Enter your job title').max(80),
+
+      /** A business posting is expected to say what it wants and what it offers. */
+      experienceLevel: experienceLevelSchema,
+      workplaceType: workplaceTypeSchema,
+      requirements: z.string().trim().max(4000).optional(),
+      benefits: z.string().trim().max(4000).optional(),
+      /** Days from now until applications close. */
+      openForDays: z.number().int().min(1).max(180).default(30),
+    }),
+  ])
+  .superRefine(checkPayOrder);
+export type CreateJobDto = z.output<typeof createJobSchema>;
+export type CreateJobInput = z.input<typeof createJobSchema>;
+
+/** A posting as its author sees it, with the count of people who saw it. */
+export const myJobSchema = jobListingSchema.extend({
+  isOpen: z.boolean(),
+  savedByCount: z.number().int().nonnegative(),
+});
+export type MyJob = z.infer<typeof myJobSchema>;
+
+export const myJobListSchema = z.object({ jobs: z.array(myJobSchema) });
+export type MyJobList = z.infer<typeof myJobListSchema>;

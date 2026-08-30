@@ -219,12 +219,15 @@ function RolePicker() {
           body="home.role.findBody"
           tint={0}
           href="/(app)/jobs"
+          cta="home.role.browse"
         />
         <RoleCard
           emoji="📋"
           title="home.role.hire"
           body="home.role.hireBody"
           tint={2}
+          href="/(app)/post-job"
+          cta="home.role.post"
         />
       </View>
       <Text style={[styles.sectionNote, { color: c.textMuted }]}>
@@ -240,6 +243,7 @@ function RoleCard({
   body,
   tint,
   href,
+  cta,
 }: {
   emoji: string;
   title: TranslationKey;
@@ -248,6 +252,7 @@ function RoleCard({
   tint: number;
   /** Omitted while the destination does not exist; the card then shows "soon". */
   href?: string;
+  cta: TranslationKey;
 }) {
   const t = useT();
   const router = useRouter();
@@ -275,7 +280,7 @@ function RoleCard({
       <Text style={[styles.roleBody, { color: c.textMuted }]}>{t(body)}</Text>
       {href ? (
         <Text style={[styles.roleGo, { color: c.primary }]}>
-          {t('home.role.browse')} →
+          {t(cta)} →
         </Text>
       ) : (
         <View
@@ -389,7 +394,14 @@ const styles = StyleSheet.create({
   },
   roleEmoji: { fontSize: 26, marginBottom: space.sm },
   roleTitle: { fontSize: font.md, fontWeight: '700' },
-  roleBody: { fontSize: font.xs, marginTop: space.xs, lineHeight: 18 },
+  // Two lines on both cards, so neither is taller than the other and the row
+  // reads as an even split rather than two boxes that happen to be adjacent.
+  roleBody: {
+    fontSize: font.xs,
+    marginTop: space.xs,
+    lineHeight: 18,
+    minHeight: 36,
+  },
 
   soonPill: {
     alignSelf: 'flex-start',
@@ -401,7 +413,7 @@ const styles = StyleSheet.create({
   },
   soonPillText: { fontSize: font.xs, fontWeight: '600' },
   rolePressed: { opacity: 0.72 },
-  roleGo: { fontSize: font.xs, fontWeight: '800', marginTop: 8 },
+  roleGo: { fontSize: font.xs, fontWeight: '800', marginTop: 'auto', paddingTop: 8 },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
   tile: {

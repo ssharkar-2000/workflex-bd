@@ -1,7 +1,12 @@
 import {
+  jobHighlightsSchema,
   jobListSchema,
+  myJobListSchema,
   jobListingSchema,
   type JobFilterState,
+  type CreateJobDto,
+  type JobHighlights,
+  type MyJobList,
   type JobList,
   type JobListing,
 } from '@workflex/shared';
@@ -47,4 +52,27 @@ export async function toggleSavedJob(id: string): Promise<boolean> {
 export async function fetchCategoryCounts(): Promise<Record<string, number>> {
   const { data } = await api.get<Record<string, number>>('/jobs/category-counts');
   return data;
+}
+
+/** Headline counts plus the most urgent listings, for the top of the feed. */
+export async function fetchJobHighlights(): Promise<JobHighlights> {
+  const { data } = await api.get('/jobs/highlights');
+  return jobHighlightsSchema.parse(data);
+}
+
+/** Posting a job, as yourself or as your verified company. */
+export async function createJob(dto: CreateJobDto): Promise<JobListing> {
+  const { data } = await api.post('/jobs', dto);
+  return jobListingSchema.parse(data);
+}
+
+export async function fetchMyJobs(): Promise<MyJobList> {
+  const { data } = await api.get('/jobs/mine');
+  return myJobListSchema.parse(data);
+}
+
+/** Closing hides a posting from the feed without destroying it. */
+export async function setJobOpen(id: string, isOpen: boolean): Promise<MyJobList> {
+  const { data } = await api.patch(`/jobs/${id}/open`, { isOpen });
+  return myJobListSchema.parse(data);
 }

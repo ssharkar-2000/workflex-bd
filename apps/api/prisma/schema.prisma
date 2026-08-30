@@ -38,6 +38,18 @@ enum DocumentKind {
   SELFIE
   TIN_CERTIFICATE
   TRADE_LICENSE
+  /// A job seeker's CV. Unlike the others this is not identity evidence —
+  /// it is the input to skill matching, and carries no verification weight.
+  CV
+}
+
+/// How confident the match is. Bands rather than a bare number, because "72"
+/// invites false precision about something inherently fuzzy.
+enum MatchBand {
+  STRONG
+  GOOD
+  FAIR
+  WEAK
 }
 
 /// Asked at registration of anyone looking for work. Drives which listings
@@ -121,6 +133,8 @@ model User {
   attendance         AttendanceRecord[]
   notificationReads  NotificationRead[]
   savedJobs          SavedJob[]
+  cvProfile          CvProfile?
+  reports            Report[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -180,6 +194,49 @@ model Company {
   updatedAt DateTime @updatedAt
 
   @@map("companies")
+}
+
+/// What a language model read out of someone's CV.
+///
+/// Parsed once on upload and stored, not re-derived per request: extraction
+/// costs a model call, and the answer only changes when a new CV is uploaded.
+/// Matching against these fields afterwards is arithmetic and runs per query.
+model CvProfile {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @unique @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The Document row this was read from, so a re-upload can supersede it.
+  documentId String? @db.Uuid
+
+  /// Lowercased skill names. The matcher intersects these with job text, so
+  /// storing them normalised avoids doing it on every comparison.
+  skills String[]
+
+  /// Total years of work history the CV evidences. Null when it says nothing
+  /// a reader could turn into a number.
+  yearsExperience Int?
+
+  /// Job categories the CV suggests, using the product's own taxonomy.
+  categories JobCategory[]
+
+  /// Titles the person has actually held, for matching against job titles.
+  titles String[]
+
+  /// One or two sentences, shown back so the user can see what was understood
+  /// and correct the CV if it is wrong.
+  summary String?
+
+  /// Extracted text, kept so a re-parse after a prompt change needs no
+  /// re-upload. Never shown to anyone.
+  rawText String?
+
+  parsedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("cv_profiles")
 }
 
 model Document {
@@ -676,4 +733,77 @@ model SavedJob {
   @@id([jobId, userId])
   @@index([userId, savedAt])
   @@map("saved_jobs")
+}
+
+// --- reports ---
+
+/// What the reporter says went wrong. Ordered so the queue can be triaged:
+/// fraud and non-payment need acting on today, a technical complaint does not.
+enum ReportCategory {
+  FRAUD
+  FAKE_JOB
+  MISLEADING_PAY
+  NON_PAYMENT
+  HARASSMENT
+  UNSAFE_WORK
+  FAKE_PROFILE
+  TECHNICAL
+  OTHER
+}
+
+enum ReportTarget {
+  SYSTEM
+  JOB
+  PERSON
+  OTHER
+}
+
+/// ACTION_TAKEN and DISMISSED are both endings, kept apart because they mean
+/// opposite things to the reporter and to anyone auditing the queue later.
+enum ReportStatus {
+  OPEN
+  IN_REVIEW
+  ACTION_TAKEN
+  DISMISSED
+}
+
+/// A complaint about the platform, a posting, or another person.
+///
+/// Separate from SupportTicket: that is "I need help" and ends when someone
+/// answers, while this may end in a suspended account or a removed posting,
+/// and the reporter is not always entitled to know which.
+model Report {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Nullable so a report survives the reporter deleting their account —
+  /// the complaint may still need acting on.
+  reporterId String? @db.Uuid
+  reporter   User?   @relation(fields: [reporterId], references: [id], onDelete: SetNull)
+
+  category   ReportCategory
+  targetType ReportTarget   @default(OTHER)
+
+  /// Set when the report is about a posting. Not a FK to Job: a scam listing
+  /// gets deleted, and the report about it must outlive the deletion.
+  targetJobId String? @db.Uuid
+  /// The reported person as the reporter knows them — a phone number from a
+  /// job advert, not an account id they have no way of seeing.
+  targetPhone String?
+
+  subject String
+  details String
+
+  status   ReportStatus @default(OPEN)
+  response String?
+
+  reviewedBy String?   @db.Uuid
+  resolvedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([category])
+  @@index([reporterId])
+  @@map("reports")
 }

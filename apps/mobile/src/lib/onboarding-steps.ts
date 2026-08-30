@@ -1,22 +1,15 @@
-import { useIntentStore } from '../store/intent-store';
-
 /**
- * A job seeker skips the individual/company question entirely, so their wizard
- * is one step shorter. The progress bar has to reflect that or it stalls at
- * "step 2 of 4" and looks broken.
+ * Registration is four steps for everyone: details → verify → documents →
+ * review.
  *
- * Counts: details → verify → documents → review, plus account type for a
- * recruiter. Verification became its own step when the SMS check moved off
- * the registration form.
+ * It used to be five for a recruiter, who spent step one choosing between an
+ * individual and a company account. That question is gone — there is one kind
+ * of account, and posting jobs as a company is unlocked later by an approved
+ * trade licence rather than declared at signup.
+ *
+ * The hook is kept, rather than inlining the numbers, so the wizard screens
+ * do not each hard-code a step count that would drift apart.
  */
 export function useStepCount(): { total: number; offset: number } {
-  const intent = useIntentStore((s) => s.intent);
-  const isRecruiter = intent === 'HIRE';
-
-  return {
-    total: isRecruiter ? 5 : 4,
-    // Recruiters spend step 1 choosing an account type; seekers start at
-    // details, so every later step shifts down by one for them.
-    offset: isRecruiter ? 1 : 0,
-  };
+  return { total: 4, offset: 0 };
 }

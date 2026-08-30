@@ -34,6 +34,9 @@ const MESSAGE_KEYS: Record<string, TranslationKey> = {
   [ApiErrorCode.UPLOAD_INVALID_TYPE]: 'error.UPLOAD_INVALID_TYPE',
 
   [ApiErrorCode.TOO_MANY_OPEN_TICKETS]: 'error.TOO_MANY_OPEN_TICKETS',
+  [ApiErrorCode.TOO_MANY_OPEN_REPORTS]: 'error.TOO_MANY_OPEN_REPORTS',
+  [ApiErrorCode.COMPANY_VERIFICATION_REQUIRED]:
+    'error.COMPANY_VERIFICATION_REQUIRED',
 
   [ApiErrorCode.EMAIL_IN_USE]: 'error.EMAIL_IN_USE',
   [ApiErrorCode.EMAIL_RESERVED]: 'error.EMAIL_RESERVED',

@@ -20,12 +20,19 @@ import {
 import { fetchJob, toggleSavedJob } from '../../../src/api/jobs';
 import { ErrorBanner } from '../../../src/components/ErrorBanner';
 import { ShimmerButton } from '../../../src/components/ShimmerButton';
+import { MatchBadge } from '../../../src/components/jobs/MatchBadge';
 import { useErrorMessage } from '../../../src/lib/error-message';
 import { useLocale, useT, type TranslationKey } from '../../../src/i18n';
 import { useTheme } from '../../../src/lib/use-theme';
 import { font, radius, space } from '../../../src/lib/theme';
 
 type Tab = 'overview' | 'requirements' | 'benefits';
+
+const REASON_KEYS: Record<'skills' | 'experience' | 'category', TranslationKey> = {
+  skills: 'match.axis.skills',
+  experience: 'match.axis.experience',
+  category: 'match.axis.category',
+};
 
 const JOB_TYPE_KEYS: Record<JobListing['jobType'], TranslationKey> = {
   FULL_TIME: 'jobs.type.FULL_TIME',
@@ -190,6 +197,59 @@ export default function JobDetailScreen() {
           <Pill icon="📅" text={t('jobs.postedOn', { date: date(job.postedAt) })} />
         </View>
 
+        {/* Fit before urgency: whether the job suits you decides whether its
+            deadline is even relevant. */}
+        {job.match ? (
+          <View
+            style={[
+              styles.matchCard,
+              { backgroundColor: c.surface, borderColor: c.border },
+            ]}
+          >
+            <View style={styles.matchHead}>
+              <MatchBadge match={job.match} showScore />
+              <Text style={[styles.matchTitle, { color: c.textMuted }]}>
+                {t('match.basedOnCv')}
+              </Text>
+            </View>
+
+            {job.match.matchedSkills.length > 0 ? (
+              <Text style={[styles.matchWhy, { color: c.text }]}>
+                {t('match.because', {
+                  skills: job.match.matchedSkills.join(', '),
+                })}
+              </Text>
+            ) : (
+              <Text style={[styles.matchWhy, { color: c.textMuted }]}>
+                {t('match.noOverlap')}
+              </Text>
+            )}
+
+            {/* The breakdown is what makes the number arguable rather than
+                mysterious — someone can see which axis let them down. */}
+            <View style={styles.bars}>
+              {job.match.reasons.map((r) => (
+                <View key={r.key} style={styles.bar}>
+                  <Text style={[styles.barLabel, { color: c.textMuted }]}>
+                    {t(REASON_KEYS[r.key])}
+                  </Text>
+                  <View style={[styles.track, { backgroundColor: c.surfaceAlt }]}>
+                    <View
+                      style={[
+                        styles.fill,
+                        {
+                          backgroundColor: c.primary,
+                          width: `${Math.round((r.earned / r.possible) * 100)}%`,
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         {job.urgency !== 'NONE' ? (
           <View
             style={[
@@ -294,6 +354,24 @@ export default function JobDetailScreen() {
             <Body text={job.benefits} empty={t('job.noBenefits')} />
           </Section>
         ) : null}
+
+        {/* Reporting carries the posting with it, so nobody has to describe
+            which listing they mean. */}
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: '/(app)/report',
+              params: { jobId: job.id, jobTitle: job.title },
+            })
+          }
+          style={styles.reportRow}
+          hitSlop={8}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.reportText, { color: c.danger }]}>
+            🚩 {t('job.report')}
+          </Text>
+        </Pressable>
       </ScrollView>
 
       {/* Save is the only action that exists — applying needs an applications
@@ -504,6 +582,21 @@ const styles = StyleSheet.create({
   pillIcon: { fontSize: 11 },
   pillText: { fontSize: font.xs, fontWeight: '600', maxWidth: 190 },
 
+  matchCard: {
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    padding: 14,
+    marginTop: 14,
+  },
+  matchHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  matchTitle: { flex: 1, fontSize: font.xs },
+  matchWhy: { fontSize: font.sm, lineHeight: 20, marginTop: 10 },
+  bars: { gap: 8, marginTop: 12 },
+  bar: { gap: 4 },
+  barLabel: { fontSize: font.xs - 1, fontWeight: '700' },
+  track: { height: 5, borderRadius: 3, overflow: 'hidden' },
+  fill: { height: 5, borderRadius: 3 },
+
   urgent: {
     alignSelf: 'flex-start',
     borderWidth: 1,
@@ -536,6 +629,9 @@ const styles = StyleSheet.create({
   factValue: { fontSize: font.sm, fontWeight: '800', marginTop: 6 },
 
   body: { fontSize: font.sm, lineHeight: 22 },
+
+  reportRow: { alignItems: 'center', marginTop: space.lg, padding: 8 },
+  reportText: { fontSize: font.sm, fontWeight: '700' },
 
   foot: { padding: space.md, borderTopWidth: 1 },
 });

@@ -119,13 +119,9 @@ export const en = {
     'At least 8 characters, with a capital letter, a small letter, a digit and a special character.',
   'ob.passwordShow': 'Show',
   'ob.passwordHide': 'Hide',
-  'auth.role.title': 'What brings you here?',
-  'auth.role.subtitle': 'You can switch or do both later.',
-  'auth.role.work': 'I want to find work',
-  'auth.role.workBody':
-    'Part-time, shift, temporary and permanent jobs near you',
-  'auth.role.hire': 'I want to hire people',
-  'auth.role.hireBody': 'Post a job as an individual or as a company',
+  'auth.role.title': 'Create your account',
+  'auth.role.subtitle':
+    'One account for everything — find work, and hire people when you need them.',
   'auth.phone.title': 'Your mobile number',
   'auth.phone.subtitle': 'We will text you a 6-digit code to confirm it.',
 
@@ -174,6 +170,7 @@ export const en = {
   'profile.phone': 'Phone number',
   'profile.name': 'Name',
   'profile.details': 'Your details',
+  'profile.noPhoto': 'Add a photo by completing face verification.',
   'profile.info': 'Your information',
   'profile.accountType': 'Account type',
   'profile.typeIndividual': 'Individual',
@@ -221,6 +218,50 @@ export const en = {
   'speech.hint.dismiss': 'Got it',
 
   'home.role.browse': 'Browse jobs',
+  'home.role.post': 'Post a job',
+
+  'post.title': 'Post a job',
+  'post.subtitle': 'Tell people what you need done, and where.',
+  'post.asIndividual': 'For myself',
+  'post.asIndividualHint': 'Household help, a one-off task, personal work',
+  'post.asCompany': 'For my company',
+  'post.asCompanyHint': 'A business vacancy',
+  'post.asCompanyLocked': 'Needs a verified trade licence',
+  'post.gateTitle': 'Trade licence needed',
+  'post.gateBody':
+    'To post on behalf of a company, upload your trade licence and our team will verify it. Until then you can still post jobs as yourself.',
+  'post.gateCta': 'Upload trade licence',
+  'post.companyName': 'Company name',
+  'post.companyNameHint': 'As written on the trade licence',
+  'post.registrationNumber': 'Registration number',
+  'post.yourRole': 'Your role there',
+  'post.yourRoleHint': 'Manager, owner, HR…',
+  'post.jobTitle': 'What is the job?',
+  'post.jobTitleHint': 'House cleaning, 3 hours',
+  'post.jobTitleHintCompany': 'Senior electrician',
+  'post.description': 'Describe the work',
+  'post.descriptionHint':
+    'What needs doing, when, and anything the worker should bring.',
+  'post.descriptionHintCompany':
+    'The role, the team, and what the day looks like.',
+  'post.area': 'Area',
+  'post.areaHint': 'Mirpur 10, Dhaka',
+  'post.vacancies': 'How many people?',
+  'post.requirementsHint': 'Qualifications, licences, experience…',
+  'post.benefitsHint': 'Meals, transport, bonuses…',
+  'post.submit': 'Post this job',
+
+  'myJobs.title': 'Jobs you posted',
+  'myJobs.live': 'Live',
+  'myJobs.closed': 'Closed',
+  'myJobs.close': 'Close this job',
+  'myJobs.reopen': 'Reopen',
+  'myJobs.savedBy': 'Saved by {count} people',
+  'myJobs.emptyTitle': 'Nothing posted yet',
+  'myJobs.emptyBody': 'Post a job and it will show up here.',
+
+  'error.COMPANY_VERIFICATION_REQUIRED':
+    'Posting for a company needs a verified trade licence. Upload one from your documents and our team will check it.',
 
   'jobs.title': 'Find your next job',
   'jobs.searchHint': 'Job title, company or area',
@@ -263,6 +304,94 @@ export const en = {
 
   'jobs.urgentOnly': 'Urgent',
   'jobs.urgentHiring': 'Urgent hiring',
+  'match.STRONG': 'Strong match',
+  'match.GOOD': 'Good match',
+  'match.FAIR': 'Partial match',
+  'match.WEAK': 'Low match',
+  'match.basedOnCv': 'Based on your CV',
+  'match.because': 'Matches your {skills}.',
+  'match.noOverlap': 'Nothing in your CV overlaps with this posting.',
+  'match.axis.skills': 'Skills and past roles',
+  'match.axis.experience': 'Years of experience',
+  'match.axis.category': 'Type of work',
+
+  'menu.cv': 'My CV',
+  'menu.report': 'Report a problem',
+  'menu.reportHint': 'Fraud, unpaid work, misconduct',
+
+  'job.report': 'Report this job',
+
+  'report.title': 'Report a problem',
+  'report.subtitle':
+    'Tell us about fraud, unpaid work, or anyone behaving badly. Our team reviews every report.',
+  'report.whatHappened': 'What happened?',
+  'report.aboutWhat': 'What is this about?',
+  'report.theirPhone': 'Their mobile number',
+  'report.subject': 'Subject',
+  'report.subjectHint': 'Sum it up in a line',
+  'report.details': 'What happened?',
+  'report.detailsHint':
+    'Dates, amounts, names, what was promised — anything that helps us look into it.',
+  'report.submit': 'Send report',
+  'report.sent': 'Report sent. Our team will review it.',
+  'report.privacy':
+    'The person you report is not told who reported them. We may contact you for more detail.',
+  'report.mine': 'Your reports',
+  'report.noneYet': 'You have not reported anything.',
+  'report.reply': 'OUR REPLY',
+
+  'report.cat.FRAUD': 'Fraud or scam',
+  'report.cat.NON_PAYMENT': 'Not paid for work',
+  'report.cat.MISLEADING_PAY': 'Pay was not as advertised',
+  'report.cat.FAKE_JOB': 'Fake job posting',
+  'report.cat.HARASSMENT': 'Harassment or abuse',
+  'report.cat.UNSAFE_WORK': 'Unsafe working conditions',
+  'report.cat.FAKE_PROFILE': 'Fake or stolen identity',
+  'report.cat.TECHNICAL': 'App problem',
+  'report.cat.OTHER': 'Something else',
+
+  'report.target.PERSON': 'A person',
+  'report.target.JOB': 'A job posting',
+  'report.target.SYSTEM': 'The app itself',
+  'report.target.OTHER': 'Something else',
+
+  'report.status.OPEN': 'Received',
+  'report.status.IN_REVIEW': 'Being reviewed',
+  'report.status.ACTION_TAKEN': 'Action taken',
+  'report.status.DISMISSED': 'No action needed',
+
+  'error.TOO_MANY_OPEN_REPORTS':
+    'You already have several reports awaiting review. Please wait for those before sending more.',
+  'menu.cvHint': 'Powers job matching',
+
+  'cv.title': 'Your CV',
+  'cv.subtitle':
+    'Upload your CV and jobs will show how well they fit your skills and experience.',
+  'cv.upload': 'Upload CV',
+  'cv.replace': 'Replace CV',
+  'cv.reading': 'Reading your CV — this can take a moment.',
+  'cv.understood': 'What we read',
+  'cv.experience': 'Experience',
+  'cv.years': '{count} years',
+  'cv.titles': 'Roles held',
+  'cv.skills': 'Skills',
+  'cv.categories': 'Suited to',
+  'cv.correctHint':
+    'If something here is wrong, edit your CV and upload it again.',
+  'cv.storedNotParsed':
+    'Your CV is saved but could not be read. Try a clearer PDF or photo.',
+  'cv.parsingOff':
+    'CV reading is switched off on the server, so jobs will not show match scores yet. Your CV is still saved.',
+  'cv.remove': 'Remove CV',
+  'cv.removing': 'Removing…',
+  'cv.removeTitle': 'Remove your CV?',
+  'cv.removeBody':
+    'Your CV and everything read from it will be deleted, and jobs will stop showing match scores.',
+  'jobs.stat.active': 'Active jobs',
+  'jobs.stat.vacancies': 'Vacancies',
+  'jobs.stat.organizations': 'Organizations',
+  'jobs.bestThisWeek': 'Best opportunities this week',
+  'jobs.seeAll': 'See all',
   'jobs.postedOn': 'Posted {date}',
   'jobs.shareVia': 'Shared from WorkFlex BD',
 
@@ -532,6 +661,9 @@ export const en = {
   'ob.doc.hintNid': 'Photograph the card flat on a dark surface.',
   'ob.doc.hintSelfie': 'Look straight at the camera in good light.',
   'ob.doc.hintBusiness': 'A photo or scan of the full document.',
+  'ob.doc.optionalTitle': 'Hiring for a company? (optional)',
+  'ob.doc.optionalBody':
+    'Upload your trade licence and, once our team verifies it, you can post jobs on behalf of your company. You can skip this and add it any time.',
   'ob.doc.uploaded': 'Uploaded',
   'ob.doc.upload': 'Upload',
   'ob.doc.retake': 'Replace',
@@ -667,13 +799,9 @@ export const bn: Record<TranslationKey, string> = {
     'কমপক্ষে ৮ অক্ষর, একটি বড় হাতের ও একটি ছোট হাতের অক্ষর, একটি সংখ্যা এবং একটি বিশেষ চিহ্ন থাকতে হবে।',
   'ob.passwordShow': 'দেখান',
   'ob.passwordHide': 'লুকান',
-  'auth.role.title': 'আপনি কী খুঁজছেন?',
-  'auth.role.subtitle': 'পরে যেকোনো সময় বদলাতে পারবেন, দুটোই করা যায়।',
-  'auth.role.work': 'আমি কাজ খুঁজছি',
-  'auth.role.workBody':
-    'আপনার কাছাকাছি খণ্ডকালীন, শিফট, অস্থায়ী ও স্থায়ী কাজ',
-  'auth.role.hire': 'আমি কর্মী নিয়োগ দিতে চাই',
-  'auth.role.hireBody': 'ব্যক্তি বা কোম্পানি হিসেবে কাজ পোস্ট করুন',
+  'auth.role.title': 'অ্যাকাউন্ট তৈরি করুন',
+  'auth.role.subtitle':
+    'একটি অ্যাকাউন্টেই সব — কাজ খুঁজুন, আবার প্রয়োজনে লোক নিয়োগ দিন।',
   'auth.phone.title': 'আপনার মোবাইল নম্বর',
   'auth.phone.subtitle': 'নিশ্চিত করতে আমরা ৬ সংখ্যার একটি কোড পাঠাব।',
 
@@ -722,6 +850,7 @@ export const bn: Record<TranslationKey, string> = {
   'profile.phone': 'ফোন নম্বর',
   'profile.name': 'নাম',
   'profile.details': 'আপনার তথ্য',
+  'profile.noPhoto': 'ফেস ভেরিফিকেশন সম্পন্ন করলে ছবি যুক্ত হবে।',
   'profile.info': 'আপনার তথ্যাবলি',
   'profile.accountType': 'অ্যাকাউন্টের ধরন',
   'profile.typeIndividual': 'ব্যক্তি',
@@ -768,6 +897,50 @@ export const bn: Record<TranslationKey, string> = {
   'speech.hint.dismiss': 'বুঝেছি',
 
   'home.role.browse': 'কাজ দেখুন',
+  'home.role.post': 'কাজের বিজ্ঞপ্তি দিন',
+
+  'post.title': 'কাজের বিজ্ঞপ্তি দিন',
+  'post.subtitle': 'আপনার কী কাজ দরকার এবং কোথায়, তা জানান।',
+  'post.asIndividual': 'নিজের জন্য',
+  'post.asIndividualHint': 'ঘরের কাজ, একবারের কাজ, ব্যক্তিগত কাজ',
+  'post.asCompany': 'আমার কোম্পানির জন্য',
+  'post.asCompanyHint': 'প্রতিষ্ঠানের নিয়োগ',
+  'post.asCompanyLocked': 'যাচাইকৃত ট্রেড লাইসেন্স লাগবে',
+  'post.gateTitle': 'ট্রেড লাইসেন্স প্রয়োজন',
+  'post.gateBody':
+    'কোম্পানির হয়ে বিজ্ঞপ্তি দিতে ট্রেড লাইসেন্স আপলোড করুন, আমাদের টিম যাচাই করবে। ততক্ষণ নিজের নামে কাজের বিজ্ঞপ্তি দিতে পারবেন।',
+  'post.gateCta': 'ট্রেড লাইসেন্স আপলোড করুন',
+  'post.companyName': 'প্রতিষ্ঠানের নাম',
+  'post.companyNameHint': 'ট্রেড লাইসেন্সে যেভাবে লেখা',
+  'post.registrationNumber': 'রেজিস্ট্রেশন নম্বর',
+  'post.yourRole': 'সেখানে আপনার পদ',
+  'post.yourRoleHint': 'ম্যানেজার, মালিক, এইচআর…',
+  'post.jobTitle': 'কী কাজ?',
+  'post.jobTitleHint': 'ঘর পরিষ্কার, ৩ ঘণ্টা',
+  'post.jobTitleHintCompany': 'সিনিয়র ইলেকট্রিশিয়ান',
+  'post.description': 'কাজের বর্ণনা',
+  'post.descriptionHint':
+    'কী করতে হবে, কখন, এবং কর্মীকে কী সঙ্গে আনতে হবে।',
+  'post.descriptionHintCompany':
+    'পদটি, টিম, এবং দৈনন্দিন কাজ কেমন হবে।',
+  'post.area': 'এলাকা',
+  'post.areaHint': 'মিরপুর ১০, ঢাকা',
+  'post.vacancies': 'কতজন লাগবে?',
+  'post.requirementsHint': 'যোগ্যতা, লাইসেন্স, অভিজ্ঞতা…',
+  'post.benefitsHint': 'খাবার, যাতায়াত, বোনাস…',
+  'post.submit': 'বিজ্ঞপ্তি প্রকাশ করুন',
+
+  'myJobs.title': 'আপনার দেওয়া কাজ',
+  'myJobs.live': 'চলমান',
+  'myJobs.closed': 'বন্ধ',
+  'myJobs.close': 'কাজটি বন্ধ করুন',
+  'myJobs.reopen': 'আবার চালু করুন',
+  'myJobs.savedBy': '{count} জন সংরক্ষণ করেছেন',
+  'myJobs.emptyTitle': 'এখনও কিছু দেওয়া হয়নি',
+  'myJobs.emptyBody': 'কাজের বিজ্ঞপ্তি দিলে এখানে দেখা যাবে।',
+
+  'error.COMPANY_VERIFICATION_REQUIRED':
+    'কোম্পানির হয়ে বিজ্ঞপ্তি দিতে যাচাইকৃত ট্রেড লাইসেন্স লাগবে। নথি থেকে আপলোড করুন, আমাদের টিম যাচাই করবে।',
 
   'jobs.title': 'পরবর্তী কাজ খুঁজুন',
   'jobs.searchHint': 'কাজের নাম, প্রতিষ্ঠান বা এলাকা',
@@ -810,6 +983,94 @@ export const bn: Record<TranslationKey, string> = {
 
   'jobs.urgentOnly': 'জরুরি',
   'jobs.urgentHiring': 'জরুরি নিয়োগ',
+  'match.STRONG': 'দারুণ মিল',
+  'match.GOOD': 'ভালো মিল',
+  'match.FAIR': 'আংশিক মিল',
+  'match.WEAK': 'কম মিল',
+  'match.basedOnCv': 'আপনার সিভি অনুযায়ী',
+  'match.because': 'আপনার {skills} এর সঙ্গে মিলেছে।',
+  'match.noOverlap': 'আপনার সিভির সঙ্গে এই কাজের কোনো মিল পাওয়া যায়নি।',
+  'match.axis.skills': 'দক্ষতা ও পূর্ব অভিজ্ঞতা',
+  'match.axis.experience': 'অভিজ্ঞতার বছর',
+  'match.axis.category': 'কাজের ধরন',
+
+  'menu.cv': 'আমার সিভি',
+  'menu.report': 'অভিযোগ জানান',
+  'menu.reportHint': 'প্রতারণা, বকেয়া মজুরি, অসদাচরণ',
+
+  'job.report': 'এই কাজের বিরুদ্ধে অভিযোগ',
+
+  'report.title': 'অভিযোগ জানান',
+  'report.subtitle':
+    'প্রতারণা, বকেয়া মজুরি বা কারও খারাপ আচরণ সম্পর্কে জানান। আমাদের টিম প্রতিটি অভিযোগ দেখে।',
+  'report.whatHappened': 'কী হয়েছে?',
+  'report.aboutWhat': 'কার বিষয়ে অভিযোগ?',
+  'report.theirPhone': 'তাঁর মোবাইল নম্বর',
+  'report.subject': 'বিষয়',
+  'report.subjectHint': 'এক লাইনে বলুন',
+  'report.details': 'বিস্তারিত লিখুন',
+  'report.detailsHint':
+    'তারিখ, টাকার পরিমাণ, নাম, কী প্রতিশ্রুতি দেওয়া হয়েছিল — যা যা তদন্তে সাহায্য করবে।',
+  'report.submit': 'অভিযোগ পাঠান',
+  'report.sent': 'অভিযোগ পাঠানো হয়েছে। আমাদের টিম দেখবে।',
+  'report.privacy':
+    'আপনি অভিযোগ করেছেন তা অভিযুক্ত ব্যক্তিকে জানানো হয় না। প্রয়োজনে আমরা আপনার সঙ্গে যোগাযোগ করতে পারি।',
+  'report.mine': 'আপনার অভিযোগ',
+  'report.noneYet': 'আপনি এখনও কোনো অভিযোগ করেননি।',
+  'report.reply': 'আমাদের উত্তর',
+
+  'report.cat.FRAUD': 'প্রতারণা',
+  'report.cat.NON_PAYMENT': 'কাজের মজুরি পাইনি',
+  'report.cat.MISLEADING_PAY': 'বিজ্ঞাপনের সঙ্গে মজুরির মিল নেই',
+  'report.cat.FAKE_JOB': 'ভুয়া কাজের বিজ্ঞপ্তি',
+  'report.cat.HARASSMENT': 'হয়রানি বা দুর্ব্যবহার',
+  'report.cat.UNSAFE_WORK': 'অনিরাপদ কাজের পরিবেশ',
+  'report.cat.FAKE_PROFILE': 'ভুয়া বা চুরি করা পরিচয়',
+  'report.cat.TECHNICAL': 'অ্যাপের সমস্যা',
+  'report.cat.OTHER': 'অন্য কিছু',
+
+  'report.target.PERSON': 'একজন ব্যক্তি',
+  'report.target.JOB': 'একটি কাজের বিজ্ঞপ্তি',
+  'report.target.SYSTEM': 'অ্যাপ নিজেই',
+  'report.target.OTHER': 'অন্য কিছু',
+
+  'report.status.OPEN': 'গৃহীত',
+  'report.status.IN_REVIEW': 'পর্যালোচনা চলছে',
+  'report.status.ACTION_TAKEN': 'ব্যবস্থা নেওয়া হয়েছে',
+  'report.status.DISMISSED': 'ব্যবস্থার প্রয়োজন নেই',
+
+  'error.TOO_MANY_OPEN_REPORTS':
+    'আপনার কয়েকটি অভিযোগ ইতিমধ্যে পর্যালোচনার অপেক্ষায় আছে। সেগুলোর নিষ্পত্তি হওয়া পর্যন্ত অপেক্ষা করুন।',
+  'menu.cvHint': 'কাজ মেলাতে ব্যবহৃত হয়',
+
+  'cv.title': 'আপনার সিভি',
+  'cv.subtitle':
+    'সিভি আপলোড করুন, তাহলে প্রতিটি কাজের সঙ্গে আপনার দক্ষতা ও অভিজ্ঞতার মিল দেখানো হবে।',
+  'cv.upload': 'সিভি আপলোড করুন',
+  'cv.replace': 'সিভি বদলান',
+  'cv.reading': 'আপনার সিভি পড়া হচ্ছে — একটু সময় লাগতে পারে।',
+  'cv.understood': 'যা বোঝা গেছে',
+  'cv.experience': 'অভিজ্ঞতা',
+  'cv.years': '{count} বছর',
+  'cv.titles': 'যেসব পদে কাজ করেছেন',
+  'cv.skills': 'দক্ষতা',
+  'cv.categories': 'উপযুক্ত কাজ',
+  'cv.correctHint':
+    'এখানে কিছু ভুল থাকলে সিভি ঠিক করে আবার আপলোড করুন।',
+  'cv.storedNotParsed':
+    'সিভি সংরক্ষিত হয়েছে, কিন্তু পড়া যায়নি। আরও স্পষ্ট পিডিএফ বা ছবি দিন।',
+  'cv.parsingOff':
+    'সার্ভারে সিভি পড়ার সুবিধা বন্ধ আছে, তাই এখন মিলের স্কোর দেখানো হবে না। আপনার সিভি সংরক্ষিত আছে।',
+  'cv.remove': 'সিভি মুছুন',
+  'cv.removing': 'মোছা হচ্ছে…',
+  'cv.removeTitle': 'সিভি মুছে ফেলবেন?',
+  'cv.removeBody':
+    'আপনার সিভি এবং তা থেকে পড়া সব তথ্য মুছে যাবে, এবং কাজের মিলের স্কোর আর দেখানো হবে না।',
+  'jobs.stat.active': 'চলমান কাজ',
+  'jobs.stat.vacancies': 'পদ সংখ্যা',
+  'jobs.stat.organizations': 'প্রতিষ্ঠান',
+  'jobs.bestThisWeek': 'এই সপ্তাহের সেরা সুযোগ',
+  'jobs.seeAll': 'সব দেখুন',
   'jobs.postedOn': '{date} তারিখে দেওয়া',
   'jobs.shareVia': 'WorkFlex BD থেকে শেয়ার করা',
 
@@ -1076,6 +1337,9 @@ export const bn: Record<TranslationKey, string> = {
   'ob.doc.hintNid': 'কার্ডটি সমতল ও গাঢ় পৃষ্ঠে রেখে ছবি তুলুন।',
   'ob.doc.hintSelfie': 'ভালো আলোতে সরাসরি ক্যামেরার দিকে তাকান।',
   'ob.doc.hintBusiness': 'সম্পূর্ণ কাগজের ছবি বা স্ক্যান।',
+  'ob.doc.optionalTitle': 'কোম্পানির হয়ে নিয়োগ দেবেন? (ঐচ্ছিক)',
+  'ob.doc.optionalBody':
+    'ট্রেড লাইসেন্স আপলোড করুন। আমাদের টিম যাচাই করার পর আপনি কোম্পানির হয়ে কাজের বিজ্ঞপ্তি দিতে পারবেন। এটি এখন বাদ দিয়ে পরেও যোগ করা যাবে।',
   'ob.doc.uploaded': 'আপলোড হয়েছে',
   'ob.doc.upload': 'আপলোড',
   'ob.doc.retake': 'পরিবর্তন',
