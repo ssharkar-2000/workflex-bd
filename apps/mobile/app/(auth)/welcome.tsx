@@ -11,7 +11,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import { MeshBackground } from '../../src/components/MeshBackground';
 import { BrandMark } from '../../src/components/BrandMark';
 import { AuroraText } from '../../src/components/AuroraText';
 import { RotatingTagline } from '../../src/components/RotatingTagline';
@@ -99,7 +98,6 @@ export default function WelcomeScreen() {
   return (
     <View style={styles.root}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      <MeshBackground />
 
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.topBar}>

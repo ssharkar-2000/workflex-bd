@@ -3,7 +3,6 @@ import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import { MeshBackground } from '../../src/components/MeshBackground';
 import { useLaunchStore } from '../../src/store/launch-store';
 import { useT } from '../../src/i18n';
 import { useTheme } from '../../src/lib/use-theme';
@@ -51,7 +50,6 @@ export default function SuccessScreen() {
   return (
     <View style={styles.root}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      <MeshBackground />
 
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.body}>

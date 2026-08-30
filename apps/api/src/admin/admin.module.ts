@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { SmsModule } from '../sms/sms.module';
 import { UsersModule } from '../users/users.module';
+import { ReportsModule } from '../reports/reports.module';
 import { AdminController } from './admin.controller';
 import { AdminAuthController } from './admin-auth.controller';
 import { AdminAuthService } from './admin-auth.service';
@@ -10,7 +11,8 @@ import { AdminInsightsService } from './admin-insights.service';
 import { AdminContentService } from './admin-content.service';
 
 @Module({
-  imports: [SmsModule, UsersModule],
+  // ReportsModule for the user-report queue, which the console triages.
+  imports: [SmsModule, UsersModule, ReportsModule],
   controllers: [AdminController, AdminAuthController],
   providers: [
     KycReviewService,

@@ -12,6 +12,7 @@ import {
   notificationSchema,
   reportSummarySchema,
   securityOverviewSchema,
+  adminReportListSchema,
   supportListSchema,
   systemStatusSchema,
   type AdminAuthTokens,
@@ -19,6 +20,7 @@ import {
   type AdminUserFilter,
   type AdminUserList,
   type KycQueueResponse,
+  type ReportStatus,
 } from '@workflex/shared';
 import { api } from './client';
 import { env } from '../lib/env';
@@ -154,6 +156,23 @@ export async function respondToTicket(
   status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED',
 ): Promise<void> {
   await api.patch(`/admin/support/${id}`, { response, status });
+}
+
+// --- user reports ---
+// A different queue from support: complaints about the platform, a posting
+// or another person, which can end in a suspension rather than a reply.
+
+export async function fetchReports(status?: string) {
+  const { data } = await api.get('/admin/reports', { params: { status } });
+  return adminReportListSchema.parse(data);
+}
+
+export async function resolveReport(
+  id: string,
+  status: ReportStatus,
+  response?: string,
+): Promise<void> {
+  await api.patch(`/admin/reports/${id}`, { status, response });
 }
 
 export async function fetchContent() {

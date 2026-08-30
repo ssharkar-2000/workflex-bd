@@ -89,6 +89,9 @@ export class UsersService {
       verificationLevel: user.verificationLevel as 0 | 1 | 2,
       isAdmin: user.isAdmin,
       accountType: user.accountType,
+      // Level 2 *is* "business verified"; a separate stored flag would be a
+      // second source of truth that could disagree with it.
+      canPostCompanyJobs: user.verificationLevel >= 2,
       profiles,
       recruiterKind,
       createdAt: user.createdAt.toISOString(),

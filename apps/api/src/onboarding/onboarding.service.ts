@@ -52,10 +52,13 @@ export class OnboardingService {
       orderBy: { createdAt: 'desc' },
     });
 
-    const needed = user.accountType
-      ? requiredDocuments(user.accountType)
-      : [];
-    const have = new Set(user.documents.map((d) => d.kind as string));
+    // The same three for everyone, from the first visit — the checklist no
+    // longer waits on an account type being chosen.
+    const needed = requiredDocuments();
+    // A CV is stored as a Document but is input to job matching, not identity
+    // evidence — it must never count towards the registration checklist.
+    const identityDocs = user.documents.filter((d) => d.kind !== 'CV');
+    const have = new Set(identityDocs.map((d) => d.kind as string));
 
     return {
       accountType: user.accountType,
@@ -67,8 +70,10 @@ export class OnboardingService {
       designation: user.designation,
       email: user.email,
       emailVerified: user.emailVerifiedAt !== null,
-      documents: user.documents.map((d) => ({
-        kind: d.kind,
+      documents: identityDocs.map((d) => ({
+        // Narrowed by the filter above; Prisma's row type still carries the
+        // full enum, which now includes CV.
+        kind: d.kind as Exclude<DocumentKind, 'CV'>,
         uploadedAt: d.createdAt.toISOString(),
         sizeBytes: d.sizeBytes,
         analysis: d.analysis
@@ -95,17 +100,17 @@ export class OnboardingService {
     };
   }
 
+  /**
+   * Registration is complete when the person has told us who they are. The
+   * company-name check that used to live here is gone: a business is proved
+   * by an approved trade licence, not by typing a name into a signup form.
+   */
   private isProfileComplete(user: {
-    accountType: AccountType | null;
     firstName: string | null;
     lastName: string | null;
     address: string | null;
-    company: { name: string } | null;
   }): boolean {
-    if (!user.accountType || !user.firstName || !user.lastName || !user.address)
-      return false;
-    if (user.accountType === 'COMPANY' && !user.company?.name) return false;
-    return true;
+    return Boolean(user.firstName && user.lastName && user.address);
   }
 
   async saveProfile(
@@ -118,37 +123,23 @@ export class OnboardingService {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
-        accountType: dto.accountType,
+        // Kept at INDIVIDUAL for every new account. The column stays for
+        // existing records and admin reporting, but it no longer decides
+        // what anyone may do — a business is proved by an approved trade
+        // licence, which is what level 2 records.
+        accountType: 'INDIVIDUAL',
         firstName: dto.firstName,
         lastName: dto.lastName,
         address: dto.address,
-        designation: dto.accountType === 'COMPANY' ? dto.designation : null,
-        // Only job seekers are asked; a company account has no answer to store.
-        experienceType:
-          dto.accountType === 'INDIVIDUAL' ? dto.experienceType : null,
+        experienceType: dto.experienceType ?? null,
         // Only the hash is ever persisted; the plaintext leaves scope here.
         passwordHash: await this.passwords.hash(dto.password),
       },
     });
 
-    if (dto.accountType === 'COMPANY') {
-      await this.prisma.company.upsert({
-        where: { ownerId: userId },
-        create: {
-          ownerId: userId,
-          name: dto.companyName,
-          registrationNumber: dto.companyRegistrationNumber,
-          tin: dto.tin || null,
-          tradeLicenseNo: dto.tradeLicenseNo || null,
-        },
-        update: {
-          name: dto.companyName,
-          registrationNumber: dto.companyRegistrationNumber,
-          tin: dto.tin || null,
-          tradeLicenseNo: dto.tradeLicenseNo || null,
-        },
-      });
-    }
+    // The company record is no longer created here. Its details are asked
+    // for at the point they are needed — posting a job as a company — rather
+    // than at signup from someone who may never post one.
 
     // Email stays optional: supplying one starts a verification, omitting one
     // changes nothing and never blocks registration.

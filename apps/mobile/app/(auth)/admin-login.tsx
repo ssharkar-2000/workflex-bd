@@ -18,7 +18,6 @@ import { useMutation } from '@tanstack/react-query';
 import { adminLoginSchema } from '@workflex/shared';
 import { adminLogin } from '../../src/api/admin';
 import { useErrorMessage } from '../../src/lib/error-message';
-import { MeshBackground } from '../../src/components/MeshBackground';
 import { GlassCard } from '../../src/components/GlassCard';
 import { ShimmerButton } from '../../src/components/ShimmerButton';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
@@ -98,7 +97,6 @@ export default function AdminLoginScreen() {
   return (
     <View style={styles.root}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      <MeshBackground />
 
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.topBar}>

@@ -69,9 +69,10 @@ export default function DocumentsScreen() {
     );
   }
 
-  const needed = data.accountType
-    ? requiredDocuments(data.accountType)
-    : requiredDocuments('INDIVIDUAL');
+  // The same three for everyone. A trade licence is offered below as an
+  // optional extra, not counted here — it unlocks posting jobs as a company
+  // and must never block someone from finishing registration.
+  const needed = requiredDocuments();
   const have = new Set(data.documents.map((d) => d.kind));
   const byKind = new Map(data.documents.map((d) => [d.kind, d]));
   const complete = needed.every((k) => have.has(k));
@@ -105,11 +106,35 @@ export default function DocumentsScreen() {
         />
       ))}
 
+      {/* Offered, never required. A trade licence is what unlocks posting
+          jobs as a company once an admin has checked it; someone who only
+          wants to find work never needs one, and it must not stand between
+          them and finishing registration. */}
+      <View style={[styles.optionalHead, { borderTopColor: c.glassBorder }]}>
+        <Text style={[styles.optionalTitle, { color: c.textOnBrand }]}>
+          {t('ob.doc.optionalTitle')}
+        </Text>
+        <Text style={[styles.optionalBody, { color: c.textMutedOnBrand }]}>
+          {t('ob.doc.optionalBody')}
+        </Text>
+      </View>
+
+      <DocumentTile
+        kind="TRADE_LICENSE"
+        uploaded={have.has('TRADE_LICENSE')}
+        uploading={busyKind === 'TRADE_LICENSE'}
+        analysis={byKind.get('TRADE_LICENSE')?.analysis ?? null}
+        onPicked={(file) => upload.mutate({ kind: 'TRADE_LICENSE', file })}
+      />
+
       <ErrorBanner message={error} />
 
       <View style={styles.counter}>
         <Text style={[styles.counterText, { color: c.textMutedOnBrand }]}>
-          {have.size} / {needed.length} {t('ob.doc.uploaded').toLowerCase()}
+          {/* Counts only the required set, so an uploaded licence cannot make
+              the tally read 4 / 3. */}
+          {needed.filter((k) => have.has(k)).length} / {needed.length}{' '}
+          {t('ob.doc.uploaded').toLowerCase()}
         </Text>
       </View>
     </StepShell>
@@ -117,6 +142,15 @@ export default function DocumentsScreen() {
 }
 
 const styles = StyleSheet.create({
+  optionalHead: {
+    borderTopWidth: 1,
+    marginTop: 18,
+    paddingTop: 16,
+    marginBottom: 12,
+  },
+  optionalTitle: { fontSize: 15, fontWeight: '800' },
+  optionalBody: { fontSize: 12.5, lineHeight: 18, marginTop: 4 },
+
   counter: { alignItems: 'center', marginTop: 8 },
   counterText: {
     fontSize: 12,

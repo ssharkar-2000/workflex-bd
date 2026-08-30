@@ -16,7 +16,6 @@ import { useMutation } from '@tanstack/react-query';
 import { maskPhone, passwordResetConfirmSchema } from '@workflex/shared';
 import { confirmPasswordReset } from '../../src/api/auth';
 import { useErrorMessage } from '../../src/lib/error-message';
-import { MeshBackground } from '../../src/components/MeshBackground';
 import { GlassCard } from '../../src/components/GlassCard';
 import { GlassField } from '../../src/components/onboarding/GlassField';
 import { ShimmerButton } from '../../src/components/ShimmerButton';
@@ -80,7 +79,6 @@ export default function ResetPasswordScreen() {
   return (
     <View style={styles.root}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      <MeshBackground />
 
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.topBar}>

@@ -19,7 +19,6 @@ import { StepShell } from '../../src/components/onboarding/StepShell';
 import { GlassField } from '../../src/components/onboarding/GlassField';
 import { PasswordStrength } from '../../src/components/onboarding/PasswordStrength';
 import { ChoiceCards } from '../../src/components/onboarding/ChoiceCards';
-import { useIntentStore } from '../../src/store/intent-store';
 import { useTheme } from '../../src/lib/use-theme';
 import { PhoneField } from '../../src/components/onboarding/PhoneField';
 import { ShimmerButton } from '../../src/components/ShimmerButton';
@@ -33,22 +32,13 @@ import { useStepCount } from '../../src/lib/onboarding-steps';
 export default function DetailsScreen() {
   const t = useT();
   const router = useRouter();
-  const params = useLocalSearchParams<{ accountType?: string }>();
-  const accountType: AccountType =
-    params.accountType === 'COMPANY' ? 'COMPANY' : 'INDIVIDUAL';
-  const isCompany = accountType === 'COMPANY';
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [companyName, setCompanyName] = useState('');
-  const [companyRegistrationNumber, setCompanyRegistrationNumber] = useState('');
-  const [designation, setDesignation] = useState('');
   const [address, setAddress] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [email, setEmail] = useState('');
-  const [tin, setTin] = useState('');
-  const [tradeLicenseNo, setTradeLicenseNo] = useState('');
 
   const [phone, setPhone] = useState('');
   const [experienceType, setExperienceType] = useState<ExperienceType | null>(
@@ -57,10 +47,8 @@ export default function DetailsScreen() {
   const setDraft = useRegistrationDraft((s) => s.set);
 
   const { c } = useTheme();
-  const intent = useIntentStore((s) => s.intent);
   // Anyone who came through "find work". A recruiter registering as an
   // individual reaches this same form but answers a different question.
-  const isJobSeeker = !isCompany && intent !== 'HIRE';
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -97,31 +85,22 @@ export default function DetailsScreen() {
       return;
     }
 
-    // Required by the form for job seekers, though the shared schema leaves it
-    // optional so an individual recruiter — who is never asked — still passes.
-    if (isJobSeeker && !experienceType) {
+    // Everyone is a potential job seeker now, so everyone is asked. The
+    // shared schema keeps it optional so an older record without an answer
+    // still validates.
+    if (!experienceType) {
       setFieldErrors({ experienceType: t('ob.experienceRequired') });
       return;
     }
 
     const input = {
-      accountType,
       firstName,
       lastName,
       address,
       password,
       confirmPassword,
       email: email.trim() || undefined,
-      ...(isJobSeeker && experienceType ? { experienceType } : {}),
-      ...(isCompany
-        ? {
-            companyName,
-            companyRegistrationNumber,
-            designation,
-            tin,
-            tradeLicenseNo,
-          }
-        : {}),
+      ...(experienceType ? { experienceType } : {}),
     } as OnboardingProfileInput;
 
     // Validated with the same schema the API uses, so nothing can pass here
@@ -198,34 +177,6 @@ export default function DetailsScreen() {
         editable={!sendCode.isPending}
       />
 
-      {isCompany ? (
-        <>
-          <GlassField
-            label={t('ob.companyName')}
-            value={companyName}
-            onChangeText={setCompanyName}
-            sanitize={sanitizeOrganisationName}
-            error={fieldErrors.companyName}
-          />
-          <GlassField
-            label={t('ob.companyRegistrationNumber')}
-            value={companyRegistrationNumber}
-            onChangeText={setCompanyRegistrationNumber}
-            sanitize={sanitizeReferenceNumber}
-            error={fieldErrors.companyRegistrationNumber}
-            autoCapitalize="none"
-          />
-          <GlassField
-            label={t('ob.designation')}
-            value={designation}
-            onChangeText={setDesignation}
-            sanitize={sanitizeDesignation}
-            placeholder={t('ob.designationPlaceholder')}
-            error={fieldErrors.designation}
-          />
-        </>
-      ) : null}
-
       <GlassField
         label={t('ob.address')}
         value={address}
@@ -236,33 +187,6 @@ export default function DetailsScreen() {
         autoCapitalize="sentences"
         multiline
       />
-
-      {isCompany ? (
-        <>
-          {/* Full width rather than side by side: both labels are long enough
-              to wrap on a phone, which left the two inputs at different
-              heights and clipped the "optional" tag. */}
-          <GlassField
-            label={t('ob.tin')}
-            value={tin}
-            onChangeText={setTin}
-            sanitize={(v) => sanitizeDigits(v, 15)}
-            error={fieldErrors.tin}
-            optional
-            autoCapitalize="none"
-            keyboardType="number-pad"
-          />
-          <GlassField
-            label={t('ob.tradeLicenseNo')}
-            value={tradeLicenseNo}
-            onChangeText={setTradeLicenseNo}
-            sanitize={sanitizeReferenceNumber}
-            error={fieldErrors.tradeLicenseNo}
-            optional
-            autoCapitalize="none"
-          />
-        </>
-      ) : null}
 
       {/* A plain field now. Saving the profile sends a verification code to
           whatever is entered, and the user confirms it later from My Profile —
@@ -307,23 +231,20 @@ export default function DetailsScreen() {
         icon="🔒"
       />
 
-      {/* Job seekers only. A recruiter has no use for "I'm a fresher", and has
-          already answered the equivalent question — individual or company — on
-          the previous screen. */}
-      {isJobSeeker ? (
-        <ChoiceCards
-          label={t('ob.experienceLabel')}
-          choices={EXPERIENCE_CHOICES}
-          selected={experienceType}
-          onSelect={(v) => {
-            setExperienceType(v);
-            if (fieldErrors.experienceType) {
-              setFieldErrors((e) => ({ ...e, experienceType: '' }));
-            }
-          }}
-          error={fieldErrors.experienceType}
-        />
-      ) : null}
+      {/* Asked of everyone. There is one kind of account now, and anybody
+          may look for work — so the question applies to anybody. */}
+      <ChoiceCards
+        label={t('ob.experienceLabel')}
+        choices={EXPERIENCE_CHOICES}
+        selected={experienceType}
+        onSelect={(v) => {
+          setExperienceType(v);
+          if (fieldErrors.experienceType) {
+            setFieldErrors((e) => ({ ...e, experienceType: '' }));
+          }
+        }}
+        error={fieldErrors.experienceType}
+      />
 
       <ErrorBanner message={formError} />
 

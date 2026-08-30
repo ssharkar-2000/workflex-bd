@@ -18,7 +18,6 @@ import { useMutation } from '@tanstack/react-query';
 import { bdPhoneSchema, sanitizeDigits } from '@workflex/shared';
 import { login } from '../../src/api/auth';
 import { useErrorMessage } from '../../src/lib/error-message';
-import { MeshBackground } from '../../src/components/MeshBackground';
 import { BrandMark } from '../../src/components/BrandMark';
 import { GlassCard } from '../../src/components/GlassCard';
 import { ShimmerButton } from '../../src/components/ShimmerButton';
@@ -27,22 +26,12 @@ import { LanguageToggle } from '../../src/components/LanguageToggle';
 import { ThemeToggle } from '../../src/components/ThemeToggle';
 import { useAuthStore } from '../../src/store/auth-store';
 import { useLaunchStore } from '../../src/store/launch-store';
-import { useIntentStore, type Intent } from '../../src/store/intent-store';
 import { useT, type TranslationKey } from '../../src/i18n';
 import { useTheme } from '../../src/lib/use-theme';
 import { font, radius } from '../../src/lib/theme';
 
 type Tab = 'login' | 'register';
 
-const INTENTS: {
-  intent: Intent;
-  emoji: string;
-  title: TranslationKey;
-  body: TranslationKey;
-}[] = [
-  { intent: 'WORK', emoji: '🔎', title: 'auth.role.work', body: 'auth.role.workBody' },
-  { intent: 'HIRE', emoji: '📋', title: 'auth.role.hire', body: 'auth.role.hireBody' },
-];
 
 /**
  * One screen, two tabs — sign in and registration entry share it rather than
@@ -63,7 +52,6 @@ export default function LoginScreen() {
     tab?: string;
   }>();
   const setSession = useAuthStore((s) => s.setSession);
-  const setIntent = useIntentStore((s) => s.setIntent);
   const errorMessage = useErrorMessage();
 
   const [tab, setTab] = useState<Tab>(params.tab === 'register' ? 'register' : 'login');
@@ -77,7 +65,6 @@ export default function LoginScreen() {
   const [focusedField, setFocusedField] = useState<'phone' | 'password' | null>(
     null,
   );
-  const [selectedIntent, setSelectedIntent] = useState<Intent | null>(null);
 
   const enter = useRef(new Animated.Value(0)).current;
 
@@ -114,20 +101,9 @@ export default function LoginScreen() {
 
   const canSubmit = phone.length >= 10 && password.length > 0;
 
-  const onContinueRegister = () => {
-    if (!selectedIntent) return;
-    void setIntent(selectedIntent);
-    // A job seeker is always an individual, so that question is not worth
-    // asking — only a recruiter can be a company.
-    if (selectedIntent === 'WORK') {
-      router.push({
-        pathname: '/(onboarding)/details',
-        params: { accountType: 'INDIVIDUAL' },
-      });
-    } else {
-      router.push('/(onboarding)/account-type');
-    }
-  };
+  // Straight to the form. There is one kind of account, so there is nothing
+  // to decide before filling it in.
+  const onContinueRegister = () => router.push('/(onboarding)/details');
 
   const fieldStyle = (field: 'phone' | 'password') => [
     styles.inputRow,
@@ -148,7 +124,6 @@ export default function LoginScreen() {
   return (
     <View style={styles.root}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      <MeshBackground />
 
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.topBar}>
@@ -364,59 +339,10 @@ export default function LoginScreen() {
                       {t('auth.role.subtitle')}
                     </Text>
 
-                    {INTENTS.map((option) => {
-                      const active = selectedIntent === option.intent;
-                      return (
-                        <Pressable
-                          key={option.intent}
-                          onPress={() => setSelectedIntent(option.intent)}
-                          style={[
-                            styles.intentCard,
-                            {
-                              borderColor: active ? c.primary : c.glassBorder,
-                              backgroundColor: active
-                                ? c.glassHighlight
-                                : c.glassFill,
-                            },
-                          ]}
-                        >
-                          <Text style={styles.intentEmoji}>{option.emoji}</Text>
-                          <View style={styles.intentText}>
-                            <Text
-                              style={[styles.intentTitle, { color: c.textOnBrand }]}
-                            >
-                              {t(option.title)}
-                            </Text>
-                            <Text
-                              style={[
-                                styles.intentBody,
-                                { color: c.textMutedOnBrand },
-                              ]}
-                            >
-                              {t(option.body)}
-                            </Text>
-                          </View>
-                          <View
-                            style={[
-                              styles.radio,
-                              { borderColor: active ? c.primary : c.glassBorder },
-                            ]}
-                          >
-                            {active ? (
-                              <View
-                                style={[styles.radioDot, { backgroundColor: c.primary }]}
-                              />
-                            ) : null}
-                          </View>
-                        </Pressable>
-                      );
-                    })}
-
                     <View style={styles.buttonWrap}>
                       <ShimmerButton
                         label={t('ob.continue')}
                         onPress={onContinueRegister}
-                        disabled={!selectedIntent}
                       />
                     </View>
                   </>

@@ -59,6 +59,19 @@ export const envSchema = z.object({
   SMS_SENDER_ID: z.string().optional(),
   SMS_ENDPOINT: z.string().url().default('http://bulksmsbd.net/api/smsapi'),
 
+  // --- CV understanding ---
+  // Turning a CV into structured skills is the one job here that genuinely
+  // needs a language model: the input is free-form prose in two languages and
+  // no two CVs share a layout. Matching *against* those skills afterwards is
+  // arithmetic, and is never sent to a model.
+  //
+  // 'off' keeps every other feature working — CVs upload and store, they are
+  // simply not parsed, and jobs carry no match score. That is the correct
+  // behaviour without a key rather than a broken screen.
+  CV_PARSER: z.enum(['off', 'claude']).default('off'),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  CV_PARSER_MODEL: z.string().default('claude-opus-5'),
+
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_FROM: z.string().optional(),
@@ -144,6 +157,12 @@ export function validateEnv(raw: Record<string, unknown>): Env {
   // Selecting a gateway without its credentials would fail at the first
   // signup attempt instead of at boot. Fail at boot.
   const missing = requiredCredentials(parsed.data);
+  if (parsed.data.CV_PARSER === 'claude' && !parsed.data.ANTHROPIC_API_KEY) {
+    throw new Error(
+      'CV_PARSER=claude requires ANTHROPIC_API_KEY. Set the key, or use CV_PARSER=off.',
+    );
+  }
+
   if (missing.length > 0) {
     throw new Error(
       `SMS_PROVIDER=${parsed.data.SMS_PROVIDER} requires: ${missing.join(', ')}`,

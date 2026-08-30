@@ -14,7 +14,6 @@ import { useMutation } from '@tanstack/react-query';
 import { maskPhone } from '@workflex/shared';
 import { requestOtp, verifyOtp } from '../../src/api/auth';
 import { useErrorMessage } from '../../src/lib/error-message';
-import { MeshBackground } from '../../src/components/MeshBackground';
 import { GlassCard } from '../../src/components/GlassCard';
 import { ShimmerButton } from '../../src/components/ShimmerButton';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
@@ -78,7 +77,6 @@ export default function OtpScreen() {
   return (
     <View style={styles.root}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      <MeshBackground />
 
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.topBar}>

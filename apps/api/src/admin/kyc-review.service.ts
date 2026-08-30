@@ -124,12 +124,25 @@ export class KycReviewService {
   async approve(submissionId: string, adminId: string) {
     const submission = await this.load(submissionId);
 
-    // A company application proves the person *and* the business, so it lands
-    // at L2; an individual application stops at L1.
-    const level =
-      submission.accountType === 'COMPANY'
-        ? VerificationLevel.L2_BUSINESS
-        : VerificationLevel.L1_IDENTITY;
+    /**
+     * The level follows the evidence, not a role chosen at signup.
+     *
+     * NID and selfie prove the person, which is L1 and is what everyone
+     * needs. A trade licence additionally proves a business, which is L2 and
+     * is what unlocks posting jobs as a company. Reading the uploaded
+     * documents means someone who adds a licence months later is upgraded on
+     * the same code path, with no account type to change.
+     */
+    const hasTradeLicence = await this.prisma.document.findUnique({
+      where: {
+        userId_kind: { userId: submission.userId, kind: 'TRADE_LICENSE' },
+      },
+      select: { id: true },
+    });
+
+    const level = hasTradeLicence
+      ? VerificationLevel.L2_BUSINESS
+      : VerificationLevel.L1_IDENTITY;
 
     await this.prisma.$transaction([
       this.prisma.kycSubmission.update({

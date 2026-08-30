@@ -18,6 +18,7 @@ import {
   adminUserQuerySchema,
   changeAdminPasswordSchema,
   createNotificationSchema,
+  resolveReportSchema,
   maskPhone,
   respondTicketSchema,
   setUserStatusSchema,
@@ -25,12 +26,14 @@ import {
   type AdminUserQuery,
   type ChangeAdminPasswordDto,
   type CreateNotificationDto,
+  type ResolveReportDto,
   type RespondTicketDto,
   type SetUserStatusDto,
   type UpsertContentDto,
 } from '@workflex/shared';
 import { AdminGuard } from '../common/guards/admin.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { ReportsService } from '../reports/reports.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { AppException } from '../common/exceptions/app.exception';
 import { SmsService } from '../sms/sms.service';
@@ -57,6 +60,7 @@ export class AdminController {
     private readonly directory: AdminDirectoryService,
     private readonly insights: AdminInsightsService,
     private readonly content: AdminContentService,
+    private readonly reportsService: ReportsService,
   ) {}
 
   // --- company management ---
@@ -157,6 +161,28 @@ export class AdminController {
   async deleteNotification(@Param('id') id: string) {
     await this.content.deleteNotification(id);
     return { deleted: true };
+  }
+
+  // --- reports ---
+  //
+  // A separate queue from support: these are complaints about the platform,
+  // a posting, or another person, and they can end in a suspension rather
+  // than a reply.
+
+  @Get('reports')
+  @ApiOperation({ summary: 'User reports, with per-category counts' })
+  async reports(@Query('status') status?: string) {
+    return this.reportsService.list(status as never);
+  }
+
+  @Patch('reports/:id')
+  @ApiOperation({ summary: 'Set a report status and optionally reply' })
+  async resolveReport(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(resolveReportSchema)) dto: ResolveReportDto,
+    @CurrentUser('userId') adminId: string,
+  ) {
+    return this.reportsService.resolve(id, adminId, dto);
   }
 
   // --- support ---

@@ -6,6 +6,6 @@ import { AnalysisService } from './analysis.service';
 
 @Module({
   providers: [ImageQualityService, OcrService, FaceService, AnalysisService],
-  exports: [AnalysisService],
+  exports: [AnalysisService, OcrService],
 })
 export class VerificationModule {}

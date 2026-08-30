@@ -15,6 +15,20 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { SmsService } from '../sms/sms.service';
 import type { Env } from '../config/env.schema';
 
+/**
+ * The KYC queue is about identity evidence. A CV is stored as a Document too,
+ * but it proves nothing about who someone is and never gets an analysis row —
+ * excluding it here keeps that boundary explicit.
+ */
+const IDENTITY_DOCS = { document: { kind: { not: 'CV' as const } } };
+
+type IdentityDocumentKind =
+  | 'NID_FRONT'
+  | 'NID_BACK'
+  | 'SELFIE'
+  | 'TIN_CERTIFICATE'
+  | 'TRADE_LICENSE';
+
 const DAY_MS = 86_400_000;
 
 /**
@@ -153,9 +167,11 @@ export class AdminInsightsService {
     const [grouped, recent] = await Promise.all([
       this.prisma.documentAnalysis.groupBy({
         by: ['status'],
+        where: IDENTITY_DOCS,
         _count: { _all: true },
       }),
       this.prisma.documentAnalysis.findMany({
+        where: IDENTITY_DOCS,
         orderBy: { createdAt: 'desc' },
         take: 40,
         include: {
@@ -183,13 +199,16 @@ export class AdminInsightsService {
       },
       alerts: recent.map((a) => ({
         id: a.id,
+        // Narrowed by IDENTITY_DOCS above; Prisma's result type cannot carry
+        // a relation filter through, so the assertion states what the query
+        // already guarantees.
+        kind: a.document.kind as IdentityDocumentKind,
         userId: a.document.user.id,
         userName:
           [a.document.user.firstName, a.document.user.lastName]
             .filter(Boolean)
             .join(' ') || 'Unnamed',
         userPhone: a.document.user.phone,
-        kind: a.document.kind,
         status: a.status,
         sharpness: a.sharpness,
         glare: a.glare,
