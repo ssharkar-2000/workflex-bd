@@ -3,12 +3,12 @@ import {
   Animated,
   Easing,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
+import { JOB_CATEGORIES } from '@workflex/shared';
 import { useTheme } from '../lib/use-theme';
 
 /**
@@ -18,22 +18,20 @@ import { useTheme } from '../lib/use-theme';
  * topic means the texture also says what the app does.
  */
 const DOODLES = [
-  '💼', '🛠️', '🪪', '💸', '⏰', '📍', '🤝', '👷', '💻', '📋',
-  '🚚', '🍽️', '🏥', '🎓', '⭐', '✅', '🔧', '📦', '🧾', '🏗️',
-  '🧰', '🚀', '📱', '🗓️', '🏭', '🧑‍🍳', '🛵', '🧹', '💰', '📊',
-];
+  // Every kind of work the product actually lists, taken from the taxonomy
+  // itself rather than a hand-kept copy of it. Add a category and it joins the
+  // background; rename one and nothing here goes stale.
+  ...JOB_CATEGORIES.map((category) => category.emoji),
 
-/**
- * Spacing between icons.
- *
- * Widened from 78 to thin the pattern out: at 78 a phone carried eighty-odd
- * icons and the background read as wallpaper rather than as scattered
- * texture. The grid is now sized from the actual viewport instead of a fixed
- * row and column count, so it covers the whole page on a tall phone and on a
- * wide desktop alike — the old 6 × 14 grid stopped less than 500px across and
- * left most of a browser window bare.
- */
-const CELL = 155;
+  // The platform's own mechanics, which are not job categories but are just as
+  // much what this app is: NID verification, bKash payment, shift times,
+  // nearby work, and being hired.
+  '🪪',
+  '💸',
+  '⏰',
+  '📍',
+  '🤝',
+];
 
 interface Blob {
   size: number;
@@ -105,37 +103,280 @@ export function MeshBackground() {
 }
 
 /**
- * The scattered icons behind every screen, now with their own small drift.
+ * How much page each icon gets.
  *
- * Two motions are layered. The whole sheet still rises and falls very slowly,
- * which reads as depth. On top of that each icon traces a small ellipse of a
- * few pixels, so the background is quietly alive rather than a printed
- * pattern.
- *
- * The icons are grouped into four bands rather than animated one by one. There
- * are eighty-four of them, and giving each its own driver would put hundreds
- * of interpolated nodes behind a decoration nobody should consciously notice —
- * on the cheap Android handsets this app is built for, that is a real cost for
- * an effect nobody asked to see. Four bands at different periods, interleaved
- * across the grid so neighbours are never in the same one, look independent at
- * any distance a person actually views them from.
+ * The layer used to be a fixed 155px grid with a jitter of a few pixels, which
+ * still read as a grid — a small jitter against a fixed pitch is a grid with
+ * soft edges, and the eye finds the rows anyway. Density is now expressed as
+ * area per icon, so a tall phone and a wide browser window get the same
+ * *texture* rather than the same count.
  */
+const AREA_PER_ICON = 45_000;
+
 /**
- * Four periods, four directions, four tiny rotations.
+ * Bounds on that density: never so few the page looks bare, never so many it
+ * reads as wallpaper. These constrain the target the layout aims at, not the
+ * final count — `scatter` rounds the target to whole rows and columns, so a
+ * desktop lands a little above the maximum and a phone a little above the
+ * minimum. Coverage matters more here than hitting an exact number.
+ */
+const MIN_ICONS = 8;
+const MAX_ICONS = 22;
+
+/**
+ * Size range.
  *
- * `spin` is deliberately under a degree. Rotating a full-screen band moves
- * icons in proportion to their distance from its centre — at 2.5deg an icon
- * near the edge travels 17px while one in the middle travels 6, and the whole
- * corner swinging together reads as the page tilting rather than icons
- * floating. Under a degree the edge moves about 5px, the same order as the
- * translation, so it adds variation across the screen instead of a tilt.
+ * Wider than the old 20–31. Varying size is what stops a scatter looking like
+ * confetti: a few large icons and many small ones reads as depth, where one
+ * uniform size reads as a pattern. The small ones are also drawn fainter,
+ * which is the same cue a real out-of-focus background gives.
+ */
+const MIN_SIZE = 22;
+const MAX_SIZE = 46;
+
+/**
+ * A deterministic hash in [0, 1).
+ *
+ * Deliberately not Math.random: the layout has to be identical on every render
+ * and every mount, or icons would jump to new positions each time a screen
+ * re-renders. Same seed, same page — while still looking unplanned.
+ */
+function hash(seed: number): number {
+  const x = Math.sin(seed * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+interface Doodle {
+  key: string;
+  icon: string;
+  top: number;
+  left: number;
+  size: number;
+  rotate: string;
+  /** Fainter when small, so size reads as distance. */
+  depth: number;
+  band: number;
+  /** Where this icon sits on its band's ellipse, 0–1. */
+  phase: number;
+}
+
+/**
+ * The vocabulary in a fixed shuffled order.
+ *
+ * Icons are then taken in sequence, which guarantees a screen shows as many
+ * different ones as it has room for. Picking each independently at random
+ * looked repetitive — with 25 icons in 10 slots the birthday problem makes a
+ * duplicate almost certain, and a repeated emoji is the one thing that gives
+ * a "random" background away as generated.
+ */
+const SHUFFLED = DOODLES.map((icon, i) => ({ icon, at: hash(i * 31 + 7) }))
+  .sort((a, b) => a.at - b.at)
+  .map((entry) => entry.icon);
+
+/**
+ * How far inside its cell an icon may wander, as a fraction of the cell.
+ *
+ * The remaining margin is what keeps neighbours apart: at 0.72 there is always
+ * at least 28% of a cell between two icons, so they cannot collide, and the
+ * roaming is wide enough that the underlying grid is not visible.
+ */
+const CELL_JITTER = 0.72;
+
+/**
+ * The share of the page kept clear for content, as a fraction of each axis.
+ *
+ * Every screen in this app centres what matters — the wordmark and buttons on
+ * the landing page, a card on the forms — and an icon behind a heading is
+ * texture competing with the thing it is meant to sit behind. Held to less
+ * than half of each axis so the icons still read as covering the page rather
+ * than hugging its frame.
+ */
+const CLEAR_X = 0.46;
+const CLEAR_Y = 0.48;
+
+/**
+ * Extra clearance in pixels, on top of the cleared area.
+ *
+ * An icon is not still — it traces an ellipse of up to 8.6px (the largest
+ * band amplitude, `hypot(5, 7)`). Pushing it to exactly the boundary means its
+ * own drift carries it back inside on every cycle. Expressing the clearance as
+ * a ratio failed for the same reason: 6% of a wide screen is generous, but 6%
+ * of a narrow one is smaller than the drift it has to survive.
+ */
+const CLEAR_PAD = 12;
+
+/**
+ * Moves an icon out of the middle of the page.
+ *
+ * The keep-out is an ellipse rather than a rectangle because content is
+ * centred and roughly oval in mass; a rectangle would push icons into hard
+ * lines along its sides, which is more visible than the clustering it fixes.
+ *
+ * An icon inside it is pushed straight out along the line from the centre, so
+ * it keeps the direction its cell gave it and the ring stays as evenly spread
+ * as the grid underneath was.
+ */
+function clearOfCentre(
+  x: number,
+  y: number,
+  size: number,
+  width: number,
+  height: number,
+  seed: number,
+): { x: number; y: number } {
+  const centreX = width / 2;
+  const centreY = height / 2;
+  // The content area plus enough clearance that drift cannot reach back in.
+  const radiusX = (width * CLEAR_X) / 2 + CLEAR_PAD;
+  const radiusY = (height * CLEAR_Y) / 2 + CLEAR_PAD;
+
+  // Measured from the icon's middle, not its corner.
+  const iconX = x + size / 2;
+  const iconY = y + size / 2;
+
+  const normX = (iconX - centreX) / radiusX;
+  const normY = (iconY - centreY) / radiusY;
+  const distance = Math.hypot(normX, normY);
+
+  if (distance >= 1) return { x, y };
+
+  // Dead centre has no direction to push along, so take one from the hash
+  // rather than leaving the icon where it is.
+  if (distance < 0.001) {
+    const angle = hash(seed * 13 + 29) * Math.PI * 2;
+    return {
+      x: centreX + Math.cos(angle) * radiusX - size / 2,
+      y: centreY + Math.sin(angle) * radiusY - size / 2,
+    };
+  }
+
+  const push = 1 / distance;
+  return {
+    x: centreX + (iconX - centreX) * push - size / 2,
+    y: centreY + (iconY - centreY) * push - size / 2,
+  };
+}
+
+/**
+ * Scatters icons evenly across the page.
+ *
+ * This started as rejection sampling — propose a random point, reject it if it
+ * lands too close to one already placed. That reliably avoided collisions but
+ * not gaps: on a phone, which only carries eight or ten icons, it repeatedly
+ * left an entire ninth of the screen empty, which is the opposite of what a
+ * full-page texture is for.
+ *
+ * Stratified placement fixes the coverage directly. The page is divided into
+ * one cell per icon and each icon is placed at a random point *within its own
+ * cell*, so every region gets one by construction and no loop can fail. The
+ * jitter inside the cell is what stops it reading as the grid it technically
+ * is.
+ */
+function scatter(width: number, height: number): Doodle[] {
+  // The first render on web can report a zero viewport. Without this the
+  // aspect ratio is 0/0, every derived count is NaN, and the loops below
+  // silently do nothing — the same empty result, but reached by accident.
+  if (width <= 0 || height <= 0) return [];
+
+  const area = width * height;
+  const target = Math.max(
+    MIN_ICONS,
+    Math.min(MAX_ICONS, Math.round(area / AREA_PER_ICON)),
+  );
+
+  // Rows come from the aspect ratio and columns follow, which keeps cells
+  // roughly square instead of the tall slivers a phone would otherwise get.
+  //
+  // Three of each is the floor. Two columns cannot cover a screen: measured in
+  // thirds, a two-column layout leaves the middle third empty unless jitter
+  // happens to reach it, and on a phone it repeatedly did not.
+  const rows = Math.max(3, Math.round(Math.sqrt(target * (height / width))));
+  const columns = Math.max(3, Math.round(target / rows));
+
+  const cellWidth = width / columns;
+  const cellHeight = height / rows;
+  const out: Doodle[] = [];
+
+  for (let row = 0; row < rows; row++) {
+    for (let column = 0; column < columns; column++) {
+      const i = row * columns + column;
+
+      const sizeMix = hash(i * 7 + 11);
+      const size = Math.round(MIN_SIZE + sizeMix * (MAX_SIZE - MIN_SIZE));
+
+      // Centre the roaming area, then place randomly inside it.
+      const roamX = Math.max(0, cellWidth * CELL_JITTER - size);
+      const roamY = Math.max(0, cellHeight * CELL_JITTER - size);
+      const originX = column * cellWidth + (cellWidth - roamX - size) / 2;
+      const originY = row * cellHeight + (cellHeight - roamY - size) / 2;
+
+      const placed = clearOfCentre(
+        originX + hash(i * 2 + 1) * roamX,
+        originY + hash(i * 2 + 2) * roamY,
+        size,
+        width,
+        height,
+        i,
+      );
+
+      out.push({
+        key: `d${i}`,
+        icon: SHUFFLED[i % SHUFFLED.length] ?? '💼',
+        // Clamped so an icon in an edge cell cannot hang off the page.
+        left: Math.min(width - size, Math.max(0, placed.x)),
+        top: Math.min(height - size, Math.max(0, placed.y)),
+        size,
+        rotate: `${Math.round(hash(i * 5 + 3) * 20 - 10)}deg`,
+        // 0.7 at the smallest, 1 at the largest.
+        //
+        // This multiplies the theme's `doodleOpacity`, it does not replace it,
+        // so the floor cannot go much lower: at 0.55 the smallest icons landed
+        // at an effective 0.12, which measures under 1.15:1 against the page
+        // and is the invisibility the whole layer was suffering from.
+        depth: 0.8 + sizeMix * 0.2,
+        // Down the diagonal rather than the flat index: with a fixed column
+        // count, `i % 4` puts every fourth icon in the same band straight down
+        // a column, and the eye picks that out at once.
+        band: (row + column) % BANDS.length,
+        phase: hash(i * 11 + 17),
+      });
+    }
+  }
+
+  return out;
+}
+
+/**
+ * The scattered icons behind every screen, each drifting on its own.
+ *
+ * Two motions are layered. The whole sheet rises and falls very slowly, which
+ * reads as depth. On top of that every icon traces a small ellipse.
+ *
+ * The icons share four drivers rather than owning one each. Drivers are the
+ * expensive part — each is a running animation the platform has to tick — and
+ * on the cheap Android handsets this app targets, twenty of them for a
+ * decoration nobody should consciously notice is a real cost. Interpolations
+ * are nearly free, so each icon reads its band's driver at *its own phase*
+ * instead: same clock, different point on the circle. Neighbours in a band
+ * therefore never move in lockstep, which is what made the old version read as
+ * the whole page tilting rather than as icons floating.
  */
 const BANDS = [
-  { duration: 15000, x: 5, y: 7, spin: 0.8 },
-  { duration: 19000, x: -7, y: 4, spin: -0.6 },
-  { duration: 23000, x: 4, y: -6, spin: 0.5 },
-  { duration: 27000, x: -5, y: -5, spin: -0.9 },
+  { duration: 15000, x: 5, y: 7 },
+  { duration: 19000, x: -7, y: 4 },
+  { duration: 23000, x: 4, y: -6 },
+  { duration: 27000, x: -5, y: -5 },
 ];
+
+/**
+ * Points sampled around each ellipse.
+ *
+ * `interpolate` walks straight lines between the values it is given, so four
+ * points would trace a diamond. Eight is enough that the corners stop reading
+ * as corners.
+ */
+const STEPS = 8;
+const PATH_INPUT = Array.from({ length: STEPS + 1 }, (_, k) => k / STEPS);
 
 function DoodleLayer({ opacity }: { opacity: number }) {
   const drift = useRef(new Animated.Value(0)).current;
@@ -161,48 +402,8 @@ function DoodleLayer({ opacity }: { opacity: number }) {
     return () => loop.stop();
   }, [drift]);
 
-  // Sized from the viewport, plus a cell of bleed so a rotating or drifting
-  // icon never reveals an empty edge.
   const { width, height } = useWindowDimensions();
-
-  const cells = useMemo(() => {
-    const out: {
-      key: string;
-      icon: string;
-      top: number;
-      left: number;
-      size: number;
-      rotate: string;
-      band: number;
-    }[] = [];
-    const columns = Math.ceil(width / CELL) + 1;
-    const rows = Math.ceil(height / CELL) + 1;
-
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < columns; col++) {
-        const index = row * columns + col;
-        // Deterministic pseudo-random offsets so the grid never looks like one.
-        const jitterX = ((index * 37) % 26) - 13;
-        const jitterY = ((index * 53) % 26) - 13;
-        const size = 20 + ((index * 17) % 12);
-        const rotate = `${((index * 43) % 40) - 20}deg`;
-
-        out.push({
-          key: `${row}-${col}`,
-          icon: DOODLES[index % DOODLES.length] ?? '💼',
-          left: col * CELL + jitterX - 20,
-          top: row * CELL + jitterY - 20,
-          size,
-          rotate,
-          // row + col, not the flat index: with six columns a flat index would
-          // put every fourth icon in the same band down a diagonal, and the
-          // eye picks that out immediately.
-          band: (row + col) % BANDS.length,
-        });
-      }
-    }
-    return out;
-  }, [width, height]);
+  const doodles = useMemo(() => scatter(width, height), [width, height]);
 
   return (
     <Animated.View
@@ -225,7 +426,7 @@ function DoodleLayer({ opacity }: { opacity: number }) {
         <WanderBand
           key={i}
           band={band}
-          cells={cells.filter((cell) => cell.band === i)}
+          doodles={doodles.filter((d) => d.band === i)}
         />
       ))}
     </Animated.View>
@@ -233,26 +434,19 @@ function DoodleLayer({ opacity }: { opacity: number }) {
 }
 
 /**
- * One band of icons, tracing a slow ellipse.
+ * One band: a single driver, read by each of its icons at a different phase.
  *
- * The ellipse comes from reading a single 0→1 driver at quarter points: X
- * peaks where Y crosses zero and vice versa, which is a circle in the same way
- * sine and cosine make one. A straight back-and-forth would read as a twitch;
- * going around reads as floating.
+ * The ellipse is a real sine and cosine sampled at `STEPS` points rather than
+ * the quarter-point trick used before. Sampling from the icon's own phase and
+ * going all the way round means the last value equals the first, so the loop
+ * closes without a visible seam.
  */
 function WanderBand({
   band,
-  cells,
+  doodles,
 }: {
   band: (typeof BANDS)[number];
-  cells: {
-    key: string;
-    icon: string;
-    top: number;
-    left: number;
-    size: number;
-    rotate: string;
-  }[];
+  doodles: Doodle[];
 }) {
   const wander = useRef(new Animated.Value(0)).current;
 
@@ -271,57 +465,53 @@ function WanderBand({
     return () => loop.stop();
   }, [wander, band.duration]);
 
-  const quarters = [0, 0.25, 0.5, 0.75, 1];
-
   return (
-    <Animated.View
-      style={[
-        StyleSheet.absoluteFill,
-        {
-          transform: [
-            {
-              translateX: wander.interpolate({
-                inputRange: quarters,
-                outputRange: [0, band.x, 0, -band.x, 0],
-              }),
-            },
-            {
-              translateY: wander.interpolate({
-                inputRange: quarters,
-                outputRange: [band.y, 0, -band.y, 0, band.y],
-              }),
-            },
-            {
-              rotate: wander.interpolate({
-                inputRange: quarters,
-                outputRange: [
-                  '0deg',
-                  `${band.spin}deg`,
-                  '0deg',
-                  `${-band.spin}deg`,
-                  '0deg',
-                ],
-              }),
-            },
-          ],
-        },
-      ]}
-    >
-      {cells.map((cell) => (
-        <Text
-          key={cell.key}
-          style={{
-            position: 'absolute',
-            top: cell.top,
-            left: cell.left,
-            fontSize: cell.size,
-            transform: [{ rotate: cell.rotate }],
-          }}
-        >
-          {cell.icon}
-        </Text>
-      ))}
-    </Animated.View>
+    <>
+      {doodles.map((doodle) => {
+        const outX = PATH_INPUT.map(
+          (k) =>
+            Math.round(
+              band.x * Math.sin(2 * Math.PI * (k + doodle.phase)) * 100,
+            ) / 100,
+        );
+        const outY = PATH_INPUT.map(
+          (k) =>
+            Math.round(
+              band.y * Math.cos(2 * Math.PI * (k + doodle.phase)) * 100,
+            ) / 100,
+        );
+
+        return (
+          <Animated.Text
+            key={doodle.key}
+            style={{
+              position: 'absolute',
+              top: doodle.top,
+              left: doodle.left,
+              fontSize: doodle.size,
+              opacity: doodle.depth,
+              transform: [
+                {
+                  translateX: wander.interpolate({
+                    inputRange: PATH_INPUT,
+                    outputRange: outX,
+                  }),
+                },
+                {
+                  translateY: wander.interpolate({
+                    inputRange: PATH_INPUT,
+                    outputRange: outY,
+                  }),
+                },
+                { rotate: doodle.rotate },
+              ],
+            }}
+          >
+            {doodle.icon}
+          </Animated.Text>
+        );
+      })}
+    </>
   );
 }
 
