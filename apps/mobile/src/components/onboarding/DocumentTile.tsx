@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -45,6 +45,8 @@ export function DocumentTile({
   const t = useT();
   const { c } = useTheme();
   const [preview, setPreview] = useState<string | null>(null);
+  const [choosing, setChoosing] = useState(false);
+  const [denied, setDenied] = useState(false);
 
   const handleAsset = (asset: ImagePicker.ImagePickerAsset) => {
     setPreview(asset.uri);
@@ -57,11 +59,16 @@ export function DocumentTile({
   };
 
   const fromCamera = async () => {
+    setChoosing(false);
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert(t('ob.doc.permission'));
+      // Shown on the tile rather than in a system dialog: `Alert.alert` is an
+      // empty function on react-native-web, so a refusal announced that way
+      // would be silent on the web build.
+      setDenied(true);
       return;
     }
+    setDenied(false);
 
     const result = await ImagePicker.launchCameraAsync({
       // The selfie is the one shot that must come from the front camera and
@@ -78,6 +85,8 @@ export function DocumentTile({
   };
 
   const fromGallery = async () => {
+    setChoosing(false);
+    setDenied(false);
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: kind !== 'SELFIE',
       quality: 0.75,
@@ -86,6 +95,15 @@ export function DocumentTile({
     if (!result.canceled && result.assets[0]) handleAsset(result.assets[0]);
   };
 
+  /**
+   * Offers camera or gallery.
+   *
+   * This used to call `Alert.alert` with two buttons. On react-native-web that
+   * method is an empty function — not a dialog without buttons, but a complete
+   * no-op — so on the web build every tile except the selfie did nothing at
+   * all when tapped. An in-app sheet works on both platforms, and reads better
+   * than a system dialog on either.
+   */
   const choose = () => {
     // A selfie taken from the gallery proves nothing, so that path is not
     // offered for the face check.
@@ -93,19 +111,28 @@ export function DocumentTile({
       void fromCamera();
       return;
     }
-    Alert.alert(t(`ob.doc.${kind}` as TranslationKey), undefined, [
-      { text: t('ob.doc.camera'), onPress: () => void fromCamera() },
-      { text: t('ob.doc.gallery'), onPress: () => void fromGallery() },
-      { text: t('common.cancel'), style: 'cancel' },
-    ]);
+    setChoosing(true);
   };
 
   return (
-    <Pressable
-      style={[styles.tile, uploaded && styles.tileDone]}
-      onPress={choose}
-      disabled={uploading}
-    >
+    <>
+      <ChoiceSheet
+        visible={choosing}
+        title={t(`ob.doc.${kind}` as TranslationKey)}
+        onCamera={() => void fromCamera()}
+        onGallery={() => void fromGallery()}
+        onCancel={() => setChoosing(false)}
+      />
+
+      <Pressable
+        style={[styles.tile, uploaded && styles.tileDone]}
+        onPress={choose}
+        disabled={uploading}
+        accessibilityRole="button"
+        accessibilityLabel={`${t(`ob.doc.${kind}` as TranslationKey)} — ${
+          uploaded ? t('ob.doc.retake') : t('ob.doc.upload')
+        }`}
+      >
       <View style={styles.thumb}>
         {preview ? (
           <Image source={{ uri: preview }} style={styles.thumbImage} />
@@ -119,31 +146,114 @@ export function DocumentTile({
         ) : null}
       </View>
 
-      <View style={styles.body}>
-        <Text style={[styles.name, { color: c.textOnBrand }]}>{t(`ob.doc.${kind}` as TranslationKey)}</Text>
-        {uploaded && analysis ? (
-          <AnalysisLine analysis={analysis} />
-        ) : (
-          <Text
-            style={[styles.hint, { color: c.textMutedOnBrand }]}
-            numberOfLines={2}
-          >
-            {t(HINTS[kind])}
+        <View style={styles.body}>
+          <Text style={[styles.name, { color: c.textOnBrand }]}>
+            {t(`ob.doc.${kind}` as TranslationKey)}
           </Text>
-        )}
-      </View>
+          {denied ? (
+            <Text style={[styles.bad, { color: c.danger }]} numberOfLines={2}>
+              {t('ob.doc.permission')}
+            </Text>
+          ) : uploaded && analysis ? (
+            <AnalysisLine analysis={analysis} />
+          ) : (
+            <Text
+              style={[styles.hint, { color: c.textMutedOnBrand }]}
+              numberOfLines={2}
+            >
+              {t(HINTS[kind])}
+            </Text>
+          )}
+        </View>
 
-      <View style={[styles.action, uploaded && styles.actionDone]}>
-        <Text
-          style={[
-            styles.actionText,
-            { color: uploaded ? c.accentOnBrand : c.textOnBrand },
-          ]}
+        <View style={[styles.action, uploaded && styles.actionDone]}>
+          <Text
+            style={[
+              styles.actionText,
+              { color: uploaded ? c.accentOnBrand : c.textOnBrand },
+            ]}
+          >
+            {uploaded ? `✓ ${t('ob.doc.retake')}` : t('ob.doc.upload')}
+          </Text>
+        </View>
+      </Pressable>
+    </>
+  );
+}
+
+/**
+ * Camera or gallery, as an in-app sheet.
+ *
+ * Deliberately not `Alert.alert`: that is a no-op on react-native-web, which
+ * is what made these tiles unresponsive on the web build in the first place.
+ */
+function ChoiceSheet({
+  visible,
+  title,
+  onCamera,
+  onGallery,
+  onCancel,
+}: {
+  visible: boolean;
+  title: string;
+  onCamera: () => void;
+  onGallery: () => void;
+  onCancel: () => void;
+}) {
+  const t = useT();
+  const { c } = useTheme();
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onCancel}
+    >
+      {/* Tapping the dimmed area closes, the way a system sheet does. */}
+      <Pressable style={styles.backdrop} onPress={onCancel}>
+        {/* Its own Pressable, so a tap on the sheet does not reach the
+            backdrop behind it and close what the person just opened. */}
+        <Pressable
+          style={[styles.sheet, { backgroundColor: c.surface, borderColor: c.border }]}
+          onPress={() => undefined}
         >
-          {uploaded ? `✓ ${t('ob.doc.retake')}` : t('ob.doc.upload')}
-        </Text>
-      </View>
-    </Pressable>
+          <Text style={[styles.sheetTitle, { color: c.text }]}>{title}</Text>
+
+          <Pressable
+            style={[styles.sheetRow, { borderColor: c.border }]}
+            onPress={onCamera}
+            accessibilityRole="button"
+          >
+            <Text style={styles.sheetIcon}>📷</Text>
+            <Text style={[styles.sheetLabel, { color: c.text }]}>
+              {t('ob.doc.camera')}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={[styles.sheetRow, { borderColor: c.border }]}
+            onPress={onGallery}
+            accessibilityRole="button"
+          >
+            <Text style={styles.sheetIcon}>🖼️</Text>
+            <Text style={[styles.sheetLabel, { color: c.text }]}>
+              {t('ob.doc.gallery')}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.sheetCancel}
+            onPress={onCancel}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.sheetCancelText, { color: c.textMuted }]}>
+              {t('common.cancel')}
+            </Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -279,4 +389,35 @@ const styles = StyleSheet.create({
   good: { fontSize: 11.5, marginTop: 2, lineHeight: 15 },
   warn: { fontSize: 11.5, marginTop: 2, lineHeight: 15 },
   bad: { fontSize: 11.5, marginTop: 2, lineHeight: 15 },
+
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+    padding: 16,
+  },
+  sheet: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    gap: 10,
+  },
+  sheetTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  sheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+  },
+  sheetIcon: { fontSize: 20 },
+  sheetLabel: { fontSize: 15, fontWeight: '700' },
+  sheetCancel: { alignItems: 'center', paddingVertical: 12 },
+  sheetCancelText: { fontSize: 14, fontWeight: '700' },
 });
