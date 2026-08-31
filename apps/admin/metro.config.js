@@ -31,4 +31,28 @@ config.cacheStores = [
 // 5. Fewer workers than cores — this machine swaps under six of them.
 config.maxWorkers = 3;
 
+// 6. expo-secure-store has no web implementation — it wraps the iOS Keychain
+// and the Android Keystore, and every call throws in a browser. This file
+// claimed to mirror the worker app's config but was missing this step, so
+// signing in to the console on web authenticated successfully and then died
+// storing the token. Swap the whole module for a localStorage-backed stand-in
+// when bundling for web; native builds never see this branch.
+const secureStoreWebShim = path.resolve(
+  projectRoot,
+  'src/lib/secure-store.web.ts',
+);
+
+const defaultResolveRequest = config.resolver.resolveRequest;
+
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (platform === 'web' && moduleName === 'expo-secure-store') {
+    return { type: 'sourceFile', filePath: secureStoreWebShim };
+  }
+  return (defaultResolveRequest ?? context.resolveRequest)(
+    context,
+    moduleName,
+    platform,
+  );
+};
+
 module.exports = config;
