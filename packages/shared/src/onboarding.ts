@@ -52,6 +52,8 @@ export type ExperienceType = z.infer<typeof experienceTypeSchema>;
 export const kycStatusSchema = z.enum([
   'NOT_STARTED',
   'PENDING_REVIEW',
+  /** A reviewer has looked and wants a closer check before deciding. */
+  'ON_HOLD',
   'APPROVED',
   'REJECTED',
 ]);

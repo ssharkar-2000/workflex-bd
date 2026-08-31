@@ -126,6 +126,13 @@ export const kycQueueItemSchema = z.object({
   accountType: accountTypeSchema,
   submittedAt: z.string(),
   waitingHours: z.number().int().nonnegative(),
+  /**
+   * PENDING_REVIEW or ON_HOLD — the queue carries both. A reviewer needs to
+   * see which, or a held case is indistinguishable from one nobody has opened.
+   */
+  status: kycStatusSchema,
+  /** Why it was held, written by the previous reviewer for the next one. */
+  holdNote: z.string().nullable(),
   applicant: z.object({
     userId: z.string(),
     phone: z.string(),

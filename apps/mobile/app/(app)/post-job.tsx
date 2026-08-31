@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -21,6 +22,7 @@ import {
   districtsOf,
   divisionName,
   jobCategoryName,
+  type CreateJobDto,
   type CreateJobInput,
   type Division,
   type JobCategory,
@@ -152,6 +154,16 @@ export default function PostJobScreen() {
 
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * The validated posting, held while the person reads it back.
+   *
+   * Storing the parsed DTO rather than a flag means the summary shows exactly
+   * what will be sent — including the defaults and coercions the schema
+   * applied — instead of a second rendering of the form state that could
+   * quietly disagree with it.
+   */
+  const [review, setReview] = useState<CreateJobDto | null>(null);
+
   const canPostAsCompany = me?.canPostCompanyJobs === true;
   const isCompany = postAs === 'COMPANY';
 
@@ -220,7 +232,12 @@ export default function PostJobScreen() {
       setError(parsed.error.issues[0]?.message ?? t('error.VALIDATION_FAILED'));
       return;
     }
-    post.mutate(parsed.data);
+
+    // Opens the summary rather than posting. Validation runs first on purpose:
+    // there is no point reviewing a form that cannot be submitted, and finding
+    // a missing field after reading the summary would be the second time of
+    // being told.
+    setReview(parsed.data);
   };
 
   if (isLoading) {
@@ -577,7 +594,164 @@ export default function PostJobScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ReviewSheet
+        job={review}
+        publishing={post.isPending}
+        onBack={() => setReview(null)}
+        onPublish={() => {
+          if (review) post.mutate(review);
+        }}
+      />
     </SafeAreaView>
+  );
+}
+
+/**
+ * The last look before a posting goes live.
+ *
+ * A job advert is public and is read by people deciding whether to travel
+ * across a city for work, so a typo in the pay or the location has a real cost.
+ * The summary lists what was entered, in the words the reader will see rather
+ * than the enum values the form stores.
+ *
+ * Back closes without clearing anything: the form is still mounted underneath
+ * with every field as it was, so correcting one line does not mean retyping
+ * the rest.
+ */
+function ReviewSheet({
+  job,
+  publishing,
+  onBack,
+  onPublish,
+}: {
+  job: CreateJobDto | null;
+  publishing: boolean;
+  onBack: () => void;
+  onPublish: () => void;
+}) {
+  const t = useT();
+  const { c } = useTheme();
+  const [locale] = useLocale();
+
+  if (!job) return null;
+
+  const money = (n: number) => `৳${n.toLocaleString('en-US')}`;
+  const pay =
+    job.salaryMin && job.salaryMax
+      ? `${money(job.salaryMin)}–${money(job.salaryMax)}`
+      : job.salaryMin
+        ? `${money(job.salaryMin)}+`
+        : job.salaryMax
+          ? `${t('post.review.upTo')} ${money(job.salaryMax)}`
+          : t('jobs.pay.NEGOTIABLE');
+
+  // Every classification on one line, the way a job card shows them.
+  //
+  // Each carries its own key prefix — duration is `jobs.dur`, not `jobs.type`
+  // — so the pairs are spelled out rather than derived from the value alone.
+  // `workplaceType` is company-only: the individual branch of the union does
+  // not have the field at all, which is why it is read through the guard.
+  const classifications: [string, string | undefined][] = [
+    ['jobs.type', job.jobType],
+    ['jobs.place', job.postAs === 'COMPANY' ? job.workplaceType : undefined],
+    ['jobs.dur', job.duration],
+    ['jobs.time', job.workingTime],
+  ];
+  const types = classifications
+    .filter(([, value]) => Boolean(value))
+    .map(([prefix, value]) => t(`${prefix}.${value}` as TranslationKey))
+    .join(', ');
+
+  const place = [job.location, job.district, job.division ? divisionName(job.division, locale) : null]
+    .filter(Boolean)
+    .join(', ');
+
+  const rows: { label: string; value: string }[] = [
+    { label: t('post.review.title'), value: job.title },
+    {
+      label: t('post.review.company'),
+      value:
+        job.postAs === 'COMPANY' ? job.companyName : t('post.review.individual'),
+    },
+    { label: t('post.review.category'), value: jobCategoryName(job.category, locale) },
+    { label: t('post.review.salary'), value: pay },
+    {
+      label: t('post.review.vacancy'),
+      value: job.vacancies ? String(job.vacancies) : t('post.review.notSaid'),
+    },
+    { label: t('post.review.location'), value: place },
+    { label: t('post.review.types'), value: types || t('post.review.notSaid') },
+  ];
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onBack}>
+      <View style={styles.reviewBackdrop}>
+        <View
+          style={[
+            styles.reviewSheet,
+            { backgroundColor: c.bg, borderColor: c.border },
+          ]}
+        >
+          <Text style={[styles.reviewTitle, { color: c.text }]}>
+            {t('post.review.heading')}
+          </Text>
+
+          <ScrollView
+            style={styles.reviewScroll}
+            contentContainerStyle={[
+              styles.reviewCard,
+              { backgroundColor: c.surface, borderColor: c.border },
+            ]}
+            showsVerticalScrollIndicator={false}
+          >
+            {rows.map((row, i) => (
+              <View
+                key={row.label}
+                style={[
+                  styles.reviewRow,
+                  i > 0 && { borderTopWidth: 1, borderTopColor: c.border },
+                ]}
+              >
+                <Text style={[styles.reviewLabel, { color: c.textMuted }]}>
+                  {row.label}
+                </Text>
+                <Text
+                  style={[styles.reviewValue, { color: c.text }]}
+                  numberOfLines={3}
+                >
+                  {row.value}
+                </Text>
+              </View>
+            ))}
+          </ScrollView>
+
+          <View style={styles.reviewActions}>
+            <Pressable
+              onPress={onBack}
+              disabled={publishing}
+              accessibilityRole="button"
+              style={[
+                styles.reviewBack,
+                { borderColor: c.border, backgroundColor: c.surface },
+              ]}
+            >
+              <Text style={[styles.reviewBackText, { color: c.text }]}>
+                {t('post.review.back')}
+              </Text>
+            </Pressable>
+
+            <View style={styles.reviewPublish}>
+              <ShimmerButton
+                label={`➤  ${t('post.review.publish')}`}
+                onPress={onPublish}
+                loading={publishing}
+              />
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -828,4 +1002,60 @@ const styles = StyleSheet.create({
   moneyInput: { flex: 1, fontSize: font.md, paddingVertical: 0 },
 
   submit: { marginTop: 8 },
+
+  reviewBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  reviewSheet: {
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    borderWidth: 1,
+    padding: space.md,
+    paddingBottom: space.lg,
+    // Never taller than most of the screen, so the form stays visible behind
+    // it and the sheet reads as a step rather than a new page.
+    maxHeight: '86%',
+  },
+  reviewTitle: {
+    fontSize: font.lg,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    marginBottom: space.md,
+  },
+  reviewScroll: { flexGrow: 0, flexShrink: 1 },
+  reviewCard: { borderWidth: 1, borderRadius: radius.lg },
+  reviewRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+  },
+  reviewLabel: { fontSize: font.sm },
+  // Right-aligned and heavier, so the values read as a column of answers.
+  reviewValue: {
+    flex: 1,
+    fontSize: font.sm,
+    fontWeight: '800',
+    textAlign: 'right',
+  },
+  reviewActions: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 12,
+    marginTop: space.md,
+  },
+  reviewBack: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+  },
+  reviewBackText: { fontSize: font.md, fontWeight: '800' },
+  reviewPublish: { flex: 1.3 },
 });

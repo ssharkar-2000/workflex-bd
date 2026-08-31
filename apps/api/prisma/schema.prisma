@@ -63,6 +63,14 @@ enum ExperienceType {
 enum KycStatus {
   NOT_STARTED
   PENDING_REVIEW
+  /// A reviewer looked and wants a closer check before deciding.
+  ///
+  /// Distinct from PENDING_REVIEW, which means nobody has looked yet, and from
+  /// REJECTED, which is a decision. Keeping it separate matters to the person
+  /// waiting: "still being checked" and "turned down" are not the same news,
+  /// and a queue that cannot say so forces reviewers to reject anything they
+  /// are unsure about.
+  ON_HOLD
   APPROVED
   REJECTED
 }

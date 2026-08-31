@@ -24,7 +24,14 @@ export function KycStatusCard() {
 
   if (!data) return null;
 
-  if (data.kycStatus === 'PENDING_REVIEW') {
+  // Held reads the same as pending to the applicant, and deliberately so.
+  // "A reviewer opened your file and wants a second look" is internal detail
+  // that would only worry someone who can do nothing with it; what they need
+  // to know is unchanged — it is still being checked, and a message is coming.
+  if (
+    data.kycStatus === 'PENDING_REVIEW' ||
+    data.kycStatus === 'ON_HOLD'
+  ) {
     return (
       <View
         style={[

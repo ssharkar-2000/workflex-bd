@@ -17,6 +17,7 @@ import {
   authImageHeaders,
   fetchKycQueue,
   kycDocumentUrl,
+  holdKyc,
   rejectKyc,
 } from '../src/api/admin';
 import { errorText } from '../src/lib/error-message';
@@ -69,6 +70,8 @@ function SubmissionCard({ item }: { item: KycQueueItem }) {
   const queryClient = useQueryClient();
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
+  const [holding, setHolding] = useState(false);
+  const [note, setNote] = useState('');
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['admin-kyc-queue'] });
@@ -90,6 +93,16 @@ function SubmissionCard({ item }: { item: KycQueueItem }) {
       invalidate();
     },
     onError: (err) => Alert.alert('Could not reject', errorText(err)),
+  });
+
+  const hold = useMutation({
+    mutationFn: () => holdKyc(item.id, note),
+    onSuccess: () => {
+      setHolding(false);
+      setNote('');
+      invalidate();
+    },
+    onError: (err) => Alert.alert('Could not hold', errorText(err)),
   });
 
   return (
@@ -169,23 +182,71 @@ function SubmissionCard({ item }: { item: KycQueueItem }) {
             </View>
           </View>
         </View>
-      ) : (
-        <View style={styles.actionRow}>
-          <View style={styles.grow}>
-            <Button
-              label="Approve"
-              onPress={() => approve.mutate()}
-              loading={approve.isPending}
-            />
-          </View>
-          <View style={styles.grow}>
-            <Button
-              label="Reject"
-              tone="outline"
-              onPress={() => setRejecting(true)}
-            />
+      ) : holding ? (
+        <View style={styles.rejectBox}>
+          <TextInput
+            style={styles.input}
+            value={note}
+            onChangeText={setNote}
+            placeholder="What needs checking (optional, for reviewers)"
+            placeholderTextColor={colors.textFaint}
+            multiline
+          />
+          <View style={styles.actionRow}>
+            <View style={styles.grow}>
+              {/* No minimum length, unlike a rejection: the applicant is not
+                  told anything here, so an empty note is a valid hold. */}
+              <Button
+                label="Hold for review"
+                tone="outline"
+                loading={hold.isPending}
+                onPress={() => hold.mutate()}
+              />
+            </View>
+            <View style={styles.grow}>
+              <Button
+                label="Cancel"
+                tone="outline"
+                onPress={() => {
+                  setHolding(false);
+                  setNote('');
+                }}
+              />
+            </View>
           </View>
         </View>
+      ) : (
+        <>
+          {item.status === 'ON_HOLD' ? (
+            <Text style={styles.heldFlag}>
+              ⏸ On hold{item.holdNote ? ` — ${item.holdNote}` : ''}
+            </Text>
+          ) : null}
+
+          <View style={styles.actionRow}>
+            <View style={styles.grow}>
+              <Button
+                label="Approve"
+                onPress={() => approve.mutate()}
+                loading={approve.isPending}
+              />
+            </View>
+            <View style={styles.grow}>
+              <Button
+                label="Hold"
+                tone="outline"
+                onPress={() => setHolding(true)}
+              />
+            </View>
+            <View style={styles.grow}>
+              <Button
+                label="Reject"
+                tone="outline"
+                onPress={() => setRejecting(true)}
+              />
+            </View>
+          </View>
+        </>
       )}
     </View>
   );
@@ -193,6 +254,12 @@ function SubmissionCard({ item }: { item: KycQueueItem }) {
 
 const styles = StyleSheet.create({
   close: { color: colors.primary, fontWeight: '800', fontSize: font.sm },
+  heldFlag: {
+    color: colors.warning,
+    fontSize: font.sm,
+    fontWeight: '700',
+    marginBottom: space.sm,
+  },
   body: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
   card: {
     backgroundColor: colors.surface,

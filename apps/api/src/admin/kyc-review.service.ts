@@ -24,8 +24,20 @@ export class KycReviewService {
 
   async queue(limit = 50) {
     const submissions = await this.prisma.kycSubmission.findMany({
-      where: { status: 'PENDING_REVIEW' },
-      orderBy: { createdAt: 'asc' },
+      // Held submissions stay in the queue. Holding is a request to look
+      // again, so dropping them from the only list reviewers see would lose
+      // the applicant entirely — nobody would ever come back to them.
+      where: { status: { in: ['PENDING_REVIEW', 'ON_HOLD'] } },
+      // Oldest first, and unreviewed ahead of held: someone nobody has looked
+      // at yet is waiting on the queue itself, where a held case is already
+      // somebody's problem.
+      //
+      // Sorting on an enum uses the order Postgres holds it in, which is not
+      // the order this schema declares. `ALTER TYPE ... ADD VALUE` appends, so
+      // an existing database sorts ON_HOLD last while a database created fresh
+      // from the schema sorts it third. Checked both: PENDING_REVIEW precedes
+      // ON_HOLD either way, so this ordering is stable across the two.
+      orderBy: [{ status: 'asc' }, { createdAt: 'asc' }],
       take: limit,
       include: {
         user: {
@@ -69,6 +81,11 @@ export class KycReviewService {
         waitingHours: Math.floor(
           (Date.now() - s.createdAt.getTime()) / 3_600_000,
         ),
+        status: s.status,
+        // `rejectReason` doubles as the hold note in the database; it is only
+        // a rejection reason when the status says so, and exposing it under
+        // that name here would invite a reviewer to read a hold as a refusal.
+        holdNote: s.status === 'ON_HOLD' ? s.rejectReason : null,
         applicant: {
           userId: s.user.id,
           phone: s.user.phone,
@@ -174,6 +191,37 @@ export class KycReviewService {
     return { id: submissionId, status: 'APPROVED', verificationLevel: level };
   }
 
+  /**
+   * Holds a submission for a closer look.
+   *
+   * Deliberately changes nothing else. The applicant's verification level is
+   * untouched and `onboardingSubmittedAt` is left set, so nothing they have
+   * already sent is thrown away and they are not asked to resubmit — unlike a
+   * rejection, this is not a decision, it is the absence of one.
+   *
+   * The note is for the next reviewer rather than the applicant, which is why
+   * it is optional: "waiting on the licence to be legible" is worth recording
+   * even when there is nothing useful to tell the person yet.
+   */
+  async hold(submissionId: string, adminId: string, note?: string) {
+    await this.load(submissionId);
+
+    await this.prisma.kycSubmission.update({
+      where: { id: submissionId },
+      data: {
+        status: 'ON_HOLD',
+        reviewedBy: adminId,
+        reviewedAt: new Date(),
+        rejectReason: note?.trim() ? note.trim() : null,
+      },
+    });
+
+    this.logger.log(
+      `KYC ${submissionId} held by ${adminId}${note ? `: ${note}` : ''}`,
+    );
+    return { id: submissionId, status: 'ON_HOLD', note: note ?? null };
+  }
+
   async reject(submissionId: string, adminId: string, reason: string) {
     const submission = await this.load(submissionId);
 
@@ -205,7 +253,15 @@ export class KycReviewService {
     });
     if (!submission) throw AppException.notFound('Submission not found');
 
-    if (submission.status !== 'PENDING_REVIEW') {
+    // Open means "still awaiting a decision", which covers held cases as well
+    // as untouched ones. Guarding on PENDING_REVIEW alone made holding a dead
+    // end: the submission could be put on hold and then never approved or
+    // rejected, because every decision path ran through here and refused it.
+    //
+    // A decided submission is still refused. Two reviewers reaching a verdict
+    // on the same file should not silently overwrite each other.
+    const open: typeof submission.status[] = ['PENDING_REVIEW', 'ON_HOLD'];
+    if (!open.includes(submission.status)) {
       throw new AppException(
         ApiErrorCode.FORBIDDEN,
         `This submission was already ${submission.status.toLowerCase()}.`,

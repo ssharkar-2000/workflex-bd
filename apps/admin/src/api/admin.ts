@@ -71,6 +71,17 @@ export async function rejectKyc(id: string, reason: string): Promise<void> {
 }
 
 /**
+ * Holds a submission for a closer check without deciding either way.
+ *
+ * The note is optional and is written for the next reviewer, not the
+ * applicant — a hold has nothing to tell them yet beyond that their documents
+ * are still being looked at.
+ */
+export async function holdKyc(id: string, note: string): Promise<void> {
+  await api.post(`/admin/kyc/${id}/hold`, { note });
+}
+
+/**
  * Documents come back as raw bytes, so they load through <Image> by URL
  * rather than the axios instance — which is also why the bearer token has to
  * be passed as an explicit header here.

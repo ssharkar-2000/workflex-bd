@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { requiredDocuments, type DocumentKind } from '@workflex/shared';
@@ -23,6 +29,7 @@ export default function DocumentsScreen() {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [busyKind, setBusyKind] = useState<DocumentKind | null>(null);
+  const [sentNotice, setSentNotice] = useState(false);
   const { total, offset } = useStepCount();
   const errorMessage = useErrorMessage();
 
@@ -56,6 +63,10 @@ export default function DocumentsScreen() {
       if (args.kind === 'SELFIE') {
         void queryClient.invalidateQueries({ queryKey: ['me'] });
       }
+      // Confirms where the document went and what happens next. A tile that
+      // silently turns green says the upload worked but not that a person will
+      // now read it, which is the part someone waiting actually needs to know.
+      setSentNotice(true);
     },
     onError: (err) => setError(errorMessage(err)),
     onSettled: () => setBusyKind(null),
@@ -95,6 +106,8 @@ export default function DocumentsScreen() {
         />
       }
     >
+      <SentNotice visible={sentNotice} onDismiss={() => setSentNotice(false)} />
+
       {needed.map((kind) => (
         <DocumentTile
           key={kind}
@@ -141,7 +154,65 @@ export default function DocumentsScreen() {
   );
 }
 
+/**
+ * Confirms that an upload reached the review team.
+ *
+ * Shown in the page rather than as a modal on purpose: it appears after every
+ * upload, and three documents means three interruptions if each one has to be
+ * dismissed before the next can be started. Sitting above the tiles it can be
+ * read or ignored, and it stays until dismissed so it cannot be missed either.
+ */
+function SentNotice({
+  visible,
+  onDismiss,
+}: {
+  visible: boolean;
+  onDismiss: () => void;
+}) {
+  const t = useT();
+  const { c } = useTheme();
+
+  if (!visible) return null;
+
+  return (
+    <View
+      style={[
+        styles.notice,
+        { backgroundColor: c.successSoft, borderColor: c.success },
+      ]}
+      accessibilityRole="alert"
+    >
+      <Text style={[styles.noticeTitle, { color: c.success }]}>
+        ✓ {t('ob.doc.sentTitle')}
+      </Text>
+      <Text style={[styles.noticeBody, { color: c.text }]}>
+        {t('ob.doc.sentBody')}
+      </Text>
+      <Pressable onPress={onDismiss} hitSlop={8} accessibilityRole="button">
+        <Text style={[styles.noticeDismiss, { color: c.success }]}>
+          {t('ob.doc.sentDismiss')}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  notice: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+    gap: 6,
+  },
+  noticeTitle: { fontSize: 14, fontWeight: '800' },
+  noticeBody: { fontSize: 12.5, lineHeight: 18 },
+  noticeDismiss: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    marginTop: 2,
+    alignSelf: 'flex-start',
+  },
   optionalHead: {
     borderTopWidth: 1,
     marginTop: 18,

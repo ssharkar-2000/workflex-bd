@@ -47,6 +47,13 @@ const rejectSchema = z.object({
 });
 type RejectDto = z.output<typeof rejectSchema>;
 
+// A hold is not a decision, so unlike a rejection it needs no reason to hand
+// back to the applicant. The note is for whoever picks the case up next.
+const holdSchema = z.object({
+  note: z.string().trim().max(500).optional().or(z.literal('')),
+});
+type HoldDto = z.output<typeof holdSchema>;
+
 @ApiTags('admin')
 @ApiBearerAuth()
 @UseGuards(AdminGuard)
@@ -409,5 +416,27 @@ export class AdminController {
     @CurrentUser('userId') adminId: string,
   ) {
     return this.kyc.reject(id, adminId, dto.reason);
+  }
+
+  @Post('kyc/:id/hold')
+  @ApiOperation({ summary: 'Hold for a closer check, without deciding' })
+  @ApiBody({
+    required: false,
+    schema: {
+      type: 'object',
+      properties: {
+        note: {
+          type: 'string',
+          example: 'Licence number does not match the company name — check RJSC.',
+        },
+      },
+    },
+  })
+  async hold(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(holdSchema)) dto: HoldDto,
+    @CurrentUser('userId') adminId: string,
+  ) {
+    return this.kyc.hold(id, adminId, dto.note || undefined);
   }
 }
