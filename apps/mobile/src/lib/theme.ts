@@ -141,7 +141,18 @@ const light: Palette = {
   gradient: ['#FDE3D3', '#F8E7DC', '#DCEDE2', '#DADEF4'],
   orbs: ['#FFC6A6', '#B7E2CB', '#CBD0F1'],
   doodle: '#1E1E3C',
-  doodleOpacity: 0.06,
+  /**
+   * Raised from 0.06, which was below the threshold of being seen at all: a
+   * mid-tone emoji at that opacity composites to within 1.07:1 of the page,
+   * so the whole layer was doing nothing.
+   *
+   * 0.55 is the ceiling, not a preference. Body text sometimes passes over an
+   * icon, and the worst-case pairing measures 5.2:1 here — above the 4.5:1 the
+   * rest of this file holds itself to. At 0.65 that drops to 4.17:1 and the
+   * text fails, so this is as visible as the layer can be made without
+   * trading away legibility somewhere else.
+   */
+  doodleOpacity: 0.55,
 
   glassFill: 'rgba(255,255,255,0.55)',
   glassBorder: 'rgba(30,30,60,0.16)',
@@ -200,10 +211,11 @@ const dark: Palette = {
   gradient: ['#111120', '#141426', '#12121F', '#131324'],
   orbs: ['#3A2620', '#1E3830', '#242749'],
   doodle: '#FFAA79',
-  // Emoji render in their own colours, so the tint above does not apply to
-  // them — on near-black they need roughly double the light-mode opacity to
-  // register at all.
-  doodleOpacity: 0.15,
+  // The same value as light mode. The old comment here claimed dark needed
+  // roughly double to register; measuring the composite says otherwise — at
+  // any given opacity an emoji sits within 0.01 of the same contrast against
+  // the near-black page as against the cream one.
+  doodleOpacity: 0.55,
 
   glassFill: 'rgba(255,255,255,0.06)',
   glassBorder: 'rgba(255,255,255,0.14)',

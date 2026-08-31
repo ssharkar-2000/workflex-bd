@@ -126,10 +126,14 @@ const MAX_ICONS = 22;
 /**
  * Size range.
  *
- * Wider than the old 20–31. Varying size is what stops a scatter looking like
- * confetti: a few large icons and many small ones reads as depth, where one
- * uniform size reads as a pattern. The small ones are also drawn fainter,
- * which is the same cue a real out-of-focus background gives.
+ * Varying size is what stops a scatter looking like confetti: a few large
+ * icons and many small ones reads as depth, where one uniform size reads as a
+ * pattern. The small ones are drawn slightly fainter too, the same cue a real
+ * out-of-focus background gives.
+ *
+ * The floor was 15px, which is where an emoji glyph stops being legible as a
+ * picture and becomes a smudge — the "blurry" look. 22px is small enough to
+ * stay background and large enough to read as the thing it depicts.
  */
 const MIN_SIZE = 22;
 const MAX_SIZE = 46;
