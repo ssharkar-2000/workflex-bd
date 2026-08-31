@@ -132,11 +132,12 @@ const MAX_ICONS = 22;
  * out-of-focus background gives.
  *
  * The floor was 15px, which is where an emoji glyph stops being legible as a
- * picture and becomes a smudge — the "blurry" look. 22px is small enough to
- * stay background and large enough to read as the thing it depicts.
+ * picture and becomes a smudge — the "blurry" look. These sizes are large
+ * enough that each icon reads as the thing it depicts while still sitting
+ * behind the page rather than on it.
  */
-const MIN_SIZE = 22;
-const MAX_SIZE = 46;
+const MIN_SIZE = 28;
+const MAX_SIZE = 56;
 
 /**
  * A deterministic hash in [0, 1).
@@ -180,9 +181,10 @@ const SHUFFLED = DOODLES.map((icon, i) => ({ icon, at: hash(i * 31 + 7) }))
 /**
  * How far inside its cell an icon may wander, as a fraction of the cell.
  *
- * The remaining margin is what keeps neighbours apart: at 0.72 there is always
- * at least 28% of a cell between two icons, so they cannot collide, and the
- * roaming is wide enough that the underlying grid is not visible.
+ * The remaining margin is the first line of defence against collisions: 28% of
+ * a cell always separates two icons that stay home. It is not sufficient on its
+ * own — icons pushed clear of the centre leave their cells entirely — which is
+ * what `relax` exists to clean up afterwards.
  */
 const CELL_JITTER = 0.72;
 
@@ -199,15 +201,46 @@ const CLEAR_X = 0.46;
 const CLEAR_Y = 0.48;
 
 /**
- * Extra clearance in pixels, on top of the cleared area.
+ * The drift each icon traces, and how long it takes to go round once.
  *
- * An icon is not still — it traces an ellipse of up to 8.6px (the largest
- * band amplitude, `hypot(5, 7)`). Pushing it to exactly the boundary means its
- * own drift carries it back inside on every cycle. Expressing the clearance as
- * a ratio failed for the same reason: 6% of a wide screen is generous, but 6%
- * of a narrow one is smaller than the drift it has to survive.
+ * The icons share four drivers rather than owning one each. Drivers are the
+ * expensive part — each is a running animation the platform has to tick — and
+ * on the cheap Android handsets this app targets, twenty of them for a
+ * decoration nobody should consciously notice is a real cost. Interpolations
+ * are nearly free, so each icon reads its band's driver at *its own phase*
+ * instead: same clock, different point on the circle. Neighbours in a band
+ * therefore never move in lockstep, which is what made an earlier version read
+ * as the whole page tilting rather than as icons floating.
+ *
+ * Declared above the layout constants because several of them are sized from
+ * the drift: an icon has to be placed far enough from the cleared centre, from
+ * its neighbours, and from the screen edge that its own travel cannot carry it
+ * somewhere it should not go.
  */
-const CLEAR_PAD = 12;
+const BANDS = [
+  { duration: 11000, x: 9, y: 12 },
+  { duration: 14000, x: -12, y: 7 },
+  { duration: 17000, x: 7, y: -11 },
+  { duration: 20000, x: -9, y: -9 },
+];
+
+/** The furthest any icon travels from where it rests. */
+const DRIFT_PEAK = Math.max(...BANDS.map((b) => Math.hypot(b.x, b.y)));
+
+/**
+ * Extra clearance around the cleared area, in pixels.
+ *
+ * An icon is not still, so pushing it to exactly the boundary means its own
+ * drift carries it back inside on every cycle. Derived from `DRIFT_PEAK`
+ * rather than written as a number: widening the motion would otherwise
+ * silently reintroduce that bug, which is exactly how it appeared the first
+ * time — a hand-tuned 12 that was correct only while the drift stayed small.
+ *
+ * Expressing the clearance as a *ratio* failed for the same reason. 6% of a
+ * wide screen is generous; 6% of a narrow one is smaller than the drift it has
+ * to survive.
+ */
+const CLEAR_PAD = Math.ceil(DRIFT_PEAK) + 6;
 
 /**
  * Moves an icon out of the middle of the page.
@@ -259,6 +292,85 @@ function clearOfCentre(
     x: centreX + (iconX - centreX) * push - size / 2,
     y: centreY + (iconY - centreY) * push - size / 2,
   };
+}
+
+/**
+ * Separates any icons that ended up too close together.
+ *
+ * The grid guarantees spacing only while every icon stays in its own cell, and
+ * two later steps break that: pushing an icon clear of the centre moves it off
+ * its cell, and clamping to the screen edge moves it again. Either can leave a
+ * pair closer than their sizes and drift allow, which shows up as two emoji
+ * sliding through each other.
+ *
+ * A few relaxation passes fix it — push any offending pair apart along the line
+ * between them, then re-apply the two hard constraints, and repeat. With at
+ * most a couple of dozen icons this settles in two or three passes; the loop
+ * stops early once a pass changes nothing.
+ *
+ * Spacing is judged as if the icons were circles. That over-separates slightly
+ * compared with their real boxes, which is the safe direction to be wrong in.
+ */
+function relax(doodles: Doodle[], width: number, height: number): Doodle[] {
+  const PASSES = 8;
+  /** Breathing room beyond the point where two icons would just touch. */
+  const GAP = 4;
+
+  for (let pass = 0; pass < PASSES; pass++) {
+    let moved = false;
+
+    for (let i = 0; i < doodles.length; i++) {
+      for (let j = i + 1; j < doodles.length; j++) {
+        const a = doodles[i]!;
+        const b = doodles[j]!;
+        const need = (a.size + b.size) / 2 + DRIFT_PEAK * 2 + GAP;
+
+        let dx = b.left + b.size / 2 - (a.left + a.size / 2);
+        let dy = b.top + b.size / 2 - (a.top + a.size / 2);
+        let distance = Math.hypot(dx, dy);
+        if (distance >= need) continue;
+
+        // Exactly coincident has no line to push along; any direction will do.
+        if (distance < 0.001) {
+          dx = 1;
+          dy = 0;
+          distance = 1;
+        }
+
+        const shift = (need - distance) / 2;
+        a.left -= (dx / distance) * shift;
+        a.top -= (dy / distance) * shift;
+        b.left += (dx / distance) * shift;
+        b.top += (dy / distance) * shift;
+        moved = true;
+      }
+    }
+
+    if (!moved) break;
+
+    // Moving icons may have pushed one back into the centre or off the edge,
+    // so both constraints are re-imposed before the next pass judges spacing.
+    for (const doodle of doodles) {
+      const placed = clearOfCentre(
+        doodle.left,
+        doodle.top,
+        doodle.size,
+        width,
+        height,
+        0,
+      );
+      doodle.left = Math.min(
+        width - doodle.size - DRIFT_PEAK,
+        Math.max(DRIFT_PEAK, placed.x),
+      );
+      doodle.top = Math.min(
+        height - doodle.size - DRIFT_PEAK,
+        Math.max(DRIFT_PEAK, placed.y),
+      );
+    }
+  }
+
+  return doodles;
 }
 
 /**
@@ -326,9 +438,10 @@ function scatter(width: number, height: number): Doodle[] {
       out.push({
         key: `d${i}`,
         icon: SHUFFLED[i % SHUFFLED.length] ?? '💼',
-        // Clamped so an icon in an edge cell cannot hang off the page.
-        left: Math.min(width - size, Math.max(0, placed.x)),
-        top: Math.min(height - size, Math.max(0, placed.y)),
+        // Inset by the drift as well as the icon, so an edge icon cannot
+        // travel off the page at the far end of its loop.
+        left: Math.min(width - size - DRIFT_PEAK, Math.max(DRIFT_PEAK, placed.x)),
+        top: Math.min(height - size - DRIFT_PEAK, Math.max(DRIFT_PEAK, placed.y)),
         size,
         rotate: `${Math.round(hash(i * 5 + 3) * 20 - 10)}deg`,
         // 0.7 at the smallest, 1 at the largest.
@@ -347,30 +460,8 @@ function scatter(width: number, height: number): Doodle[] {
     }
   }
 
-  return out;
+  return relax(out, width, height);
 }
-
-/**
- * The scattered icons behind every screen, each drifting on its own.
- *
- * Two motions are layered. The whole sheet rises and falls very slowly, which
- * reads as depth. On top of that every icon traces a small ellipse.
- *
- * The icons share four drivers rather than owning one each. Drivers are the
- * expensive part — each is a running animation the platform has to tick — and
- * on the cheap Android handsets this app targets, twenty of them for a
- * decoration nobody should consciously notice is a real cost. Interpolations
- * are nearly free, so each icon reads its band's driver at *its own phase*
- * instead: same clock, different point on the circle. Neighbours in a band
- * therefore never move in lockstep, which is what made the old version read as
- * the whole page tilting rather than as icons floating.
- */
-const BANDS = [
-  { duration: 15000, x: 5, y: 7 },
-  { duration: 19000, x: -7, y: 4 },
-  { duration: 23000, x: 4, y: -6 },
-  { duration: 27000, x: -5, y: -5 },
-];
 
 /**
  * Points sampled around each ellipse.
