@@ -25,7 +25,7 @@ import { RecommendedForYou } from '../../src/components/jobs/RecommendedForYou';
 import {
   ActivityOverview,
   Greeting,
-  ProfileStrength,
+  ProfileStrengthBadge,
   RecentNotifications,
   useDashboardSummary,
 } from '../../src/components/home/DashboardSections';
@@ -115,7 +115,6 @@ export default function HomeScreen() {
         <Header user={data} onSignOut={() => void onSignOut()} />
 
         <Greeting name={data.firstName ?? data.phone} />
-        {summary ? <ProfileStrength data={summary} /> : null}
 
         <RolePicker />
         <RecommendedForYou />
@@ -179,6 +178,7 @@ function Header({
         </Text>
       </View>
 
+      <ProfileStrengthBadge />
       <NotificationBell />
       <DashboardMenu user={user} onSignOut={onSignOut} />
     </View>
