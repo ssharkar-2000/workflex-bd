@@ -22,6 +22,13 @@ import { DashboardMenu } from '../../src/components/DashboardMenu';
 import { useAuthStore } from '../../src/store/auth-store';
 import { useLocale, useT, type TranslationKey } from '../../src/i18n';
 import { RecommendedForYou } from '../../src/components/jobs/RecommendedForYou';
+import {
+  ActivityOverview,
+  Greeting,
+  ProfileStrength,
+  RecentNotifications,
+  useDashboardSummary,
+} from '../../src/components/home/DashboardSections';
 import { useTheme } from '../../src/lib/use-theme';
 import { font, radius, space } from '../../src/lib/theme';
 
@@ -37,6 +44,12 @@ export default function HomeScreen() {
     queryKey: ['me'],
     queryFn: fetchMe,
   });
+
+  // Fetched alongside `me` rather than inside each panel: the counts belong to
+  // one request, and a panel that fetched its own would make the dashboard
+  // four round trips deep on a phone connection. Undefined while it loads, so
+  // the sections that need it simply do not render yet.
+  const { data: summary } = useDashboardSummary();
 
   // The device is the source of truth for language; the account copy exists so
   // server-sent messages (SMS, email) match what the user reads in the app.
@@ -101,8 +114,14 @@ export default function HomeScreen() {
             dashboard body is for work, not settings. */}
         <Header user={data} onSignOut={() => void onSignOut()} />
 
+        <Greeting name={data.firstName ?? data.phone} />
+        {summary ? <ProfileStrength data={summary} /> : null}
+
         <RolePicker />
         <RecommendedForYou />
+        {summary ? <ActivityOverview data={summary} /> : null}
+        <RecentNotifications />
+
         <ActionGrid
           unlocked={data.verificationLevel >= VerificationLevel.L1_IDENTITY}
         />

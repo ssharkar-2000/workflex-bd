@@ -17,6 +17,7 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { UsersService } from './users.service';
 import { EmailVerificationService } from './email-verification.service';
 import { ProfileService } from './profile.service';
+import { DashboardService } from './dashboard.service';
 
 const updateLocaleSchema = z.object({ locale: localeSchema });
 type UpdateLocaleDto = z.output<typeof updateLocaleSchema>;
@@ -29,6 +30,7 @@ export class UsersController {
     private readonly users: UsersService,
     private readonly emails: EmailVerificationService,
     private readonly profiles: ProfileService,
+    private readonly dashboard: DashboardService,
   ) {}
 
   /**
@@ -40,6 +42,12 @@ export class UsersController {
   async me(@CurrentUser('userId') userId: string) {
     const user = await this.users.findById(userId);
     return this.users.toAuthUser(user);
+  }
+
+  @Get('me/dashboard')
+  @ApiOperation({ summary: 'Counts and profile completeness for the dashboard' })
+  async dashboardSummary(@CurrentUser('userId') userId: string) {
+    return this.dashboard.summary(userId);
   }
 
   @Patch('me/locale')

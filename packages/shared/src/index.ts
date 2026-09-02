@@ -16,4 +16,5 @@ export * from './jobs';
 export * from './applications';
 export * from './matching';
 export * from './recommendations';
+export * from './dashboard';
 export * from './reports';

@@ -6,6 +6,8 @@ import {
   type AuthUser,
   type OtpPurpose,
   type OtpRequestResponse,
+  dashboardSummarySchema,
+  type DashboardSummary,
 } from '@workflex/shared';
 import { api } from './client';
 import { getOrCreateDeviceId } from '../lib/secure-storage';
@@ -67,4 +69,16 @@ export async function fetchMe(): Promise<AuthUser> {
 
 export async function logout(refreshToken?: string): Promise<void> {
   await api.post('/auth/logout', { refreshToken, allDevices: false });
+}
+
+/**
+ * Counts and completeness for the dashboard, in one request.
+ *
+ * Separate from `fetchMe` because it changes far more often — applying for a
+ * job moves these numbers, but not the identity `/me` returns — and because
+ * the dashboard should still render if this one is slow.
+ */
+export async function fetchDashboardSummary(): Promise<DashboardSummary> {
+  const { data } = await api.get('/me/dashboard');
+  return dashboardSummarySchema.parse(data);
 }
