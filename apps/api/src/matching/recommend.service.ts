@@ -39,13 +39,31 @@ const FRESHNESS_MAX = 6;
 const FRESHNESS_WINDOW_DAYS = 30;
 
 /**
- * A suggestion has to clear this to be shown.
+ * A suggestion has to clear this to be shown, as a percentage of what this
+ * particular person's signals could possibly award.
  *
- * Below it the ranking is noise: matching on one weak axis says nothing, and
- * padding the row to a fixed length with near-random jobs is how a
- * "recommended for you" section teaches people to ignore it.
+ * Measured against the achievable maximum rather than a flat 100, because the
+ * four signals are not all available to everyone. Somebody who has uploaded a
+ * CV but never saved a job can only earn the skills weight — 40 — so a fixed
+ * threshold of 25 silently demanded a 62% CV match from them while asking far
+ * less of a user with history. Tested against a real CV that hid 16 of the 18
+ * genuinely relevant postings.
+ *
+ * Normalising also makes the number on the card mean something consistent:
+ * "how well this fits, given what is known about you", rather than a fraction
+ * of a total the person could never reach.
  */
-const MIN_FIT = 25;
+const MIN_FIT = 35;
+
+/**
+ * How much of an axis's weight must be earned before it is offered as a reason.
+ *
+ * A card with no reason is not shown at all, so this gate is what actually
+ * decides what surfaces — it was previously set at half the skills weight in
+ * one branch and left implicit everywhere else, which made it stricter than
+ * MIN_FIT and quietly overrode it.
+ */
+const REASON_SHARE = 0.35;
 
 /** How many postings the taste profile is built from. */
 const HISTORY_LIMIT = 40;
@@ -177,10 +195,27 @@ export class RecommendService {
     // --- skills, borrowed from the CV matcher rather than reimplemented ---
     if (profile) {
       const match = this.matcher.score(profile, job);
-      const earned = Math.round((match.score / 100) * WEIGHTS.skills);
-      fit += earned;
-      // Half the available weight is a real signal, not a rounding artefact.
-      if (earned >= WEIGHTS.skills * 0.5) reasons.push('SKILLS');
+      fit += Math.round((match.score / 100) * WEIGHTS.skills);
+
+      // The reason is drawn from the matcher's *skills* axis, not its blended
+      // total. The total folds in experience and category, so a posting could
+      // earn most of its score from being in the right field with no skill
+      // overlap at all — and be labelled "matches your skills", which would be
+      // a claim the evidence did not support.
+      const skillAxis = match.reasons.find((r) => r.key === 'skills');
+      if (skillAxis && skillAxis.earned >= skillAxis.possible * REASON_SHARE) {
+        reasons.push('SKILLS');
+      }
+
+      // A CV states the person's field, which is a preference in exactly the
+      // way a saved job is. Without this, someone who has uploaded a CV but
+      // never saved anything had one usable signal where they should have had
+      // two, and 16 of the 18 postings genuinely in their field were dropped
+      // for having no reason to show.
+      if (profile.categories.includes(job.category)) {
+        fit += Math.round(WEIGHTS.preference * 0.6);
+        reasons.push('PREFERENCE');
+      }
     }
 
     // --- location ---
@@ -233,7 +268,7 @@ export class RecommendService {
       );
     }
 
-    return { fit: Math.min(100, fit), reasons };
+    return { fit: Math.min(100, fit), reasons: [...new Set(reasons)] };
   }
 
   /**
@@ -268,7 +303,10 @@ export class RecommendService {
       skills: profile !== null,
       location: taste.districts.size > 0 || taste.divisions.size > 0 || homeDivision !== null,
       availability: taste.workingTimes.size > 0,
-      preferences: taste.categories.size > 0 || taste.jobTypes.size > 0,
+      preferences:
+        taste.categories.size > 0 ||
+        taste.jobTypes.size > 0 ||
+        (profile?.categories.length ?? 0) > 0,
     };
 
     // Nothing known about this person: say so instead of guessing.
@@ -276,11 +314,30 @@ export class RecommendService {
       return { scored: [], basis };
     }
 
+    // The most any job could score for this person, given which signals they
+    // actually have. Never zero: the guard above returns early when nothing is
+    // known, so at least one term is always available here.
+    const achievable =
+      (basis.skills ? WEIGHTS.skills : 0) +
+      (basis.location ? WEIGHTS.location : 0) +
+      (basis.availability ? WEIGHTS.availability : 0) +
+      (basis.preferences ? WEIGHTS.preference : 0);
+
     const scored = candidates
-      .map((job) => ({
-        job,
-        ...this.scoreJob(job, taste, homeDivision, profile),
-      }))
+      .map((job) => {
+        const raw = this.scoreJob(job, taste, homeDivision, profile);
+        return {
+          job,
+          reasons: raw.reasons,
+          // Rescaled to the achievable maximum, so the percentage shown means
+          // the same thing whether the system knows one thing about someone or
+          // all four.
+          fit: Math.min(
+            100,
+            Math.round((raw.fit / Math.max(1, achievable)) * 100),
+          ),
+        };
+      })
       .filter((row) => row.fit >= MIN_FIT && row.reasons.length > 0)
       // Ties broken by recency, so an unchanging list does not calcify.
       .sort(

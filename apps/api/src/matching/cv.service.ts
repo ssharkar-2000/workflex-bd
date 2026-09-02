@@ -6,6 +6,7 @@ import { StorageService } from '../storage/storage.service';
 import { PDFParse } from 'pdf-parse';
 import { OcrService } from '../verification/ocr.service';
 import { CvParserService } from './cv-parser.service';
+import { extractFromKeywords } from './cv-keywords';
 
 /**
  * Storing a CV, reading it, and keeping the parsed profile in step with it.
@@ -99,8 +100,21 @@ export class CvService {
       return this.status(userId);
     }
 
-    const extracted = await this.parser.parse(text);
+    // The model first, keywords if it could not answer. Falling back keeps a
+    // CV useful when the provider is unreachable or unfunded, which otherwise
+    // left the whole feature — profile, match scores, recommendations — dead
+    // from an upload that had worked perfectly.
+    const modelled = await this.parser.parse(text);
+    const extracted = modelled ?? extractFromKeywords(text);
+
     if (!extracted) return this.status(userId);
+
+    if (!modelled) {
+      this.logger.warn(
+        `CV for ${userId} read by keyword match, not by model — ` +
+          `${extracted.skills.length} roles recognised`,
+      );
+    }
 
     await this.prisma.cvProfile.upsert({
       where: { userId },

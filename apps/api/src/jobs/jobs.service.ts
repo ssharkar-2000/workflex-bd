@@ -620,9 +620,21 @@ export class JobsService {
   async recommended(userId: string): Promise<Recommendations> {
     const candidates = await this.prisma.job.findMany({
       where: {
-        ...this.openJobs,
-        // Not mine, and not already acted on.
-        NOT: { postedBy: userId },
+        // Both conditions are OR groups, so they go in an AND array rather
+        // than side by side — a second `OR` key at this level would replace
+        // the first, and the one it replaced is the deadline filter. Spreading
+        // `openJobs` and adding `OR` next to it silently starts recommending
+        // expired postings.
+        AND: [
+          this.openJobs,
+          // Not mine. Written as an OR rather than `NOT: { postedBy: userId }`
+          // because `postedBy` is nullable — the schema says "Null on seeded
+          // and imported listings" — and SQL compares NULL to a value as NULL,
+          // never as true, so the NOT form silently discarded every ownerless
+          // posting. Verified with a probe row: dropped by NOT, kept by this.
+          { OR: [{ postedBy: null }, { postedBy: { not: userId } }] },
+        ],
+        // Not already acted on.
         savedBy: { none: { userId } },
         applications: { none: { userId, status: { not: 'WITHDRAWN' } } },
       },
