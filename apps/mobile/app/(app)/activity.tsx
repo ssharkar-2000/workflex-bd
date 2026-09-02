@@ -111,7 +111,6 @@ export default function ActivityScreen() {
             <Stat
               label="act.stat.shortlisted"
               value={summary.seeking.shortlisted}
-              highlight
             />
             <Stat label="act.stat.active" value={summary.hiring.openJobs} />
           </View>
@@ -166,33 +165,15 @@ export default function ActivityScreen() {
   );
 }
 
-function Stat({
-  label,
-  value,
-  highlight,
-}: {
-  label: TranslationKey;
-  value: number;
-  highlight?: boolean;
-}) {
+function Stat({ label, value }: { label: TranslationKey; value: number }) {
   const t = useT();
   const { c } = useTheme();
 
   return (
     <View
-      style={[
-        styles.stat,
-        {
-          backgroundColor: highlight ? c.successSoft : c.surface,
-          borderColor: highlight ? c.success : c.border,
-        },
-      ]}
+      style={[styles.stat, { backgroundColor: c.surface, borderColor: c.border }]}
     >
-      <Text
-        style={[styles.statValue, { color: highlight ? c.success : c.text }]}
-      >
-        {value}
-      </Text>
+      <Text style={[styles.statValue, { color: c.text }]}>{value}</Text>
       <Text style={[styles.statLabel, { color: c.textMuted }]}>{t(label)}</Text>
     </View>
   );
