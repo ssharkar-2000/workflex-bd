@@ -659,6 +659,7 @@ export class JobsService {
         job: this.toListing(row.job, false, profile, false, userId),
         fit: row.fit,
         reasons: row.reasons,
+        factors: row.factors,
       })),
       basis,
     };
