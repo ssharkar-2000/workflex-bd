@@ -17,4 +17,5 @@ export * from './applications';
 export * from './matching';
 export * from './recommendations';
 export * from './dashboard';
+export * from './skill-gap';
 export * from './reports';

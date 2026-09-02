@@ -1,5 +1,10 @@
 import { Platform } from 'react-native';
-import { cvStatusSchema, type CvStatus } from '@workflex/shared';
+import {
+  cvStatusSchema,
+  skillPathResponseSchema,
+  type CvStatus,
+  type SkillPathResponse,
+} from '@workflex/shared';
 import { api } from './client';
 
 export async function fetchCvStatus(): Promise<CvStatus> {
@@ -60,4 +65,16 @@ export async function uploadCv(file: {
 export async function removeCv(): Promise<CvStatus> {
   const { data } = await api.delete('/cv');
   return cvStatusSchema.parse(data);
+}
+
+/**
+ * Skills worth learning next, counted from live demand on the platform.
+ *
+ * `path` is null when there is nothing honest to say — no parsed CV, or no
+ * postings in the person's field naming any skill — and the card hides itself
+ * rather than inventing a target.
+ */
+export async function fetchSkillPath(): Promise<SkillPathResponse> {
+  const { data } = await api.get('/cv/skill-path');
+  return skillPathResponseSchema.parse(data);
 }

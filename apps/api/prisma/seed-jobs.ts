@@ -143,6 +143,66 @@ const REQUIREMENTS = [
   ['• Physically fit for the work involved', '• Reliable and honest', '• Local to the area preferred', '• National ID required'].join('\n'),
 ];
 
+
+/**
+ * The skills each field's postings actually ask for.
+ *
+ * The generic requirement blocks above are true of any job — punctual,
+ * presentable, has an NID — and say nothing about the work. Real postings name
+ * what the employer needs, and a catalogue that never does cannot support
+ * anything that reads demand out of it: the skill-gap analysis found three
+ * technical terms across eleven IT postings, each in one job, which is not a
+ * signal.
+ *
+ * Terms are drawn from the same vocabulary the CV reader uses, so what a
+ * posting asks for and what a CV offers are expressed in the same words.
+ */
+const CATEGORY_SKILLS: Partial<Record<JobCategory, readonly string[]>> = {
+  IT: [
+    'JavaScript', 'TypeScript', 'React', 'Node.js', 'Python', 'Java',
+    'SQL', 'MySQL', 'REST API', 'Git', 'HTML', 'CSS', 'PHP', 'Laravel',
+    'Flutter', 'React Native', 'Django', 'MongoDB', 'Docker', 'Firebase',
+  ],
+  CREATIVE: [
+    'Figma', 'Photoshop', 'Illustrator', 'UI/UX', 'graphic design',
+    'video editing', 'Premiere Pro', 'After Effects', 'animation',
+    'content writing',
+  ],
+  OFFICE: [
+    'MS Excel', 'MS Word', 'PowerPoint', 'data entry', 'bookkeeping',
+    'accounting', 'Tally', 'administrative',
+  ],
+  PROFESSIONAL: [
+    'digital marketing', 'SEO', 'market research', 'business development',
+    'project management', 'human resources', 'recruitment',
+  ],
+  EDUCATION: ['teaching', 'lesson plan', 'classroom', 'tuition'],
+  HEALTHCARE: ['patient care', 'first aid', 'nursing', 'pharmacy'],
+  TRADES: ['electrical wiring', 'plumbing', 'refrigeration', 'AC technician'],
+  CONSTRUCTION: ['masonry', 'carpentry', 'welding', 'AutoCAD', 'site supervisor'],
+  HOSPITALITY: ['kitchen', 'catering', 'housekeeping', 'barista'],
+  RETAIL: ['point of sale', 'inventory', 'merchandising', 'customer service'],
+  MANUFACTURING: ['quality control', 'sewing', 'packaging', 'assembly line'],
+  TRANSPORT: ['driving licence', 'logistics', 'fleet'],
+  DELIVERY: ['delivery', 'courier', 'parcel', 'dispatch'],
+  SECURITY: ['CCTV', 'surveillance', 'patrol'],
+  BEAUTY: ['hair stylist', 'makeup artist', 'manicure', 'facial'],
+  AGRICULTURE: ['farming', 'poultry', 'livestock', 'harvest'],
+  EVENTS: ['event management', 'decoration', 'stage setup'],
+  HOUSEHOLD: ['house cleaning', 'babysitting', 'elderly care', 'laundry'],
+};
+
+/**
+ * Three skills for one posting, chosen by index so the catalogue is stable
+ * across re-seeds but the postings in a field do not all ask for the same
+ * three — which would make every skill either universal or absent.
+ */
+function skillsFor(category: JobCategory, n: number): string[] {
+  const pool = CATEGORY_SKILLS[category];
+  if (!pool || pool.length === 0) return [];
+  return [0, 1, 2].map((i) => pool[(n * 3 + i) % pool.length]!);
+}
+
 const BENEFITS = [
   ['• Payment on completion, via bKash or cash', '• Lunch provided', '• Friendly working environment'].join('\n'),
   ['• Weekly payment', '• Transport allowance', '• Overtime paid at agreed rate'].join('\n'),
@@ -225,7 +285,10 @@ async function main() {
           : null,
         flexibleStart: !shortJob,
 
-        requirements: pick(REQUIREMENTS, n),
+        requirements: [
+          ...skillsFor(category.key as JobCategory, n).map((sk) => `• ${sk}`),
+          pick(REQUIREMENTS, n),
+        ].join('\n'),
         benefits: pick(BENEFITS, n),
         // Every fourth posting leaves it unsaid, which is realistic and gives
         // the detail screen its "Not specified" case to render.

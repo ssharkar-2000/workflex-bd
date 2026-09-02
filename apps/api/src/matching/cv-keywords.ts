@@ -39,7 +39,7 @@ import { JOB_CATEGORIES, type JobCategory } from '@workflex/shared';
  * kind of document being read. "Manager" and "assistant" are absent for the
  * same reason — they mean twenty different things each.
  */
-const SIGNALS: { category: JobCategory; terms: readonly string[] }[] = [
+export const SIGNALS: { category: JobCategory; terms: readonly string[] }[] = [
   {
     category: 'IT',
     terms: [
@@ -213,7 +213,7 @@ function yearsFrom(text: string): number | null {
  * `node.js`, `ui/ux`), where there is no word boundary to anchor to. Guarding
  * on the neighbouring character instead works for both shapes.
  */
-function mentions(haystack: string, term: string): boolean {
+export function mentions(haystack: string, term: string): boolean {
   const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`, 'i').test(haystack);
 }

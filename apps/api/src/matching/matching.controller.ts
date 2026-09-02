@@ -16,6 +16,7 @@ import { AppException } from '../common/exceptions/app.exception';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { CvService } from './cv.service';
+import { SkillGapService } from './skill-gap.service';
 import type { Env } from '../config/env.schema';
 
 /**
@@ -42,12 +43,23 @@ export class MatchingController {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly config: ConfigService<Env, true>,
+    private readonly skillGap: SkillGapService,
   ) {}
 
   @Get()
   @ApiOperation({ summary: "The account's CV and what was read from it" })
   async status(@CurrentUser('userId') userId: string) {
     return this.cv.status(userId);
+  }
+
+  @Get('skill-path')
+  @ApiOperation({
+    summary: 'Skills worth learning next, from live demand on the platform',
+  })
+  async skillPath(@CurrentUser('userId') userId: string) {
+    // Null rather than an error when there is no CV: the dashboard card hides
+    // itself, which is not a failure worth a status code.
+    return { path: await this.skillGap.path(userId) };
   }
 
   @Post()

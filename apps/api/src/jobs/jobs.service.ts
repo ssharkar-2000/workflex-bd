@@ -221,12 +221,20 @@ export class JobsService {
       // AND-ed with the OR above rather than merged into it — putting the
       // search terms in the same OR array would make a keyword match override
       // the expiry filter and resurrect closed jobs.
+      //
+      // Description and requirements are searched too, because that is the
+      // only place a skill is ever written down. Without them the box was
+      // blind to exactly what its own placeholder invites — "React", "Django",
+      // "welding" — and answered "nothing matches" for skills that a dozen
+      // open postings ask for by name.
       and.push({
         OR: [
           { title: { contains: query.q, mode: 'insensitive' } },
           { companyName: { contains: query.q, mode: 'insensitive' } },
           { location: { contains: query.q, mode: 'insensitive' } },
           { district: { contains: query.q, mode: 'insensitive' } },
+          { description: { contains: query.q, mode: 'insensitive' } },
+          { requirements: { contains: query.q, mode: 'insensitive' } },
         ],
       });
     }

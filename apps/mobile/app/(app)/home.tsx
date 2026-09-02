@@ -12,13 +12,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { VerificationLevel, type AuthUser } from '@workflex/shared';
+import { VerificationLevel } from '@workflex/shared';
 import { fetchMe, logout } from '../../src/api/auth';
 import { updateLocale } from '../../src/api/email';
 import { useErrorMessage } from '../../src/lib/error-message';
 import { useAuthStore } from '../../src/store/auth-store';
 import { useLocale, useT, type TranslationKey } from '../../src/i18n';
 import { RecommendedForYou } from '../../src/components/jobs/RecommendedForYou';
+import { NextSkillAI } from '../../src/components/home/NextSkillAI';
 import {
   ActivityOverview,
   RecentNotifications,
@@ -112,6 +113,7 @@ export default function HomeScreen() {
 
         <RolePicker />
         <RecommendedForYou />
+        <NextSkillAI />
         {summary ? <ActivityOverview data={summary} /> : null}
         <RecentNotifications />
 

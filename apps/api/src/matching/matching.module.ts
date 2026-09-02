@@ -6,6 +6,7 @@ import { CvService } from './cv.service';
 import { CvParserService } from './cv-parser.service';
 import { MatchService } from './match.service';
 import { RecommendService } from './recommend.service';
+import { SkillGapService } from './skill-gap.service';
 
 /**
  * CV understanding and job matching.
@@ -16,7 +17,13 @@ import { RecommendService } from './recommend.service';
 @Module({
   imports: [StorageModule, VerificationModule],
   controllers: [MatchingController],
-  providers: [CvService, CvParserService, MatchService, RecommendService],
-  exports: [MatchService, RecommendService, CvService],
+  providers: [
+    CvService,
+    CvParserService,
+    MatchService,
+    RecommendService,
+    SkillGapService,
+  ],
+  exports: [MatchService, RecommendService, SkillGapService, CvService],
 })
 export class MatchingModule {}
