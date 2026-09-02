@@ -18,4 +18,5 @@ export * from './matching';
 export * from './recommendations';
 export * from './dashboard';
 export * from './skill-gap';
+export * from './trust';
 export * from './reports';

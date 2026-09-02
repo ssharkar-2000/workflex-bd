@@ -18,6 +18,7 @@ import { UsersService } from './users.service';
 import { EmailVerificationService } from './email-verification.service';
 import { ProfileService } from './profile.service';
 import { DashboardService } from './dashboard.service';
+import { TrustService } from './trust.service';
 
 const updateLocaleSchema = z.object({ locale: localeSchema });
 type UpdateLocaleDto = z.output<typeof updateLocaleSchema>;
@@ -31,6 +32,7 @@ export class UsersController {
     private readonly emails: EmailVerificationService,
     private readonly profiles: ProfileService,
     private readonly dashboard: DashboardService,
+    private readonly trust: TrustService,
   ) {}
 
   /**
@@ -48,6 +50,12 @@ export class UsersController {
   @ApiOperation({ summary: 'Counts and profile completeness for the dashboard' })
   async dashboardSummary(@CurrentUser('userId') userId: string) {
     return this.dashboard.summary(userId);
+  }
+
+  @Get('me/trust')
+  @ApiOperation({ summary: 'Trust score, and the records it is built from' })
+  async trustScore(@CurrentUser('userId') userId: string) {
+    return this.trust.score(userId);
   }
 
   @Patch('me/locale')

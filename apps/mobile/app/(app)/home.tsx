@@ -20,6 +20,7 @@ import { useAuthStore } from '../../src/store/auth-store';
 import { useLocale, useT, type TranslationKey } from '../../src/i18n';
 import { RecommendedForYou } from '../../src/components/jobs/RecommendedForYou';
 import { NextSkillAI } from '../../src/components/home/NextSkillAI';
+import { TrustScore } from '../../src/components/home/TrustScore';
 import {
   ActivityOverview,
   RecentNotifications,
@@ -115,6 +116,7 @@ export default function HomeScreen() {
         <RecommendedForYou />
         <NextSkillAI />
         {summary ? <ActivityOverview data={summary} /> : null}
+        <TrustScore />
         <RecentNotifications />
 
         <ActionGrid
@@ -266,7 +268,6 @@ const ACTIONS = [
   { emoji: '📄', label: 'home.tile.applications', needsL1: true },
   { emoji: '🗓️', label: 'home.tile.shifts', needsL1: true },
   { emoji: '👛', label: 'home.tile.wallet', needsL1: true },
-  { emoji: '⭐', label: 'home.tile.trust', needsL1: true },
   { emoji: '💬', label: 'home.tile.messages', needsL1: false },
 ] as const satisfies readonly {
   emoji: string;

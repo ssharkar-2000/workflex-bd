@@ -8,6 +8,8 @@ import {
   type OtpRequestResponse,
   dashboardSummarySchema,
   type DashboardSummary,
+  trustScoreSchema,
+  type TrustScore,
 } from '@workflex/shared';
 import { api } from './client';
 import { getOrCreateDeviceId } from '../lib/secure-storage';
@@ -81,4 +83,16 @@ export async function logout(refreshToken?: string): Promise<void> {
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   const { data } = await api.get('/me/dashboard');
   return dashboardSummarySchema.parse(data);
+}
+
+/**
+ * The trust score and the records behind it.
+ *
+ * Its own request rather than a field on the dashboard summary: it reads
+ * attendance and reports, which the counts do not touch, and a slow join
+ * should not hold up the numbers at the top of the screen.
+ */
+export async function fetchTrustScore(): Promise<TrustScore> {
+  const { data } = await api.get('/me/trust');
+  return trustScoreSchema.parse(data);
 }
