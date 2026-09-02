@@ -204,7 +204,7 @@ export function ActivityOverview({ data }: { data: DashboardSummary }) {
       label: 'dash.stat.applications',
       value: data.seeking.applications,
       hint: t('dash.stat.activeOf', { count: data.seeking.activeApplications }),
-      href: '/(app)/applications',
+      href: '/(app)/activity',
     },
     {
       label: 'dash.stat.saved',
@@ -215,12 +215,12 @@ export function ActivityOverview({ data }: { data: DashboardSummary }) {
       label: 'dash.stat.posted',
       value: data.hiring.jobsPosted,
       hint: t('dash.stat.openOf', { count: data.hiring.openJobs }),
-      href: '/(app)/my-jobs',
+      href: '/(app)/activity?tab=jobs',
     },
     {
       label: 'dash.stat.applicants',
       value: data.hiring.applicants,
-      href: '/(app)/my-jobs',
+      href: '/(app)/activity?tab=jobs',
     },
   ];
 

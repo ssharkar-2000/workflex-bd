@@ -80,6 +80,7 @@ export class DashboardService {
       profileStrength,
       applications,
       activeApplications,
+      shortlisted,
       savedJobs,
       jobsPosted,
       openJobs,
@@ -95,6 +96,9 @@ export class DashboardService {
           userId,
           status: { in: ['SUBMITTED', 'VIEWED', 'SHORTLISTED', 'ACCEPTED'] },
         },
+      }),
+      this.prisma.jobApplication.count({
+        where: { userId, status: 'SHORTLISTED' },
       }),
       this.prisma.savedJob.count({ where: { userId } }),
 
@@ -118,7 +122,7 @@ export class DashboardService {
 
     return {
       profileStrength,
-      seeking: { applications, activeApplications, savedJobs },
+      seeking: { applications, activeApplications, shortlisted, savedJobs },
       hiring: { jobsPosted, openJobs, applicants },
       // Clamped: a read row can outlive the notice it referred to, and a
       // negative badge is worse than a stale zero.

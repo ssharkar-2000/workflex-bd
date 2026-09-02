@@ -408,7 +408,7 @@ export default function JobDetailScreen() {
           // Your own posting. Applying is refused server-side, so the button
           // is not offered at all rather than shown and then rejected.
           <Pressable
-            onPress={() => router.push('/(app)/my-jobs')}
+            onPress={() => router.push('/(app)/activity?tab=jobs')}
             accessibilityRole="button"
             style={[styles.ownBar, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
           >

@@ -23,7 +23,7 @@ const TABS: {
   { href: '/(app)/home', icon: '🏠', label: 'nav.home' },
   { href: '/(app)/jobs', icon: '🔍', label: 'nav.findWork' },
   { href: '/(app)/post-job', icon: '＋', label: 'nav.postJob', primary: true },
-  { href: '/(app)/applications', icon: '📊', label: 'nav.activity' },
+  { href: '/(app)/activity', icon: '📊', label: 'nav.activity' },
   { href: '/(app)/profile', icon: '👤', label: 'nav.profile' },
 ];
 
@@ -39,7 +39,7 @@ const TAB_ROUTES = new Set([
   '/home',
   '/jobs',
   '/post-job',
-  '/applications',
+  '/activity',
   '/profile',
 ]);
 

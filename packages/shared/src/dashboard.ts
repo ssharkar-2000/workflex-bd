@@ -41,6 +41,8 @@ export const dashboardSummarySchema = z.object({
     applications: z.number().int().nonnegative(),
     /** Applications not yet rejected or withdrawn — still live. */
     activeApplications: z.number().int().nonnegative(),
+    /** Applications an employer has moved to their shortlist. */
+    shortlisted: z.number().int().nonnegative(),
     savedJobs: z.number().int().nonnegative(),
   }),
 
