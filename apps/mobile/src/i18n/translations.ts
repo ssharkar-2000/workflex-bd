@@ -511,6 +511,11 @@ export const en = {
   'dash.stat.applicants': 'Applicants',
   'dash.notifications': 'Recent notifications',
   'dash.viewAll': 'View all',
+  'nav.home': 'Home',
+  'nav.findWork': 'Find Work',
+  'nav.postJob': 'Post Job',
+  'nav.activity': 'Activity',
+  'nav.profile': 'Profile',
 
   'jobs.start.TODAY': 'Start today',
   'jobs.start.TOMORROW': 'Tomorrow',
@@ -1263,6 +1268,11 @@ export const bn: Record<TranslationKey, string> = {
   'dash.stat.applicants': 'আবেদনকারী',
   'dash.notifications': 'সাম্প্রতিক বিজ্ঞপ্তি',
   'dash.viewAll': 'সব দেখুন',
+  'nav.home': 'হোম',
+  'nav.findWork': 'কাজ খুঁজুন',
+  'nav.postJob': 'কাজ দিন',
+  'nav.activity': 'কার্যক্রম',
+  'nav.profile': 'প্রোফাইল',
 
   'jobs.start.TODAY': 'আজ শুরু',
   'jobs.start.TOMORROW': 'আগামীকাল',

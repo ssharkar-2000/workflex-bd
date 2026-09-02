@@ -3,6 +3,7 @@ import { Redirect, Stack } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { fetchOnboardingStatus } from '../../src/api/onboarding';
 import { useLaunchStore } from '../../src/store/launch-store';
+import { BottomNav } from '../../src/components/BottomNav';
 import { useTheme } from '../../src/lib/use-theme';
 
 /**
@@ -49,10 +50,20 @@ export default function AppLayout() {
     return <Redirect href="/(onboarding)/details" />;
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  // The bar is a sibling of the Stack, not an overlay on it, so the screens
+  // keep their full height and none of them has to reserve room for it.
+  return (
+    <View style={styles.shell}>
+      <View style={styles.shell}>
+        <Stack screenOptions={{ headerShown: false }} />
+      </View>
+      <BottomNav />
+    </View>
+  );
 }
 
 const styles = {
+  shell: { flex: 1 },
   center: {
     flex: 1,
     alignItems: 'center' as const,
