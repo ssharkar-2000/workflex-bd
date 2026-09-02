@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { maskPhone, VerificationLevel, type AuthUser } from '@workflex/shared';
+import { VerificationLevel, type AuthUser } from '@workflex/shared';
 import { fetchMe, logout } from '../../src/api/auth';
 import { updateLocale } from '../../src/api/email';
 import { useErrorMessage } from '../../src/lib/error-message';
@@ -169,14 +169,11 @@ function Header({
           version={String(user.hasPhoto)}
         />
       </Pressable>
-      <View style={styles.headerText}>
-        <Text style={[styles.greeting, { color: c.text }]}>
-          {t('home.welcome')}
-        </Text>
-        <Text style={[styles.phone, { color: c.textMuted }]} numberOfLines={1}>
-          {fullName || maskPhone(user.phone)}
-        </Text>
-      </View>
+      {/* The header used to greet the user here, which the greeting directly
+          below it does properly — with the time of day and room to breathe.
+          Two greetings a centimetre apart read as a mistake, so this is now
+          just the space that pushes the controls to the right. */}
+      <View style={styles.headerSpacer} />
 
       <ProfileStrengthBadge />
       <NotificationBell />
@@ -398,9 +395,7 @@ const styles = StyleSheet.create({
     gap: space.sm,
     marginBottom: space.md,
   },
-  headerText: { flex: 1, flexShrink: 1 },
-  greeting: { fontSize: font.lg, fontWeight: '700' },
-  phone: { fontSize: font.sm },
+  headerSpacer: { flex: 1 },
 
   section: { marginTop: space.lg },
   sectionTitle: { fontSize: font.md, fontWeight: '700', marginBottom: space.md },
