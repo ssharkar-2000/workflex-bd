@@ -376,8 +376,40 @@ export const myJobSchema = jobListingSchema.extend({
    * audience, so there is no per-user event to send.
    */
   applicantCount: z.number().int().nonnegative(),
+  /**
+   * How far through that pile the poster has got.
+   *
+   * Kept beside the applicant count rather than derived from it, because the
+   * pair is the whole story on a hiring card: ten applicants and none
+   * shortlisted is a posting that needs an hour of someone's attention, while
+   * ten and six is one that is nearly decided.
+   */
+  shortlistedCount: z.number().int().nonnegative(),
 });
 export type MyJob = z.infer<typeof myJobSchema>;
 
 export const myJobListSchema = z.object({ jobs: z.array(myJobSchema) });
 export type MyJobList = z.infer<typeof myJobListSchema>;
+
+/**
+ * Work this account has been accepted for and has not yet done.
+ *
+ * The full listing rather than a trimmed shape, because "upcoming work" is
+ * still a posting — the same title, place and pay the person agreed to — and
+ * a second, thinner copy of a job would drift from this one the first time a
+ * field was added.
+ *
+ * Two things the design for this asked for do not exist in the data and are
+ * absent rather than invented. There is no start and finish *time*: a posting
+ * carries `workingTime` (morning, evening) and `hoursBand` (4–6 hours), which
+ * is what employers in this market actually write down, and no clock times to
+ * print as "5:00 PM – 7:00 PM". And there are no coordinates on a job, only
+ * the free-text place the recruiter typed, so nothing here can drop a pin.
+ *
+ * Accepted applications are the source. An application that is merely
+ * shortlisted is not work anyone should be told to turn up for.
+ */
+export const upcomingWorkSchema = z.object({
+  jobs: z.array(jobListingSchema),
+});
+export type UpcomingWork = z.infer<typeof upcomingWorkSchema>;

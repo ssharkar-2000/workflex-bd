@@ -12,6 +12,7 @@ import {
   type JobListing,
   type JobQuery,
   type MyJobList,
+  type UpcomingWork,
   type Recommendations,
 } from '@workflex/shared';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -409,14 +410,74 @@ export class JobsService {
       },
     });
 
+    // A second pass rather than another `_count`: Prisma counts a relation
+    // once per query, so the same relation cannot be counted twice under two
+    // different filters. Grouping is one round trip either way.
+    const shortlisted = await this.prisma.jobApplication.groupBy({
+      by: ['jobId'],
+      where: { job: { postedBy: userId }, status: 'SHORTLISTED' },
+      _count: { _all: true },
+    });
+    const shortlistedByJob = new Map(
+      shortlisted.map((row) => [row.jobId, row._count._all]),
+    );
+
     return {
       jobs: rows.map((job) => ({
         ...this.toListing(job, false, null, false, userId),
         isOpen: job.isOpen,
         savedByCount: job._count.savedBy,
         applicantCount: job._count.applications,
+        shortlistedCount: shortlistedByJob.get(job.id) ?? 0,
       })),
     };
+  }
+
+  /**
+   * Work this account has been accepted for and not yet done.
+   *
+   * ACCEPTED only. Shortlisted is a maybe, and putting a maybe on a schedule
+   * would have people turning up to work nobody agreed to give them.
+   *
+   * Dated postings come first in date order, then the ones whose employer has
+   * not fixed a day. Those undated jobs are still real commitments — someone
+   * agreed to do them — so dropping them would hide work from the person doing
+   * it; the app groups them under a heading that says the date is not set
+   * rather than guessing one.
+   *
+   * Yesterday's work is excluded by comparing against the start of today, not
+   * the current moment: a shift starting at 9am is still today's work at noon,
+   * and a list that quietly dropped it at 9:01 would be wrong exactly when
+   * someone was most likely to be looking at it.
+   */
+  async upcoming(userId: string): Promise<UpcomingWork> {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const rows = await this.prisma.jobApplication.findMany({
+      where: {
+        userId,
+        status: 'ACCEPTED',
+        job: {
+          OR: [{ startDate: null }, { startDate: { gte: startOfToday } }],
+        },
+      },
+      include: { job: true },
+      take: 50,
+    });
+
+    const jobs = rows
+      .map((row) => row.job)
+      .sort((a, b) => {
+        if (!a.startDate && !b.startDate) return 0;
+        // Undated last, whichever side it appears on.
+        if (!a.startDate) return 1;
+        if (!b.startDate) return -1;
+        return a.startDate.getTime() - b.startDate.getTime();
+      })
+      .map((job) => this.toListing(job, false, null, true, userId));
+
+    return { jobs };
   }
 
   /** Closing hides a posting from the feed without destroying its history. */

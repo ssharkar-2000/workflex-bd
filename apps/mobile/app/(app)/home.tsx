@@ -21,6 +21,8 @@ import { useLocale, useT, type TranslationKey } from '../../src/i18n';
 import { RecommendedForYou } from '../../src/components/jobs/RecommendedForYou';
 import { NextSkillAI } from '../../src/components/home/NextSkillAI';
 import { TrustScore } from '../../src/components/home/TrustScore';
+import { MyHiringActivity } from '../../src/components/home/MyHiringActivity';
+import { UpcomingWork } from '../../src/components/home/UpcomingWork';
 import {
   ActivityOverview,
   RecentNotifications,
@@ -113,7 +115,9 @@ export default function HomeScreen() {
         <DashboardHeader user={data} onSignOut={() => void onSignOut()} />
 
         <RolePicker />
+        <UpcomingWork />
         <RecommendedForYou />
+        <MyHiringActivity />
         <NextSkillAI />
         {summary ? <ActivityOverview data={summary} /> : null}
         <TrustScore />
