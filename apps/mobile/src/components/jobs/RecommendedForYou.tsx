@@ -396,16 +396,27 @@ const styles = StyleSheet.create({
   factIcon: { fontSize: 13 },
   factText: { flex: 1, fontSize: font.sm },
 
+  /**
+   * Wraps rather than clipping.
+   *
+   * "Save this job" and "View job" fit side by side in English, but Bangla
+   * spends far more characters on both — on a 320px phone the pair asked for
+   * 299px of a 243px row and the button was simply cut off at the screen
+   * edge, still tappable in theory and invisible in practice. Wrapping lets
+   * it drop onto its own line instead, and `flexShrink` on the save link
+   * keeps that from happening a moment sooner than it must.
+   */
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
     gap: 10,
     borderTopWidth: 1,
     marginTop: 12,
     paddingTop: 12,
   },
-  saveBtn: { paddingVertical: 6, paddingRight: 8 },
+  saveBtn: { flexShrink: 1, paddingVertical: 6, paddingRight: 8 },
   saveText: { fontSize: font.sm, fontWeight: '800' },
   viewBtn: {
     borderRadius: radius.pill,

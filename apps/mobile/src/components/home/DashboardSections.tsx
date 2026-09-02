@@ -191,32 +191,60 @@ export function ActivityOverview({ data }: { data: DashboardSummary }) {
   const { c } = useTheme();
   const router = useRouter();
 
+  /**
+   * The second line is the interesting half, so it is chosen rather than
+   * fixed: how many of your applications reached a shortlist says more than
+   * how many are merely still open, and only falls back to the opener when
+   * nothing has been shortlisted yet. Each phrasing names its own unit, so a
+   * tile never leaves the reader guessing which number they are looking at.
+   *
+   * A hint of zero is dropped entirely. "0 shortlisted" under a 0 is the same
+   * fact written twice, and in a tile this narrow the space is worth more than
+   * the repetition.
+   */
   const rows: {
+    icon: string;
     label: TranslationKey;
     value: number;
     hint?: string;
     href: string;
   }[] = [
     {
+      icon: '📄',
       label: 'dash.stat.applications',
       value: data.seeking.applications,
-      hint: t('dash.stat.activeOf', { count: data.seeking.activeApplications }),
+      hint:
+        data.seeking.shortlisted > 0
+          ? t('dash.stat.shortlistedOf', { count: data.seeking.shortlisted })
+          : data.seeking.activeApplications > 0
+            ? t('dash.stat.activeOf', { count: data.seeking.activeApplications })
+            : undefined,
       href: '/(app)/activity',
     },
     {
+      icon: '🔖',
       label: 'dash.stat.saved',
       value: data.seeking.savedJobs,
       href: '/(app)/jobs?saved=1',
     },
     {
+      icon: '📋',
       label: 'dash.stat.posted',
       value: data.hiring.jobsPosted,
-      hint: t('dash.stat.openOf', { count: data.hiring.openJobs }),
+      hint:
+        data.hiring.openJobs > 0
+          ? t('dash.stat.openOf', { count: data.hiring.openJobs })
+          : undefined,
       href: '/(app)/activity?tab=jobs',
     },
     {
+      icon: '👥',
       label: 'dash.stat.applicants',
       value: data.hiring.applicants,
+      hint:
+        data.hiring.shortlisted > 0
+          ? t('dash.stat.shortlistedOf', { count: data.hiring.shortlisted })
+          : undefined,
       href: '/(app)/activity?tab=jobs',
     },
   ];
@@ -238,12 +266,19 @@ export function ActivityOverview({ data }: { data: DashboardSummary }) {
               { backgroundColor: c.surface, borderColor: c.border },
             ]}
           >
+            <Text style={styles.statIcon}>{row.icon}</Text>
             <Text style={[styles.statValue, { color: c.text }]}>{row.value}</Text>
-            <Text style={[styles.statLabel, { color: c.textMuted }]}>
+            <Text
+              style={[styles.statLabel, { color: c.textMuted }]}
+              numberOfLines={2}
+            >
               {t(row.label)}
             </Text>
             {row.hint ? (
-              <Text style={[styles.statHint, { color: c.primary }]}>
+              <Text
+                style={[styles.statHint, { color: c.primary }]}
+                numberOfLines={2}
+              >
                 {row.hint}
               </Text>
             ) : null}
@@ -355,21 +390,53 @@ const styles = StyleSheet.create({
 
   statGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+    gap: 7,
     marginTop: space.md,
   },
   stat: {
-    // Two per row on a phone, without hard-coding a pixel width.
-    flexGrow: 1,
-    flexBasis: '46%',
+    /**
+     * Four across, one row.
+     *
+     * `flex: 1` with `minWidth: 0` rather than a percentage basis: the four
+     * share whatever is left after the gaps, so the row fits a 320px phone and
+     * a tablet without a breakpoint. Without `minWidth: 0` a long label would
+     * set the floor and push the fourth tile off the screen — flex items
+     * refuse to shrink below their content otherwise.
+     *
+     * The fixed height is what keeps the four aligned when only some of them
+     * have a second line, which is the common case: nothing shortlisted yet,
+     * nothing posted yet.
+     */
+    flex: 1,
+    minWidth: 0,
+    height: 108,
     borderWidth: 1,
-    borderRadius: radius.lg,
-    padding: 14,
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    paddingHorizontal: 5,
+    alignItems: 'center',
   },
-  statValue: { fontSize: font.xl, fontWeight: '800', letterSpacing: -0.5 },
-  statLabel: { fontSize: font.xs, marginTop: 2, fontWeight: '600' },
-  statHint: { fontSize: font.xs, marginTop: 6, fontWeight: '700' },
+  statIcon: { fontSize: 13, lineHeight: 16 },
+  statValue: {
+    fontSize: font.lg,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    marginTop: 1,
+  },
+  statLabel: {
+    fontSize: 10,
+    lineHeight: 12,
+    marginTop: 2,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  statHint: {
+    fontSize: 9,
+    lineHeight: 11,
+    marginTop: 3,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
 
   notice: { paddingVertical: 12 },
   noticeTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },

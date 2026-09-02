@@ -52,6 +52,8 @@ export const dashboardSummarySchema = z.object({
     openJobs: z.number().int().nonnegative(),
     /** People waiting on a decision across every posting. */
     applicants: z.number().int().nonnegative(),
+    /** Of those, the ones this account has already shortlisted. */
+    shortlisted: z.number().int().nonnegative(),
   }),
 
   /** Unread announcements, for the bell and the preview list. */

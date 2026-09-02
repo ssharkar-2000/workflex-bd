@@ -83,8 +83,21 @@ export function MeshBackground() {
     [c],
   );
 
+  // `overflow: 'hidden'` below is load-bearing, not tidiness. The blobs are
+  // deliberately larger than the screen and placed partly off it, which is
+  // what makes the wash look continuous rather than like a row of circles.
+  // Unclipped, those overhangs count towards the document width: on a 320px
+  // phone one blob reached 468px and the whole app gained a horizontal
+  // scrollbar, so every screen could be dragged sideways to reveal a strip of
+  // nothing. Decoration must never be able to widen the page it decorates.
   return (
-    <View style={[StyleSheet.absoluteFill, { backgroundColor: c.bg }]} pointerEvents="none">
+    <View
+      style={[
+        StyleSheet.absoluteFill,
+        { backgroundColor: c.bg, overflow: 'hidden' },
+      ]}
+      pointerEvents="none"
+    >
       <LinearGradient
         colors={[...c.gradient]}
         locations={[0, 0.36, 0.7, 1]}

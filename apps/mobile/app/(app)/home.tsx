@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { VerificationLevel } from '@workflex/shared';
+import { VerificationLevel, type DashboardSummary } from '@workflex/shared';
 import { fetchMe, logout } from '../../src/api/auth';
 import { updateLocale } from '../../src/api/email';
 import { useErrorMessage } from '../../src/lib/error-message';
@@ -119,6 +119,7 @@ export default function HomeScreen() {
 
         <ActionGrid
           unlocked={data.verificationLevel >= VerificationLevel.L1_IDENTITY}
+          summary={summary}
         />
         <MyProfileSection />
       </ScrollView>
@@ -273,15 +274,73 @@ const ACTIONS = [
   needsL1: boolean;
 }[];
 
-function ActionGrid({ unlocked }: { unlocked: boolean }) {
+/**
+ * The workspace grid.
+ *
+ * Four of these tiles used to carry the words "Level 1" under them, which is
+ * the product's own vocabulary rather than the reader's: it names a tier
+ * without saying what it costs or how to reach it, and printing it four times
+ * made the grid look busier while telling you nothing new on the second,
+ * third or fourth reading. The requirement is stated once now, above the grid,
+ * in the form of the thing you would actually do about it — and the tiles keep
+ * only the padlock, which is the part that was carrying the meaning.
+ *
+ * The space that frees up goes to counts that are real. Only some tiles have
+ * one: applications are rows in a table, whereas shifts, wallet balances and
+ * trust scores are screens this product has not built yet. Those stay blank
+ * rather than showing a zero, which would read as "you have none" instead of
+ * "this does not exist yet".
+ */
+function ActionGrid({
+  unlocked,
+  summary,
+}: {
+  unlocked: boolean;
+  summary?: DashboardSummary;
+}) {
   const t = useT();
   const { c } = useTheme();
+  const router = useRouter();
+
+  const lockedCount = unlocked
+    ? 0
+    : ACTIONS.filter((action) => action.needsL1).length;
+
+  const facts: Partial<Record<TranslationKey, string>> = summary
+    ? {
+        'home.tile.applications':
+          summary.seeking.activeApplications > 0
+            ? t('dash.stat.activeOf', {
+                count: summary.seeking.activeApplications,
+              })
+            : undefined,
+      }
+    : {};
 
   return (
     <View style={styles.section}>
       <Text style={[styles.sectionTitle, { color: c.text }]}>
         {t('home.workspace')}
       </Text>
+
+      {lockedCount > 0 ? (
+        <Pressable
+          onPress={() => router.push('/(onboarding)/documents')}
+          accessibilityRole="button"
+          style={[
+            styles.unlockNote,
+            { backgroundColor: c.surfaceAlt, borderColor: c.border },
+          ]}
+        >
+          <Text style={[styles.unlockText, { color: c.text }]}>
+            🔒 {t('home.tile.unlockWith', { count: lockedCount })}
+          </Text>
+          <Text style={[styles.unlockCta, { color: c.primary }]}>
+            {t('dash.gap.NID_VERIFIED')} →
+          </Text>
+        </Pressable>
+      ) : null}
+
       <View style={styles.grid}>
         {ACTIONS.map((action, i) => {
           const locked = action.needsL1 && !unlocked;
@@ -316,8 +375,10 @@ function ActionGrid({ unlocked }: { unlocked: boolean }) {
                 {t(action.label)}
               </Text>
               {locked ? (
-                <Text style={[styles.tileLock, { color: c.locked }]}>
-                  🔒 {t('home.tile.locked')}
+                <Text style={[styles.tileLock, { color: c.locked }]}>🔒</Text>
+              ) : facts[action.label] ? (
+                <Text style={[styles.tileFact, { color: c.primary }]}>
+                  {facts[action.label]}
                 </Text>
               ) : null}
             </View>
@@ -386,6 +447,21 @@ const styles = StyleSheet.create({
   },
   tileDim: { opacity: 0.45 },
   tileLock: { marginTop: 2, fontSize: font.xs },
+  tileFact: { marginTop: 2, fontSize: 11, fontWeight: '700' },
+
+  unlockNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.sm,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: space.md,
+  },
+  unlockText: { flex: 1, fontSize: font.xs, fontWeight: '600' },
+  unlockCta: { fontSize: font.xs, fontWeight: '800' },
 
   profileRow: {
     flexDirection: 'row',

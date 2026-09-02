@@ -85,6 +85,7 @@ export class DashboardService {
       jobsPosted,
       openJobs,
       applicants,
+      hiringShortlisted,
       notifications,
       reads,
     ] = await Promise.all([
@@ -115,6 +116,12 @@ export class DashboardService {
       this.prisma.jobApplication.count({
         where: { job: { postedBy: userId }, status: { not: 'WITHDRAWN' } },
       }),
+      // The same population narrowed to those already shortlisted, so the
+      // dashboard can say how far through the pile the poster is rather than
+      // only how tall it was.
+      this.prisma.jobApplication.count({
+        where: { job: { postedBy: userId }, status: 'SHORTLISTED' },
+      }),
 
       this.prisma.notification.count({ where: { sentAt: { not: null } } }),
       this.prisma.notificationRead.count({ where: { userId } }),
@@ -123,7 +130,12 @@ export class DashboardService {
     return {
       profileStrength,
       seeking: { applications, activeApplications, shortlisted, savedJobs },
-      hiring: { jobsPosted, openJobs, applicants },
+      hiring: {
+        jobsPosted,
+        openJobs,
+        applicants,
+        shortlisted: hiringShortlisted,
+      },
       // Clamped: a read row can outlive the notice it referred to, and a
       // negative badge is worse than a stale zero.
       unreadNotifications: Math.max(0, notifications - reads),

@@ -163,7 +163,7 @@ export const en = {
   'home.tile.wallet': 'Wallet',
   'home.tile.trust': 'Trust score',
   'home.tile.messages': 'Messages',
-  'home.tile.locked': 'Level 1',
+  'home.tile.unlockWith': '{count} tools need identity verification',
   'home.signOut': 'Sign out',
   'home.loadFailed': 'Could not load your profile',
 
@@ -521,6 +521,7 @@ export const en = {
   'dash.activity': 'Your activity',
   'dash.stat.applications': 'Applications',
   'dash.stat.activeOf': '{count} still open',
+  'dash.stat.shortlistedOf': '{count} shortlisted',
   'dash.stat.saved': 'Saved jobs',
   'dash.stat.posted': 'Jobs posted',
   'dash.stat.openOf': '{count} live',
@@ -945,7 +946,7 @@ export const bn: Record<TranslationKey, string> = {
   'home.tile.wallet': 'ওয়ালেট',
   'home.tile.trust': 'ট্রাস্ট স্কোর',
   'home.tile.messages': 'বার্তা',
-  'home.tile.locked': 'ধাপ ১',
+  'home.tile.unlockWith': '{count}টি সুবিধার জন্য পরিচয় যাচাই দরকার',
   'home.signOut': 'সাইন আউট',
   'home.loadFailed': 'প্রোফাইল লোড করা যায়নি',
 
@@ -1301,6 +1302,7 @@ export const bn: Record<TranslationKey, string> = {
   'dash.activity': 'আপনার কার্যক্রম',
   'dash.stat.applications': 'আবেদন',
   'dash.stat.activeOf': '{count}টি এখনো চলমান',
+  'dash.stat.shortlistedOf': '{count}টি বাছাইয়ে',
   'dash.stat.saved': 'সংরক্ষিত কাজ',
   'dash.stat.posted': 'দেওয়া বিজ্ঞপ্তি',
   'dash.stat.openOf': '{count}টি সক্রিয়',
