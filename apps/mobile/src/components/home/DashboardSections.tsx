@@ -74,10 +74,7 @@ export function Greeting({ name }: { name: string }) {
       >
         {t(key, { name })} 👋
       </Text>
-      <Text
-        style={[styles.greetingBody, { color: c.textMuted }]}
-        numberOfLines={1}
-      >
+      <Text style={[styles.greetingBody, { color: c.textMuted }]}>
         {t('dash.greetingBody')}
       </Text>
     </View>
@@ -337,9 +334,9 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: font.lg, fontWeight: '800', letterSpacing: -0.3 },
   viewAll: { fontSize: font.sm, fontWeight: '800' },
 
-  greeting: { flex: 1, flexShrink: 1 },
+  greeting: {},
   greetingTitle: { fontSize: font.lg, fontWeight: '800', letterSpacing: -0.3 },
-  greetingBody: { fontSize: font.xs, marginTop: 2 },
+  greetingBody: { fontSize: font.sm, marginTop: 3 },
 
   card: { borderWidth: 1, borderRadius: radius.lg, padding: 14, marginTop: space.md },
   cardTitle: { fontSize: font.md, fontWeight: '800' },

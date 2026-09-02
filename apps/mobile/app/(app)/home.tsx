@@ -16,19 +16,15 @@ import { VerificationLevel, type AuthUser } from '@workflex/shared';
 import { fetchMe, logout } from '../../src/api/auth';
 import { updateLocale } from '../../src/api/email';
 import { useErrorMessage } from '../../src/lib/error-message';
-import { Avatar } from '../../src/components/Avatar';
-import { NotificationBell } from '../../src/components/NotificationBell';
-import { DashboardMenu } from '../../src/components/DashboardMenu';
 import { useAuthStore } from '../../src/store/auth-store';
 import { useLocale, useT, type TranslationKey } from '../../src/i18n';
 import { RecommendedForYou } from '../../src/components/jobs/RecommendedForYou';
 import {
   ActivityOverview,
-  Greeting,
-  ProfileStrengthBadge,
   RecentNotifications,
   useDashboardSummary,
 } from '../../src/components/home/DashboardSections';
+import { DashboardHeader } from '../../src/components/home/DashboardHeader';
 import { useTheme } from '../../src/lib/use-theme';
 import { font, radius, space } from '../../src/lib/theme';
 
@@ -112,7 +108,7 @@ export default function HomeScreen() {
       >
         {/* Language, theme and sign out all moved into the header menu — the
             dashboard body is for work, not settings. */}
-        <Header user={data} onSignOut={() => void onSignOut()} />
+        <DashboardHeader user={data} onSignOut={() => void onSignOut()} />
 
         <RolePicker />
         <RecommendedForYou />
@@ -125,54 +121,6 @@ export default function HomeScreen() {
         <MyProfileSection />
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function Header({
-  user,
-  onSignOut,
-}: {
-  user: AuthUser;
-  onSignOut: () => void;
-}) {
-  const t = useT();
-  const router = useRouter();
-  const { c } = useTheme();
-
-  const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ');
-  // Initials beat the last two digits of a phone number as a fallback, but an
-  // account that has not registered yet has neither — hence the number.
-  const initials = fullName
-    ? fullName
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((p) => p[0])
-        .join('')
-        .toUpperCase()
-    : user.phone.slice(-2);
-
-  return (
-    <View style={styles.header}>
-      <Pressable
-        onPress={() => router.push('/(app)/profile')}
-        accessibilityRole="button"
-        accessibilityLabel={t('profile.title')}
-      >
-        <Avatar
-          hasPhoto={user.hasPhoto}
-          initials={initials}
-          size={50}
-          // Re-fetches when the account's photo state flips, so a selfie
-          // taken during verification shows up without a restart.
-          version={String(user.hasPhoto)}
-        />
-      </Pressable>
-      <Greeting name={user.firstName ?? user.phone} />
-
-      <ProfileStrengthBadge />
-      <NotificationBell />
-      <DashboardMenu user={user} onSignOut={onSignOut} />
-    </View>
   );
 }
 
@@ -383,12 +331,6 @@ const styles = StyleSheet.create({
   centered: { alignItems: 'center', justifyContent: 'center', padding: space.lg },
   container: { padding: space.lg, paddingBottom: space.xl },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-    marginBottom: space.md,
-  },
 
   section: { marginTop: space.lg },
   sectionTitle: { fontSize: font.md, fontWeight: '700', marginBottom: space.md },

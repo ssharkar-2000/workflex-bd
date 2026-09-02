@@ -99,14 +99,18 @@ export default function JobsScreen() {
   const queryClient = useQueryClient();
   const errorMessage = useErrorMessage();
 
-  const [search, setSearch] = useState('');
-  const [applied, setApplied] = useState('');
-
   // Opened from the drawer's "Saved jobs" row, which is this same screen
   // with one filter pre-applied rather than a second screen listing the same
   // cards. Read once as the initial state — the filter is the user's after
   // that, and re-applying it on every render would fight them clearing it.
-  const { saved } = useLocalSearchParams<{ saved?: string }>();
+  //
+  // `q` arrives from the dashboard header's search field, which submits into
+  // this screen rather than keeping a second copy of the search state. Read
+  // before the state below, which seeds itself from it.
+  const { saved, q } = useLocalSearchParams<{ saved?: string; q?: string }>();
+
+  const [search, setSearch] = useState(q ?? '');
+  const [applied, setApplied] = useState(q ?? '');
 
   // Everything the drawer owns. The search box stays outside it, because it
   // is reached constantly and a sheet for one tap is friction.
