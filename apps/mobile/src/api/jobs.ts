@@ -5,6 +5,7 @@ import {
   jobListSchema,
   myJobListSchema,
   jobListingSchema,
+  recommendationsSchema,
   type ApplicationState,
   type JobApplicationList,
   type JobFilterState,
@@ -13,6 +14,7 @@ import {
   type MyJobList,
   type JobList,
   type JobListing,
+  type Recommendations,
 } from '@workflex/shared';
 import { api } from './client';
 
@@ -103,4 +105,16 @@ export async function withdrawApplication(id: string): Promise<ApplicationState>
 export async function fetchMyApplications(): Promise<JobApplicationList> {
   const { data } = await api.get('/jobs/applications');
   return jobApplicationListSchema.parse(data);
+}
+
+/**
+ * Personalised suggestions for the dashboard.
+ *
+ * `basis` comes back alongside the items so the screen can say what the
+ * suggestions were built from, rather than claiming to know things about
+ * someone that it does not.
+ */
+export async function fetchRecommendations(): Promise<Recommendations> {
+  const { data } = await api.get('/jobs/recommended');
+  return recommendationsSchema.parse(data);
 }

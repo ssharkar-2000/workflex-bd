@@ -21,6 +21,7 @@ import { NotificationBell } from '../../src/components/NotificationBell';
 import { DashboardMenu } from '../../src/components/DashboardMenu';
 import { useAuthStore } from '../../src/store/auth-store';
 import { useLocale, useT, type TranslationKey } from '../../src/i18n';
+import { RecommendedForYou } from '../../src/components/jobs/RecommendedForYou';
 import { useTheme } from '../../src/lib/use-theme';
 import { font, radius, space } from '../../src/lib/theme';
 
@@ -101,6 +102,7 @@ export default function HomeScreen() {
         <Header user={data} onSignOut={() => void onSignOut()} />
 
         <RolePicker />
+        <RecommendedForYou />
         <ActionGrid
           unlocked={data.verificationLevel >= VerificationLevel.L1_IDENTITY}
         />

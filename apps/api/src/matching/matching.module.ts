@@ -5,6 +5,7 @@ import { MatchingController } from './matching.controller';
 import { CvService } from './cv.service';
 import { CvParserService } from './cv-parser.service';
 import { MatchService } from './match.service';
+import { RecommendService } from './recommend.service';
 
 /**
  * CV understanding and job matching.
@@ -15,7 +16,7 @@ import { MatchService } from './match.service';
 @Module({
   imports: [StorageModule, VerificationModule],
   controllers: [MatchingController],
-  providers: [CvService, CvParserService, MatchService],
-  exports: [MatchService, CvService],
+  providers: [CvService, CvParserService, MatchService, RecommendService],
+  exports: [MatchService, RecommendService, CvService],
 })
 export class MatchingModule {}

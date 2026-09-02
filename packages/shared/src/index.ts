@@ -15,4 +15,5 @@ export * from './bd-geography';
 export * from './jobs';
 export * from './applications';
 export * from './matching';
+export * from './recommendations';
 export * from './reports';

@@ -74,6 +74,12 @@ export class JobsController {
     return this.jobs.myApplications(userId);
   }
 
+  @Get('recommended')
+  @ApiOperation({ summary: 'Personalised suggestions for the dashboard' })
+  async recommended(@CurrentUser('userId') userId: string) {
+    return this.jobs.recommended(userId);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Post a job as yourself or as your company' })
   async create(

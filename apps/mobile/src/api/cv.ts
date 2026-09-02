@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { cvStatusSchema, type CvStatus } from '@workflex/shared';
 import { api } from './client';
 
@@ -9,9 +10,19 @@ export async function fetchCvStatus(): Promise<CvStatus> {
 /**
  * Uploads and parses in one request.
  *
- * `Content-Type` is deliberately left unset: axios and the platform build the
- * multipart boundary themselves, and naming the type by hand omits it, which
- * makes the server reject the body as malformed.
+ * The two platforms need different bodies, which is why this is not one path
+ * with a cast — the same split as `uploadDocument` in ./onboarding.
+ *
+ * React Native's FormData takes a `{uri, name, type}` object and resolves the
+ * file natively. A browser does not: appending a plain object runs it through
+ * `String()`, so the request carried the literal text `[object Object]` where
+ * the server expected a file, and the API answered "No file was uploaded" — a
+ * 404 the app showed as "we could not find what you were looking for".
+ *
+ * The header differs for the same reason. Multipart needs a boundary that only
+ * the runtime can generate, and naming the type without one leaves the body
+ * unparseable. The comment that used to sit here said exactly that, while the
+ * code set the header anyway.
  */
 export async function uploadCv(file: {
   uri: string;
@@ -19,14 +30,27 @@ export async function uploadCv(file: {
   mimeType: string;
 }): Promise<CvStatus> {
   const form = new FormData();
-  form.append('file', {
-    uri: file.uri,
-    name: file.name,
-    type: file.mimeType,
-  } as unknown as Blob);
+  const web = Platform.OS === 'web';
+
+  if (web) {
+    // The picker hands back a blob: or data: URL on web; fetching it is the
+    // supported way to turn either into the Blob FormData needs.
+    const blob = await fetch(file.uri).then((response) => response.blob());
+    form.append('file', blob, file.name);
+  } else {
+    form.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: file.mimeType,
+    } as unknown as Blob);
+  }
 
   const { data } = await api.post('/cv', form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    headers: {
+      // `undefined` removes the client's application/json default in axios 1.x.
+      // Native keeps the explicit type it has always sent.
+      'Content-Type': web ? undefined : 'multipart/form-data',
+    },
     // Reading a CV involves OCR or a model call; the default 15s is not enough.
     timeout: 120_000,
   });

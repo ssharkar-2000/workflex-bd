@@ -2,6 +2,7 @@ import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { CvProfile, Job, Prisma } from '@prisma/client';
 import {
   ApiErrorCode,
+  DIVISIONS,
   type ApplicationState,
   type ApplyToJobDto,
   type CreateJobDto,
@@ -11,15 +12,20 @@ import {
   type JobListing,
   type JobQuery,
   type MyJobList,
+  type Recommendations,
 } from '@workflex/shared';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AppException } from '../common/exceptions/app.exception';
 import { MatchService } from '../matching/match.service';
+import { RecommendService } from '../matching/recommend.service';
 
 const MS_PER_DAY = 86_400_000;
 
 /** How many listings the discovery carousel shows before "See all". */
 const HIGHLIGHT_LIMIT = 10;
+
+/** How many suggestions the dashboard row shows. */
+const RECOMMENDATION_LIMIT = 8;
 
 @Injectable()
 export class JobsService {
@@ -28,6 +34,7 @@ export class JobsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly matcher: MatchService,
+    private readonly recommender: RecommendService,
   ) {}
 
   /**
@@ -598,6 +605,50 @@ export class JobsService {
           job.isOpen &&
           (!job.deadline || job.deadline.getTime() >= Date.now()),
       })),
+    };
+  }
+
+  /**
+   * Personalised suggestions for the dashboard.
+   *
+   * Candidates are the open postings this account has not already saved or
+   * applied to — suggesting work someone has already acted on is the fastest
+   * way to make the row look broken. The ranking itself lives in
+   * RecommendService; this method's job is to decide what may be ranked and to
+   * shape the result for the client.
+   */
+  async recommended(userId: string): Promise<Recommendations> {
+    const candidates = await this.prisma.job.findMany({
+      where: {
+        ...this.openJobs,
+        // Not mine, and not already acted on.
+        NOT: { postedBy: userId },
+        savedBy: { none: { userId } },
+        applications: { none: { userId, status: { not: 'WITHDRAWN' } } },
+      },
+      orderBy: { createdAt: 'desc' },
+      // A window, not the whole catalogue: scoring is arithmetic but it is
+      // still per-row, and the newest few hundred contain anything worth
+      // surfacing on a dashboard.
+      take: 300,
+    });
+
+    const profile = await this.cvProfile(userId);
+
+    const { scored, basis } = await this.recommender.recommend(
+      userId,
+      candidates,
+      RECOMMENDATION_LIMIT,
+      DIVISIONS.map((d) => d.en),
+    );
+
+    return {
+      items: scored.map((row) => ({
+        job: this.toListing(row.job, false, profile, false, userId),
+        fit: row.fit,
+        reasons: row.reasons,
+      })),
+      basis,
     };
   }
 
