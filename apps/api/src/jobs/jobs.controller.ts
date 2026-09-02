@@ -68,6 +68,18 @@ export class JobsController {
     return this.jobs.mine(userId);
   }
 
+  @Get('nearby')
+  @ApiOperation({ summary: 'Open work in the area this account gave as its address' })
+  async nearby(@CurrentUser('userId') userId: string) {
+    return this.jobs.nearby(userId);
+  }
+
+  @Get('upcoming')
+  @ApiOperation({ summary: 'Work this account has been accepted for' })
+  async upcoming(@CurrentUser('userId') userId: string) {
+    return this.jobs.upcoming(userId);
+  }
+
   @Get('applications')
   @ApiOperation({ summary: 'Jobs this account has applied to' })
   async myApplications(@CurrentUser('userId') userId: string) {

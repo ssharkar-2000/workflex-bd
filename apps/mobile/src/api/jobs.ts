@@ -4,6 +4,8 @@ import {
   jobHighlightsSchema,
   jobListSchema,
   myJobListSchema,
+  upcomingWorkSchema,
+  nearbyJobsSchema,
   jobListingSchema,
   recommendationsSchema,
   type ApplicationState,
@@ -12,6 +14,8 @@ import {
   type CreateJobDto,
   type JobHighlights,
   type MyJobList,
+  type UpcomingWork,
+  type NearbyJobs,
   type JobList,
   type JobListing,
   type Recommendations,
@@ -117,4 +121,28 @@ export async function fetchMyApplications(): Promise<JobApplicationList> {
 export async function fetchRecommendations(): Promise<Recommendations> {
   const { data } = await api.get('/jobs/recommended');
   return recommendationsSchema.parse(data);
+}
+
+/**
+ * Work this account has been accepted for and not yet done.
+ *
+ * Its own request rather than a slice of the applications list: the dashboard
+ * shows this before anything else on a work day, and it must not wait on a
+ * list that also carries every rejection and withdrawal.
+ */
+export async function fetchUpcomingWork(): Promise<UpcomingWork> {
+  const { data } = await api.get('/jobs/upcoming');
+  return upcomingWorkSchema.parse(data);
+}
+
+/**
+ * Open work in the area this account gave as its address.
+ *
+ * `area` is null when the address names nowhere any posting mentions, which
+ * the card reports plainly instead of showing an empty list under a heading
+ * that promises work nearby.
+ */
+export async function fetchNearbyJobs(): Promise<NearbyJobs> {
+  const { data } = await api.get('/jobs/nearby');
+  return nearbyJobsSchema.parse(data);
 }

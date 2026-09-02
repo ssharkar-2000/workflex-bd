@@ -160,7 +160,11 @@ function RecommendationCard({
 
   const pay =
     job.salaryMin && job.salaryMax
-      ? `${short(job.salaryMin)}–${short(job.salaryMax)}`
+      ? // A fixed fee is quoted with both bounds equal, and printing it as
+        // "৳600–৳600" reads like a range someone forgot to fill in.
+        job.salaryMin === job.salaryMax
+        ? short(job.salaryMin)
+        : `${short(job.salaryMin)}–${short(job.salaryMax)}`
       : job.salaryMin
         ? `${short(job.salaryMin)}+`
         : job.salaryMax

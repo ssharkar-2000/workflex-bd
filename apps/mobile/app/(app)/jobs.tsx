@@ -19,6 +19,7 @@ import {
 } from '@tanstack/react-query';
 import {
   jobCategoryName,
+  startWindowSchema,
   type JobFilterState,
   type JobListing,
   type JobType,
@@ -107,16 +108,28 @@ export default function JobsScreen() {
   // `q` arrives from the dashboard header's search field, which submits into
   // this screen rather than keeping a second copy of the search state. Read
   // before the state below, which seeds itself from it.
-  const { saved, q } = useLocalSearchParams<{ saved?: string; q?: string }>();
+  const { saved, q, startWindow } = useLocalSearchParams<{
+    saved?: string;
+    q?: string;
+    startWindow?: string;
+  }>();
 
   const [search, setSearch] = useState(q ?? '');
   const [applied, setApplied] = useState(q ?? '');
 
   // Everything the drawer owns. The search box stays outside it, because it
   // is reached constantly and a sheet for one tap is friction.
-  const [sheet, setSheet] = useState<JobFilterState>(() =>
-    saved === '1' ? { savedOnly: true } : {},
-  );
+  //
+  // `startWindow` arrives from "Find a job for today" on the dashboard. It is
+  // validated against the enum rather than trusted: the value reaches this
+  // screen through a URL, and a filter built from an unrecognised string would
+  // be rejected by the API and show the person an error instead of jobs.
+  const [sheet, setSheet] = useState<JobFilterState>(() => {
+    const initial: JobFilterState = saved === '1' ? { savedOnly: true } : {};
+    const window = startWindowSchema.safeParse(startWindow);
+    if (window.success) initial.startWindow = window.data;
+    return initial;
+  });
 
   const filters: JobFilterState = useMemo(
     () => ({ ...sheet, q: applied || undefined }),
