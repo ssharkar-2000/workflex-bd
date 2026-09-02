@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ElectricBorder } from './ElectricBorder';
 import { useTheme } from '../lib/use-theme';
 import { font, radius } from '../lib/theme';
 
@@ -57,6 +58,13 @@ export function ShimmerButton({
 
   return (
     <Animated.View style={{ transform: [{ scale }] }}>
+      <ElectricBorder
+        radius={radius.lg}
+        // Stops while the control cannot be used. A charge running around a
+        // dead button is the interface promising something it will not do.
+        active={!disabled && !loading}
+        style={[styles.electric, { shadowColor: c.primary }]}
+      >
       <Pressable
         onPress={onPress}
         disabled={disabled || loading}
@@ -78,11 +86,7 @@ export function ShimmerButton({
             bounciness: 6,
           }).start()
         }
-        style={[
-          styles.wrap,
-          { shadowColor: c.primary },
-          (disabled || loading) && styles.disabled,
-        ]}
+        style={[styles.wrap, (disabled || loading) && styles.disabled]}
       >
         <LinearGradient
           colors={[c.primary, c.primaryPressed]}
@@ -128,22 +132,24 @@ export function ShimmerButton({
           )}
         </View>
       </Pressable>
+      </ElectricBorder>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    height: 56,
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    // Coloured shadow rather than grey — it makes the control feel lit from
-    // its own surface instead of pasted on.
+  // The glow sits on the outer shell: a shadow drawn inside a parent that
+  // clips its children is invisible, and the electric border clips.
+  electric: {
     shadowOpacity: 0.4,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
     elevation: 8,
+  },
+  wrap: {
+    height: 56,
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   disabled: { opacity: 0.5 },
   glint: { width: 90, height: '260%' },
