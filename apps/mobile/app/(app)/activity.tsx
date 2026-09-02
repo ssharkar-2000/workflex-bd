@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -103,16 +104,48 @@ export default function ActivityScreen() {
 
         {summary ? (
           <View style={styles.stats}>
-            <Stat
-              label="act.stat.applications"
-              value={summary.seeking.applications}
-            />
-            <Stat label="act.stat.posted" value={summary.hiring.jobsPosted} />
-            <Stat
-              label="act.stat.shortlisted"
-              value={summary.seeking.shortlisted}
-            />
-            <Stat label="act.stat.active" value={summary.hiring.openJobs} />
+            {(
+              [
+                {
+                  label: 'act.stat.applications',
+                  value: summary.seeking.applications,
+                  icon: '📄',
+                  tint: 0,
+                  goes: 'applications',
+                },
+                {
+                  label: 'act.stat.posted',
+                  value: summary.hiring.jobsPosted,
+                  icon: '📢',
+                  tint: 2,
+                  goes: 'jobs',
+                },
+                {
+                  label: 'act.stat.shortlisted',
+                  value: summary.seeking.shortlisted,
+                  icon: '⭐',
+                  tint: 1,
+                  goes: 'applications',
+                },
+                {
+                  label: 'act.stat.active',
+                  value: summary.hiring.openJobs,
+                  icon: '🟢',
+                  tint: 3,
+                  goes: 'jobs',
+                },
+              ] as const
+            ).map((s) => (
+              <Stat
+                key={s.label}
+                label={s.label}
+                value={s.value}
+                icon={s.icon}
+                tint={s.tint}
+                selected={tab === s.goes}
+                onPress={() => setTab(s.goes)}
+              />
+            ))}
           </View>
         ) : null}
 
@@ -165,17 +198,81 @@ export default function ActivityScreen() {
   );
 }
 
-function Stat({ label, value }: { label: TranslationKey; value: number }) {
+/**
+ * One count, in its own colour.
+ *
+ * The four tints are the palette the Find work / Hire people cards already
+ * use, so the tiles read as part of the same product rather than as a new
+ * kind of thing. Colour here is identity, not status: it tells the four
+ * numbers apart at a glance, which four identical white boxes could not.
+ *
+ * Each one is a control, not a label. Tapping a count switches to the list it
+ * came from — a number you cannot follow is a dead end, and "12 applications"
+ * with the applications a tap away is the whole point of the screen.
+ */
+function Stat({
+  label,
+  value,
+  icon,
+  tint,
+  selected,
+  onPress,
+}: {
+  label: TranslationKey;
+  value: number;
+  icon: string;
+  tint: 0 | 1 | 2 | 3;
+  selected: boolean;
+  onPress: () => void;
+}) {
   const t = useT();
   const { c } = useTheme();
 
+  // Springs back rather than easing, so a tap feels like pressing something
+  // physical instead of watching an animation play.
+  const press = useRef(new Animated.Value(0)).current;
+  const animate = (to: number) =>
+    Animated.spring(press, {
+      toValue: to,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 6,
+    }).start();
+
+  const scale = press.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.96],
+  });
+
   return (
-    <View
-      style={[styles.stat, { backgroundColor: c.surface, borderColor: c.border }]}
-    >
-      <Text style={[styles.statValue, { color: c.text }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: c.textMuted }]}>{t(label)}</Text>
-    </View>
+    <Animated.View style={[styles.statWrap, { transform: [{ scale }] }]}>
+      <Pressable
+        onPressIn={() => animate(1)}
+        onPressOut={() => animate(0)}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        accessibilityLabel={`${value} ${t(label)}`}
+        style={[
+          styles.stat,
+          {
+            backgroundColor: c.tints[tint],
+            // The tile whose list is open is ringed rather than recoloured,
+            // so the four keep their identities while one is clearly current.
+            borderColor: selected ? c.primary : c.tintBorders[tint],
+            borderWidth: selected ? 2 : 1,
+          },
+        ]}
+      >
+        <View style={styles.statTop}>
+          <Text style={styles.statIcon}>{icon}</Text>
+          <Text style={[styles.statValue, { color: c.text }]}>{value}</Text>
+        </View>
+        <Text style={[styles.statLabel, { color: c.textMuted }]} numberOfLines={1}>
+          {t(label)}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -309,13 +406,16 @@ const styles = StyleSheet.create({
   },
 
   stats: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  stat: {
-    flexGrow: 1,
-    flexBasis: '46%',
-    borderWidth: 1,
-    borderRadius: radius.lg,
-    padding: 14,
+  // Sizing lives on the wrapper because the animated transform belongs there —
+  // scaling a flex child directly fights the layout it is inside.
+  statWrap: { flexGrow: 1, flexBasis: '46%' },
+  stat: { borderRadius: radius.lg, padding: 14 },
+  statTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
+  statIcon: { fontSize: 18 },
   statValue: { fontSize: font.xl, fontWeight: '800', letterSpacing: -0.5 },
   statLabel: { fontSize: font.xs, marginTop: 2, fontWeight: '600' },
 
