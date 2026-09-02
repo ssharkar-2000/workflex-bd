@@ -46,12 +46,17 @@ export function useDashboardSummary() {
 }
 
 /**
- * A greeting that changes with the hour.
+ * A greeting that changes with the hour, sized for the header row.
  *
  * Resolved on the device rather than the server: this is the one thing on the
  * screen that should follow the reader's own clock, and a server in another
  * timezone wishing someone good morning at nine at night is worse than no
  * greeting at all.
+ *
+ * It sits beside the avatar where the old static welcome was, so both lines
+ * are clipped to one line each and the block takes the space left between the
+ * avatar and the controls. A long name shortens the line rather than pushing
+ * the ring and bell off the edge.
  */
 export function Greeting({ name }: { name: string }) {
   const t = useT();
@@ -63,10 +68,16 @@ export function Greeting({ name }: { name: string }) {
 
   return (
     <View style={styles.greeting}>
-      <Text style={[styles.greetingTitle, { color: c.text }]}>
+      <Text
+        style={[styles.greetingTitle, { color: c.text }]}
+        numberOfLines={1}
+      >
         {t(key, { name })} 👋
       </Text>
-      <Text style={[styles.greetingBody, { color: c.textMuted }]}>
+      <Text
+        style={[styles.greetingBody, { color: c.textMuted }]}
+        numberOfLines={1}
+      >
         {t('dash.greetingBody')}
       </Text>
     </View>
@@ -326,9 +337,9 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: font.lg, fontWeight: '800', letterSpacing: -0.3 },
   viewAll: { fontSize: font.sm, fontWeight: '800' },
 
-  greeting: { marginTop: space.sm },
-  greetingTitle: { fontSize: font.xl, fontWeight: '800', letterSpacing: -0.5 },
-  greetingBody: { fontSize: font.sm, marginTop: 4 },
+  greeting: { flex: 1, flexShrink: 1 },
+  greetingTitle: { fontSize: font.lg, fontWeight: '800', letterSpacing: -0.3 },
+  greetingBody: { fontSize: font.xs, marginTop: 2 },
 
   card: { borderWidth: 1, borderRadius: radius.lg, padding: 14, marginTop: space.md },
   cardTitle: { fontSize: font.md, fontWeight: '800' },

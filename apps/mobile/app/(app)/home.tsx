@@ -114,8 +114,6 @@ export default function HomeScreen() {
             dashboard body is for work, not settings. */}
         <Header user={data} onSignOut={() => void onSignOut()} />
 
-        <Greeting name={data.firstName ?? data.phone} />
-
         <RolePicker />
         <RecommendedForYou />
         {summary ? <ActivityOverview data={summary} /> : null}
@@ -169,11 +167,7 @@ function Header({
           version={String(user.hasPhoto)}
         />
       </Pressable>
-      {/* The header used to greet the user here, which the greeting directly
-          below it does properly — with the time of day and room to breathe.
-          Two greetings a centimetre apart read as a mistake, so this is now
-          just the space that pushes the controls to the right. */}
-      <View style={styles.headerSpacer} />
+      <Greeting name={user.firstName ?? user.phone} />
 
       <ProfileStrengthBadge />
       <NotificationBell />
@@ -395,7 +389,6 @@ const styles = StyleSheet.create({
     gap: space.sm,
     marginBottom: space.md,
   },
-  headerSpacer: { flex: 1 },
 
   section: { marginTop: space.lg },
   sectionTitle: { fontSize: font.md, fontWeight: '700', marginBottom: space.md },
