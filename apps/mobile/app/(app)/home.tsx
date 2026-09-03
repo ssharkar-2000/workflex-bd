@@ -23,6 +23,7 @@ import { NextSkillAI } from '../../src/components/home/NextSkillAI';
 import { TrustScore } from '../../src/components/home/TrustScore';
 import { MyHiringActivity } from '../../src/components/home/MyHiringActivity';
 import { UpcomingWork } from '../../src/components/home/UpcomingWork';
+import { NearbyJobs } from '../../src/components/home/NearbyJobs';
 import {
   ActivityOverview,
   RecentNotifications,
@@ -117,6 +118,7 @@ export default function HomeScreen() {
         <RolePicker />
         <UpcomingWork />
         <RecommendedForYou />
+        <NearbyJobs />
         <MyHiringActivity />
         <NextSkillAI />
         {summary ? <ActivityOverview data={summary} /> : null}

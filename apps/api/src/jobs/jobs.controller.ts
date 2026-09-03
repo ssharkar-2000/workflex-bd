@@ -9,14 +9,16 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import {
   applyToJobSchema,
   createJobSchema,
   jobQuerySchema,
+  nearbyQuerySchema,
   type ApplyToJobDto,
   type CreateJobDto,
   type JobQuery,
+  type NearbyQuery,
 } from '@workflex/shared';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
@@ -69,9 +71,22 @@ export class JobsController {
   }
 
   @Get('nearby')
-  @ApiOperation({ summary: 'Open work in the area this account gave as its address' })
-  async nearby(@CurrentUser('userId') userId: string) {
-    return this.jobs.nearby(userId);
+  @ApiOperation({ summary: 'Open work near the viewer, with distances' })
+  @ApiQuery({ name: 'lat', required: false, type: Number })
+  @ApiQuery({ name: 'lng', required: false, type: Number })
+  @ApiQuery({ name: 'radiusKm', required: false, type: Number })
+  async nearby(
+    @CurrentUser('userId') userId: string,
+    @Query(new ZodValidationPipe(nearbyQuerySchema)) query: NearbyQuery,
+  ) {
+    // Both or neither. Half a coordinate is not a position, and silently
+    // treating lat-with-no-lng as "somewhere on the prime meridian" would put
+    // the person in the Atlantic.
+    const origin =
+      query.lat !== undefined && query.lng !== undefined
+        ? { lat: query.lat, lng: query.lng }
+        : null;
+    return this.jobs.nearby(userId, origin, query.radiusKm);
   }
 
   @Get('upcoming')

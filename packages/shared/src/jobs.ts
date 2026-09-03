@@ -413,3 +413,83 @@ export const upcomingWorkSchema = z.object({
   jobs: z.array(jobListingSchema),
 });
 export type UpcomingWork = z.infer<typeof upcomingWorkSchema>;
+
+/**
+ * Open work in the area this account gave as its address.
+ *
+ * Deliberately an *area*, not a radius. Nothing in this product stores a
+ * coordinate for a job or for a person — a posting carries the free text a
+ * recruiter typed ("Mirpur 10, Dhaka") and an account carries the address
+ * someone wrote at registration. There is no arithmetic that turns two pieces
+ * of prose into "1.2 km", and a distance invented from a district centroid
+ * would be wrong by kilometres in exactly the dense neighbourhoods where
+ * people care about the difference.
+ *
+ * So the unit here is the name of the place, which is how work near home is
+ * actually described in Bangladesh: someone in Dhanmondi looks for jobs in
+ * Dhanmondi, not jobs within 4.7km. Giving distances would need coordinates
+ * on every posting, a geocoder to produce them, and the device's own position
+ * — see the note in the mobile component.
+ */
+/**
+ * Query for GET /jobs/nearby.
+ *
+ * Coordinates arrive as strings on a query string, so they are coerced and
+ * then bounded: a latitude of 200 is not a typo to be clamped, it is a
+ * malformed request, and rejecting it beats measuring distances from a point
+ * that cannot exist.
+ */
+export const nearbyQuerySchema = z.object({
+  lat: z.coerce.number().min(-90).max(90).optional(),
+  lng: z.coerce.number().min(-180).max(180).optional(),
+  /** Capped so one request cannot ask the server to rank the whole country. */
+  radiusKm: z.coerce.number().positive().max(200).optional(),
+});
+export type NearbyQuery = z.infer<typeof nearbyQuerySchema>;
+
+/** One posting with how far away it is. */
+export const nearbyJobSchema = z.object({
+  job: jobListingSchema,
+  /**
+   * Kilometres, straight line, to one decimal.
+   *
+   * Approximate by construction and shown with a "~" everywhere: a posting's
+   * point is the centre of its named place, so this is accurate to roughly
+   * that place's size. One decimal is already generous — a second would imply
+   * a precision the inputs do not have.
+   */
+  distanceKm: z.number().nonnegative(),
+});
+export type NearbyJob = z.infer<typeof nearbyJobSchema>;
+
+/** How the viewer's own position was arrived at. */
+export const originKindSchema = z.enum([
+  /** The device's GPS, with the person's permission. */
+  'DEVICE',
+  /** The centre of the area named in their registered address. */
+  'ADDRESS',
+]);
+export type OriginKind = z.infer<typeof originKindSchema>;
+
+export const nearbyJobsSchema = z.object({
+  /**
+   * Where distances were measured from, and how that point was obtained.
+   *
+   * Null when neither is available — no device position offered and an address
+   * naming nowhere the gazetteer knows — which is the app's signal to say so
+   * rather than show a list under a heading that promises proximity.
+   */
+  origin: z
+    .object({
+      kind: originKindSchema,
+      /** The place name, for "12 jobs within 5 km of Dhanmondi". */
+      area: z.string().nullable(),
+    })
+    .nullable(),
+  /** The radius the count was taken over, in kilometres. */
+  radiusKm: z.number().positive(),
+  /** Open postings inside that radius, which may exceed the ones listed. */
+  total: z.number().int().nonnegative(),
+  jobs: z.array(nearbyJobSchema),
+});
+export type NearbyJobs = z.infer<typeof nearbyJobsSchema>;

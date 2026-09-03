@@ -705,6 +705,16 @@ model Job {
   duration    JobDuration @default(LONG_TERM)
   urgency     Urgency     @default(NONE)
 
+  /// Where the work is, as a point.
+  ///
+  /// Resolved from `location` against the gazetteer in @workflex/shared, so
+  /// it is the centre of the named place rather than a surveyed address —
+  /// accurate to the size of that place, which is what the app tells the
+  /// reader. Nullable because a posting can name somewhere the table does
+  /// not know, and a wrong point is worse than no point.
+  latitude  Float?
+  longitude Float?
+
   /// When the work begins. Null with flexibleStart means "whenever suits".
   startDate     DateTime?
   flexibleStart Boolean   @default(true)

@@ -3,6 +3,8 @@ import { CvProfile, Job, Prisma } from '@prisma/client';
 import {
   ApiErrorCode,
   DIVISIONS,
+  haversineKm,
+  resolvePlace,
   type ApplicationState,
   type ApplyToJobDto,
   type CreateJobDto,
@@ -13,6 +15,8 @@ import {
   type JobQuery,
   type MyJobList,
   type UpcomingWork,
+  type NearbyJobs,
+  type LatLng,
   type Recommendations,
 } from '@workflex/shared';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -27,6 +31,16 @@ const HIGHLIGHT_LIMIT = 10;
 
 /** How many suggestions the dashboard row shows. */
 const RECOMMENDATION_LIMIT = 8;
+
+/**
+ * The default radius for the dashboard card.
+ *
+ * Five kilometres is a rickshaw or a short bus ride in a Bangladeshi city —
+ * far enough to be worth a daily commute, close enough that the trip does
+ * not eat the fare. Callers can widen it; the response says which radius the
+ * count was taken over so the number and the wording cannot drift apart.
+ */
+const DEFAULT_RADIUS_KM = 5;
 
 @Injectable()
 export class JobsService {
@@ -343,6 +357,10 @@ export class JobsService {
     const posterName =
       [user.firstName, user.lastName].filter(Boolean).join(' ') || 'WorkFlex member';
 
+    // The neighbourhood the recruiter typed, falling back to the district they
+    // picked from the list.
+    const placed = resolvePlace(dto.location) ?? resolvePlace(dto.district);
+
     const job = await this.prisma.job.create({
       data: {
         title: dto.title,
@@ -362,6 +380,18 @@ export class JobsService {
         location: dto.location,
         division: dto.division,
         district: dto.district,
+        /**
+         * Placed at posting time, not on read.
+         *
+         * Resolving on every request would repeat the same lookup for the same
+         * unchanging string thousands of times, and would leave a posting's
+         * position quietly changing whenever the gazetteer did. Null when the
+         * table does not recognise the place — such a posting simply does not
+         * appear in distance results, which is better than appearing at a
+         * guessed point.
+         */
+        latitude: placed?.lat ?? null,
+        longitude: placed?.lng ?? null,
 
         paymentType: dto.paymentType,
         salaryMin: dto.salaryMin ?? null,
@@ -478,6 +508,89 @@ export class JobsService {
       .map((job) => this.toListing(job, false, null, true, userId));
 
     return { jobs };
+  }
+
+  /**
+   * Open work near a point, with real distances.
+   *
+   * The point comes from the device when the person allowed it, and otherwise
+   * from the centre of the area in their registered address. Which one was
+   * used is returned, because "2.1 km away" means something different when the
+   * origin is your actual position than when it is the middle of your
+   * neighbourhood, and the screen says which.
+   *
+   * Filtering happens in memory rather than SQL. Postgres can do this properly
+   * with PostGIS or a bounding-box prefilter, and at a few hundred postings
+   * neither is worth the dependency — but this is the line to change first if
+   * the table grows past a few thousand rows.
+   */
+  async nearby(
+    userId: string,
+    origin: LatLng | null,
+    radiusKm = DEFAULT_RADIUS_KM,
+    limit = 3,
+  ): Promise<NearbyJobs> {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { address: true },
+    });
+
+    const home = resolvePlace(user.address);
+    // The device wins when offered: it is the person's actual position, and
+    // the address is only ever the middle of an area they said they live in.
+    const from: LatLng | null = origin ?? (home ? { lat: home.lat, lng: home.lng } : null);
+
+    if (!from) {
+      return { origin: null, radiusKm, total: 0, jobs: [] };
+    }
+
+    const rows = await this.prisma.job.findMany({
+      where: {
+        isOpen: true,
+        OR: [{ deadline: null }, { deadline: { gte: new Date() } }],
+        // A posting with no point cannot be measured, and guessing one from
+        // its district would put every unplaced job at the same false spot.
+        AND: [{ latitude: { not: null } }, { longitude: { not: null } }],
+      },
+      include: { savedBy: { where: { userId }, select: { userId: true } } },
+    });
+
+    const withinRadius = rows
+      .map((job) => ({
+        job,
+        distanceKm: haversineKm(from, {
+          lat: job.latitude!,
+          lng: job.longitude!,
+        }),
+      }))
+      .filter((row) => row.distanceKm <= radiusKm)
+      .sort((a, b) => a.distanceKm - b.distanceKm);
+
+    const profile = await this.cvProfile(userId);
+
+    return {
+      origin: {
+        kind: origin ? 'DEVICE' : 'ADDRESS',
+        // The area name is only meaningful for an address origin; a device
+        // position is wherever the person is standing, which may be nowhere
+        // the gazetteer has a name for.
+        area: origin ? null : (home?.name ?? null),
+      },
+      radiusKm,
+      total: withinRadius.length,
+      jobs: withinRadius.slice(0, limit).map((row) => ({
+        job: this.toListing(
+          row.job,
+          row.job.savedBy.length > 0,
+          profile,
+          false,
+          userId,
+        ),
+        // One decimal. The inputs are place centres, so a second would be
+        // precision this cannot honestly claim.
+        distanceKm: Math.round(row.distanceKm * 10) / 10,
+      })),
+    };
   }
 
   /** Closing hides a posting from the feed without destroying its history. */

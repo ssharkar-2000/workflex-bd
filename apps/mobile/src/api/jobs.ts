@@ -16,6 +16,7 @@ import {
   type MyJobList,
   type UpcomingWork,
   type NearbyJobs,
+  type LatLng,
   type JobList,
   type JobListing,
   type Recommendations,
@@ -142,7 +143,13 @@ export async function fetchUpcomingWork(): Promise<UpcomingWork> {
  * the card reports plainly instead of showing an empty list under a heading
  * that promises work nearby.
  */
-export async function fetchNearbyJobs(): Promise<NearbyJobs> {
-  const { data } = await api.get('/jobs/nearby');
+export async function fetchNearbyJobs(
+  origin: LatLng | null,
+): Promise<NearbyJobs> {
+  // Omitted entirely rather than sent as null: the server treats an absent
+  // coordinate as "fall back to the address", and a null would have to mean
+  // the same thing through a second code path.
+  const params = origin ? { lat: origin.lat, lng: origin.lng } : undefined;
+  const { data } = await api.get('/jobs/nearby', { params });
   return nearbyJobsSchema.parse(data);
 }
