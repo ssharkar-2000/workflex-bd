@@ -56,6 +56,16 @@ const WORKER_ROWS: Row[] = [
   // parameter in app/(app)/jobs.tsx.
   { icon: '🔖', label: 'menu.savedJobs', href: '/(app)/jobs?saved=1' },
   { icon: '📅', label: 'menu.myShifts' },
+  /**
+   * Messaging has no screen and no table behind it yet, so this row sits with
+   * the other unbuilt features and says "coming next" like they do.
+   *
+   * It is here because the workspace grid on the dashboard used to be the only
+   * place in the app that mentioned messages at all, and that grid has gone.
+   * Dropping the row with it would have quietly deleted the one signal that
+   * messaging is planned.
+   */
+  { icon: '💬', label: 'menu.messages' },
 ];
 
 const RECRUITER_ROWS: Row[] = [
