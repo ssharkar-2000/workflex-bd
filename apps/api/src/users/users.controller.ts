@@ -19,6 +19,7 @@ import { EmailVerificationService } from './email-verification.service';
 import { ProfileService } from './profile.service';
 import { DashboardService } from './dashboard.service';
 import { TrustService } from './trust.service';
+import { ActivityFeedService } from './activity-feed.service';
 
 const updateLocaleSchema = z.object({ locale: localeSchema });
 type UpdateLocaleDto = z.output<typeof updateLocaleSchema>;
@@ -33,6 +34,7 @@ export class UsersController {
     private readonly profiles: ProfileService,
     private readonly dashboard: DashboardService,
     private readonly trust: TrustService,
+    private readonly activity: ActivityFeedService,
   ) {}
 
   /**
@@ -50,6 +52,12 @@ export class UsersController {
   @ApiOperation({ summary: 'Counts and profile completeness for the dashboard' })
   async dashboardSummary(@CurrentUser('userId') userId: string) {
     return this.dashboard.summary(userId);
+  }
+
+  @Get('me/activity-feed')
+  @ApiOperation({ summary: 'Things that happened to this account lately' })
+  async activityFeed(@CurrentUser('userId') userId: string) {
+    return this.activity.feed(userId);
   }
 
   @Get('me/trust')

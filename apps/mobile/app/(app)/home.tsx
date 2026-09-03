@@ -26,9 +26,9 @@ import { UpcomingWork } from '../../src/components/home/UpcomingWork';
 import { NearbyJobs } from '../../src/components/home/NearbyJobs';
 import {
   ActivityOverview,
-  RecentNotifications,
   useDashboardSummary,
 } from '../../src/components/home/DashboardSections';
+import { RecentActivity } from '../../src/components/home/RecentActivity';
 import { DashboardHeader } from '../../src/components/home/DashboardHeader';
 import { useTheme } from '../../src/lib/use-theme';
 import { font, radius, space } from '../../src/lib/theme';
@@ -123,7 +123,7 @@ export default function HomeScreen() {
         <NextSkillAI />
         {summary ? <ActivityOverview data={summary} /> : null}
         <TrustScore />
-        <RecentNotifications />
+        <RecentActivity />
 
         <ActionGrid
           unlocked={data.verificationLevel >= VerificationLevel.L1_IDENTITY}

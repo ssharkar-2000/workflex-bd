@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import type { DashboardSummary, ProfileGap } from '@workflex/shared';
 import { fetchDashboardSummary } from '../../api/auth';
-import { fetchNotifications } from '../../api/notifications';
 import { useT, type TranslationKey } from '../../i18n';
 import { useTheme } from '../../lib/use-theme';
 import { font, radius, space } from '../../lib/theme';
@@ -289,75 +288,6 @@ export function ActivityOverview({ data }: { data: DashboardSummary }) {
   );
 }
 
-/**
- * The three most recent announcements.
- *
- * A preview, not the list: the bell already opens the full screen, and a
- * dashboard that reproduces another page in full has stopped being a summary.
- */
-export function RecentNotifications() {
-  const t = useT();
-  const { c } = useTheme();
-  const router = useRouter();
-
-  const { data } = useQuery({
-    queryKey: ['notifications'],
-    queryFn: fetchNotifications,
-    staleTime: 60_000,
-  });
-
-  const items = data?.items.slice(0, 3) ?? [];
-  if (items.length === 0) return null;
-
-  return (
-    <View style={styles.section}>
-      <View style={styles.sectionHead}>
-        <Text style={[styles.sectionTitle, { color: c.text }]}>
-          {t('dash.notifications')}
-        </Text>
-        <Pressable
-          onPress={() => router.push('/(app)/notifications')}
-          hitSlop={10}
-          accessibilityRole="button"
-        >
-          <Text style={[styles.viewAll, { color: c.primary }]}>
-            {t('dash.viewAll')}
-          </Text>
-        </Pressable>
-      </View>
-
-      <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
-        {items.map((n, i) => (
-          <View
-            key={n.id}
-            style={[
-              styles.notice,
-              i > 0 && { borderTopWidth: 1, borderTopColor: c.border },
-            ]}
-          >
-            <View style={styles.noticeTop}>
-              <Text
-                style={[styles.noticeTitle, { color: c.text }]}
-                numberOfLines={1}
-              >
-                {n.title}
-              </Text>
-              {!n.read ? (
-                <View style={[styles.dot, { backgroundColor: c.primary }]} />
-              ) : null}
-            </View>
-            <Text
-              style={[styles.noticeBody, { color: c.textMuted }]}
-              numberOfLines={2}
-            >
-              {n.body}
-            </Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   section: { marginTop: space.lg },
