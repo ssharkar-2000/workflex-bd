@@ -33,6 +33,7 @@ import { EmailCard } from '../../src/components/EmailCard';
 import { KycStatusCard } from '../../src/components/KycStatusCard';
 import { VerificationCard } from '../../src/components/VerificationCard';
 import { useT } from '../../src/i18n';
+import { useScrollDirectionHandler } from '../../src/lib/scroll-direction';
 import { useTheme } from '../../src/lib/use-theme';
 import { font, radius, space } from '../../src/lib/theme';
 
@@ -40,6 +41,9 @@ export default function ProfileScreen() {
   const t = useT();
   const router = useRouter();
   const { c } = useTheme();
+  // Feeds the floating Post a job button, which slides away while the
+  // reader is moving down the page so it stops covering card buttons.
+  const onScroll = useScrollDirectionHandler();
   const errorMessage = useErrorMessage();
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -90,6 +94,8 @@ export default function ProfileScreen() {
         <ScrollView
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
+          onScroll={onScroll}
+          scrollEventThrottle={16}
         >
           {/* The verification selfie, shown where someone looks for their
               own photo. `me` carries hasPhoto; MyProfile does not, and the

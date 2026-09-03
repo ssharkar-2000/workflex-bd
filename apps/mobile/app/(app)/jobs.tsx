@@ -37,6 +37,7 @@ import { NotificationBell } from '../../src/components/NotificationBell';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { useErrorMessage } from '../../src/lib/error-message';
 import { useLocale, useT, type TranslationKey } from '../../src/i18n';
+import { useScrollDirectionHandler } from '../../src/lib/scroll-direction';
 import { useTheme } from '../../src/lib/use-theme';
 import { font, radius, space } from '../../src/lib/theme';
 
@@ -97,6 +98,9 @@ export default function JobsScreen() {
   const t = useT();
   const router = useRouter();
   const { c, isDark } = useTheme();
+  // Feeds the floating Post a job button, which slides away while the
+  // reader is moving down the page so it stops covering card buttons.
+  const onScroll = useScrollDirectionHandler();
   const queryClient = useQueryClient();
   const errorMessage = useErrorMessage();
 
@@ -274,6 +278,8 @@ export default function JobsScreen() {
         <FlatList
           data={items}
           keyExtractor={(j) => j.id}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           contentContainerStyle={
             items.length === 0 ? styles.emptyWrap : styles.list
           }

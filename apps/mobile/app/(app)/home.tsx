@@ -29,12 +29,16 @@ import {
 } from '../../src/components/home/DashboardSections';
 import { RecentActivity } from '../../src/components/home/RecentActivity';
 import { DashboardHeader } from '../../src/components/home/DashboardHeader';
+import { useScrollDirectionHandler } from '../../src/lib/scroll-direction';
 import { useTheme } from '../../src/lib/use-theme';
 import { font, radius, space } from '../../src/lib/theme';
 
 export default function HomeScreen() {
   const t = useT();
   const { c, isDark } = useTheme();
+  // Feeds the floating Post a job button, which slides away while the
+  // reader is moving down the page so it stops covering card buttons.
+  const onScroll = useScrollDirectionHandler();
   const [locale] = useLocale();
   const signOut = useAuthStore((s) => s.signOut);
   const refreshToken = useAuthStore((s) => s.refreshToken);
@@ -102,6 +106,8 @@ export default function HomeScreen() {
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <ScrollView
         contentContainerStyle={styles.container}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}

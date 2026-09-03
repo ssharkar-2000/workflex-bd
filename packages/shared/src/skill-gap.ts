@@ -30,6 +30,29 @@ export const skillGapSchema = z.object({
    * well. The honest reading of "learning this could unlock N more jobs".
    */
   unlocks: z.number().int().nonnegative(),
+  /**
+   * Postings naming this skill, the raw count `relevance` was derived from.
+   *
+   * Sent alongside the percentage so the explanation can say "2 of 11" rather
+   * than only "18%". A share on its own hides its own sample size, and 18% of
+   * eleven postings deserves less weight than 18% of four hundred.
+   */
+  postings: z.number().int().nonnegative(),
+  /**
+   * The skill already on the CV that this one most often appears beside, and
+   * how many postings name both.
+   *
+   * Null when nothing on the CV shows up in the same postings — which says
+   * something real, namely that this skill sits away from everything the
+   * person can already do.
+   *
+   * Notably not a "related to" judgement. Nothing here knows that TypeScript
+   * resembles JavaScript; it knows that employers on this platform ask for
+   * them together, which is a fact with a number behind it.
+   */
+  pairedWith: z
+    .object({ skill: z.string(), jobs: z.number().int().positive() })
+    .nullable(),
 });
 export type SkillGap = z.infer<typeof skillGapSchema>;
 

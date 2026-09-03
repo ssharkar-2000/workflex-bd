@@ -17,6 +17,7 @@ import {
 } from '@workflex/shared';
 import { fetchRecommendations, toggleSavedJob } from '../../api/jobs';
 import { useLocale, useT, type TranslationKey } from '../../i18n';
+import { InteractiveCard } from '../InteractiveCard';
 import { useTheme } from '../../lib/use-theme';
 import { font, radius, space } from '../../lib/theme';
 
@@ -172,8 +173,10 @@ function RecommendationCard({
           : t('jobs.pay.NEGOTIABLE');
 
   return (
-    <View
-      style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}
+    <InteractiveCard
+      onPress={onView}
+      accessibilityLabel={job.title}
+      style={styles.card}
     >
       <View style={styles.cardHead}>
         <View style={styles.cardHeadText}>
@@ -257,7 +260,7 @@ function RecommendationCard({
           </Text>
         </Pressable>
       </View>
-    </View>
+    </InteractiveCard>
   );
 }
 
@@ -366,7 +369,8 @@ const styles = StyleSheet.create({
   // sideways to reach is a card most people never see.
   list: { marginTop: space.md, gap: 12 },
 
-  card: { borderWidth: 1, borderRadius: radius.lg, padding: 14 },
+  // Border, radius, surface and the hover lift all live in InteractiveCard.
+  card: { padding: 14 },
   cardHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   cardHeadText: { flex: 1 },
   jobTitle: { fontSize: font.md, fontWeight: '800', letterSpacing: -0.2 },

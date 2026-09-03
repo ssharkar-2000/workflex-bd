@@ -2,6 +2,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePathname, useRouter } from 'expo-router';
 import { useT, type TranslationKey } from '../i18n';
+import { useScrollingDown } from '../lib/scroll-direction';
 import { useTheme } from '../lib/use-theme';
 import { font, radius, space } from '../lib/theme';
 
@@ -192,6 +193,7 @@ export function PostJobFab() {
   const { c } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
+  const scrollingDown = useScrollingDown();
 
   if (!TAB_ROUTES.has(pathname) || pathname === '/post-job') return null;
 
@@ -200,13 +202,25 @@ export function PostJobFab() {
       onPress={() => router.push('/(app)/post-job' as never)}
       accessibilityRole="button"
       accessibilityLabel={t('nav.postJob')}
+      pointerEvents={scrollingDown ? 'none' : 'auto'}
       style={({ pressed }) => [
         styles.fab,
         {
           backgroundColor: c.primary,
-          // Pressed state has to come from the button itself: there is no
-          // hover on a phone and no ripple on iOS.
-          transform: [{ scale: pressed ? 0.94 : 1 }],
+          /**
+           * Slid away, not unmounted.
+           *
+           * Unmounting would drop the press state mid-tap and give the button
+           * nothing to animate from when it returns. Moving it below its own
+           * height puts it off the bottom of the wrapper while leaving the
+           * element in place, and `pointerEvents` stops it swallowing taps
+           * meant for whatever it was covering.
+           */
+          transform: [
+            { translateY: scrollingDown ? FAB_SIZE + FAB_GAP * 2 : 0 },
+            { scale: pressed ? 0.94 : 1 },
+          ],
+          opacity: scrollingDown ? 0 : 1,
         },
       ]}
     >

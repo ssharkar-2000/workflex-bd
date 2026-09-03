@@ -23,6 +23,7 @@ import { useDashboardSummary } from '../../src/components/home/DashboardSections
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { useErrorMessage } from '../../src/lib/error-message';
 import { useLocale, useT, type TranslationKey } from '../../src/i18n';
+import { useScrollDirectionHandler } from '../../src/lib/scroll-direction';
 import { useTheme } from '../../src/lib/use-theme';
 import { font, radius, space } from '../../src/lib/theme';
 
@@ -66,6 +67,9 @@ export default function ActivityScreen() {
   const t = useT();
   const router = useRouter();
   const { c, isDark } = useTheme();
+  // Feeds the floating Post a job button, which slides away while the
+  // reader is moving down the page so it stops covering card buttons.
+  const onScroll = useScrollDirectionHandler();
   const errorMessage = useErrorMessage();
 
   // Opened from a stat tile or the menu, which can ask for a specific half.
@@ -99,6 +103,8 @@ export default function ActivityScreen() {
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
       >
         <Text style={[styles.title, { color: c.text }]}>{t('act.title')}</Text>
 

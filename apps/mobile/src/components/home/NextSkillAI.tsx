@@ -1,7 +1,12 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { jobCategoryName, type SkillGap } from '@workflex/shared';
+import {
+  jobCategoryName,
+  type SkillGap,
+  type SkillPath,
+} from '@workflex/shared';
 import { fetchSkillPath } from '../../api/cv';
 import { useLocale, useT } from '../../i18n';
 import { useTheme } from '../../lib/use-theme';
@@ -26,6 +31,11 @@ export function NextSkillAI() {
   const { c } = useTheme();
   const router = useRouter();
   const [locale] = useLocale();
+
+  // Which gap the reader has asked about. Null is the closed state; the whole
+  // gap goes in rather than its name, so the sheet never has to look it up
+  // again and cannot show figures from a stale copy.
+  const [asking, setAsking] = useState<SkillGap | null>(null);
 
   const { data } = useQuery({
     queryKey: ['skill-path'],
@@ -88,7 +98,7 @@ export function NextSkillAI() {
 
         <View style={styles.gaps}>
           {path.gaps.map((gap) => (
-            <GapRow key={gap.skill} gap={gap} />
+            <GapRow key={gap.skill} gap={gap} onAsk={() => setAsking(gap)} />
           ))}
         </View>
 
@@ -110,16 +120,38 @@ export function NextSkillAI() {
           </Text>
         </Pressable>
       </View>
+
+      <WhyThisSkill
+        gap={asking}
+        path={path}
+        onClose={() => setAsking(null)}
+      />
     </View>
   );
 }
 
-function GapRow({ gap }: { gap: SkillGap }) {
+/**
+ * One suggested skill, and the way into why it was suggested.
+ *
+ * A row rather than a bare line because the percentage beside it is the part
+ * people disbelieve — "why that one?" is the first reaction to any
+ * recommendation, and the answer should be one tap away rather than absent.
+ */
+function GapRow({ gap, onAsk }: { gap: SkillGap; onAsk: () => void }) {
   const t = useT();
   const { c } = useTheme();
 
   return (
-    <View style={styles.gapRow}>
+    <Pressable
+      onPress={onAsk}
+      accessibilityRole="button"
+      accessibilityLabel={`${gap.skill}. ${t('skill.why')}`}
+      style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
+        styles.gapRow,
+        (hovered || pressed) && { backgroundColor: c.surfaceAlt },
+        pressed && styles.gapPressed,
+      ]}
+    >
       <View style={[styles.dot, { backgroundColor: c.primary }]} />
       <Text style={[styles.gapSkill, { color: c.text }]} numberOfLines={1}>
         {gap.skill}
@@ -127,7 +159,109 @@ function GapRow({ gap }: { gap: SkillGap }) {
       <Text style={[styles.gapRelevance, { color: c.textMuted }]}>
         {t('skill.relevant', { percent: gap.relevance })}
       </Text>
-    </View>
+      <Text style={[styles.gapInfo, { color: c.primary }]}>ⓘ</Text>
+    </Pressable>
+  );
+}
+
+/**
+ * Why this skill, in the figures it was actually chosen by.
+ *
+ * Every line is one of the numbers the recommendation was computed from, so
+ * the panel is the working rather than a justification written afterwards. It
+ * shows the sample size beside the share — "2 of 11 postings", not a bare
+ * 18% — because a percentage hides how much evidence is behind it, and eleven
+ * postings is not many.
+ *
+ * The reference design also asked for "Demand +18% this month". That one is
+ * absent: nothing in this product stores what demand was last month, so the
+ * arrow could only be decoration. Adding a monthly snapshot of these counts
+ * would make it real, and is the obvious next step if the trend matters.
+ */
+function WhyThisSkill({
+  gap,
+  path,
+  onClose,
+}: {
+  gap: SkillGap | null;
+  path: SkillPath;
+  onClose: () => void;
+}) {
+  const t = useT();
+  const { c } = useTheme();
+  const [locale] = useLocale();
+
+  if (!gap) return null;
+
+  const facts: { icon: string; line: string }[] = [
+    {
+      icon: '🔥',
+      line: t('skill.why.demand', {
+        count: gap.postings,
+        total: path.jobsConsidered,
+        field: jobCategoryName(path.category, locale),
+      }),
+    },
+  ];
+
+  if (gap.unlocks > 0) {
+    facts.push({ icon: '💼', line: t('skill.why.unlocks', { count: gap.unlocks }) });
+  } else {
+    facts.push({ icon: '💼', line: t('skill.why.noUnlocks') });
+  }
+
+  if (gap.pairedWith) {
+    facts.push({
+      icon: '⭐',
+      line: t('skill.why.paired', {
+        skill: gap.pairedWith.skill,
+        count: gap.pairedWith.jobs,
+      }),
+    });
+  }
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        {/* Stops a tap inside the sheet from closing it — the backdrop is the
+            dismiss target, and the sheet sits on top of it. */}
+        <Pressable
+          style={[styles.sheet, { backgroundColor: c.surface }]}
+          onPress={() => undefined}
+        >
+          <Text style={[styles.sheetEyebrow, { color: c.textMuted }]}>
+            {t('skill.why')}
+          </Text>
+          <Text style={[styles.sheetTitle, { color: c.text }]}>{gap.skill}</Text>
+
+          <View style={styles.factList}>
+            {facts.map((fact) => (
+              <View key={fact.line} style={styles.factRow}>
+                <Text style={styles.factIcon}>{fact.icon}</Text>
+                <Text style={[styles.factText, { color: c.text }]}>
+                  {fact.line}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Said plainly rather than left for someone to assume otherwise. */}
+          <Text style={[styles.sheetNote, { color: c.textMuted }]}>
+            {t('skill.why.basis')}
+          </Text>
+
+          <Pressable
+            onPress={onClose}
+            accessibilityRole="button"
+            style={[styles.sheetClose, { backgroundColor: c.primary }]}
+          >
+            <Text style={[styles.sheetCloseText, { color: c.primaryText }]}>
+              {t('common.close')}
+            </Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -159,7 +293,45 @@ const styles = StyleSheet.create({
   basis: { fontSize: font.xs, marginTop: 8, lineHeight: 17 },
 
   gaps: { marginTop: 14, gap: 10 },
-  gapRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  gapRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: radius.md,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    marginHorizontal: -8,
+  },
+  gapPressed: { opacity: 0.85 },
+  gapInfo: { fontSize: font.sm, fontWeight: '800' },
+
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: space.lg,
+  },
+  sheet: { width: '100%', maxWidth: 420, borderRadius: radius.xl, padding: 20 },
+  sheetEyebrow: {
+    fontSize: font.xs,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  sheetTitle: { fontSize: font.xl, fontWeight: '800', marginTop: 4 },
+  factList: { marginTop: 16, gap: 12 },
+  factRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  factIcon: { fontSize: font.md, lineHeight: 22 },
+  factText: { flex: 1, fontSize: font.sm, lineHeight: 21, fontWeight: '600' },
+  sheetNote: { fontSize: font.xs, marginTop: 16, lineHeight: 17 },
+  sheetClose: {
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 18,
+  },
+  sheetCloseText: { fontSize: font.sm, fontWeight: '800' },
   dot: { width: 8, height: 8, borderRadius: 4 },
   gapSkill: { flex: 1, fontSize: font.sm, fontWeight: '800' },
   gapRelevance: { fontSize: font.xs, fontWeight: '700' },

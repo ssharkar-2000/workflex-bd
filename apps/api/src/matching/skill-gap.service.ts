@@ -167,6 +167,38 @@ export class SkillGapService {
       }).length;
     };
 
+    /**
+     * The skill you already have that this one is most often asked for beside.
+     *
+     * Real co-occurrence, counted over the same postings: of the jobs naming
+     * the gap skill, how many also name each skill on the CV. It answers "why
+     * is this being suggested to *me*" with something checkable — TypeScript
+     * comes up because eight of the eleven postings asking for it also ask for
+     * the JavaScript already on your CV — rather than with an assertion that
+     * two technologies are related.
+     *
+     * Null when the postings naming it mention nothing the person has, which
+     * is itself informative: the skill is in demand but sits away from
+     * everything they can already do.
+     */
+    const pairedFor = (
+      term: string,
+    ): { skill: string; jobs: number } | null => {
+      const candidates = jobsWithTerm.get(term) ?? [];
+      if (candidates.length === 0) return null;
+
+      let best: { skill: string; jobs: number } | null = null;
+      for (const mine of strengths) {
+        const together = candidates.filter((job) =>
+          mentions(this.haystack(job), mine),
+        ).length;
+        if (together > 0 && (!best || together > best.jobs)) {
+          best = { skill: mine, jobs: together };
+        }
+      }
+      return best;
+    };
+
     return {
       category,
       targetRole: this.commonestTitle(jobs, category),
@@ -191,6 +223,10 @@ export class SkillGapService {
           skill: term,
           relevance: Math.round((n / jobs.length) * 100),
           unlocks: unlocksFor(term),
+          // The raw count behind `relevance`, so the explanation can show the
+          // fraction rather than only the percentage it was rounded to.
+          postings: n,
+          pairedWith: pairedFor(term),
         }))
         .sort((a, b) => b.relevance - a.relevance || b.unlocks - a.unlocks)
         .slice(0, GAP_LIMIT),
