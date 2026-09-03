@@ -227,7 +227,7 @@ function RoleCard({
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   centered: { alignItems: 'center', justifyContent: 'center', padding: space.lg },
-  container: { padding: space.lg, paddingBottom: space.xl },
+  container: { padding: space.lg, paddingBottom: space.fab },
 
 
   section: { marginTop: space.lg },

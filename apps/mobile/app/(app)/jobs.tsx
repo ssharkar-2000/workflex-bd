@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
     paddingBottom: space.sm,
   },
 
-  list: { paddingBottom: space.xl, gap: 10 },
+  list: { paddingBottom: space.fab, gap: 10 },
   filterWrap: { marginTop: space.md },
   more: { marginVertical: space.md },
 

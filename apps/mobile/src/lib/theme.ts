@@ -230,7 +230,12 @@ export const palettes: Record<ThemeMode, Palette> = { light, dark };
  * scale — the audience includes people who will not reach for reading glasses
  * to check a job listing.
  */
-export const space = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 } as const;
+/**
+ * `fab` is not a spacing step — it is the room a scrolling screen has to
+ * leave at the bottom so its last row is not sitting under the floating
+ * Post a job button. 56 for the button, 16 of gap, 16 of breathing room.
+ */
+export const space = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, fab: 88 } as const;
 export const radius = { sm: 6, md: 12, lg: 18, xl: 26, pill: 999 } as const;
 export const font = {
   xs: 12,

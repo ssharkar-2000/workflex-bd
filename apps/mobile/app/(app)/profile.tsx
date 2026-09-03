@@ -676,7 +676,7 @@ const styles = StyleSheet.create({
   backSpacer: { width: font.lg },
   title: { fontSize: font.md, fontWeight: '700' },
 
-  container: { padding: space.lg, paddingTop: 0, paddingBottom: space.xl },
+  container: { padding: space.lg, paddingTop: 0, paddingBottom: space.fab },
   centered: {
     flex: 1,
     alignItems: 'center',

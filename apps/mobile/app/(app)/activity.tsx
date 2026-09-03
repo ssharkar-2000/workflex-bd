@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: space.md, paddingTop: space.sm },
   back: { fontSize: font.sm, fontWeight: '700' },
 
-  scroll: { padding: space.md, paddingBottom: space.xl },
+  scroll: { padding: space.md, paddingBottom: space.fab },
   title: {
     fontSize: font.xl,
     fontWeight: '800',

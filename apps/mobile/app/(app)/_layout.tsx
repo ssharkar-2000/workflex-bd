@@ -3,7 +3,7 @@ import { Redirect, Stack } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { fetchOnboardingStatus } from '../../src/api/onboarding';
 import { useLaunchStore } from '../../src/store/launch-store';
-import { BottomNav } from '../../src/components/BottomNav';
+import { BottomNav, PostJobFab } from '../../src/components/BottomNav';
 import { useTheme } from '../../src/lib/use-theme';
 
 /**
@@ -52,10 +52,16 @@ export default function AppLayout() {
 
   // The bar is a sibling of the Stack, not an overlay on it, so the screens
   // keep their full height and none of them has to reserve room for it.
+  //
+  // The floating button is the exception, and has to be: floating over the
+  // content is what makes it a floating action button. It sits outside the
+  // Stack wrapper so it is not clipped by a screen, and the scrolling tab
+  // screens pad their last row past it with `space.fab`.
   return (
     <View style={styles.shell}>
       <View style={styles.shell}>
         <Stack screenOptions={{ headerShown: false }} />
+        <PostJobFab />
       </View>
       <BottomNav />
     </View>
