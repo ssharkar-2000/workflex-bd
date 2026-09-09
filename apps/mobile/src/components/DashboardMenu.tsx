@@ -167,14 +167,17 @@ export function DashboardMenu({
               {
                 width: drawerWidth,
                 backgroundColor: c.surface,
-                borderLeftColor: c.border,
+                borderRightColor: c.border,
                 paddingTop: insets.top + 14,
                 paddingBottom: insets.bottom + 10,
                 transform: [
                   {
+                    // Negative, so it starts off the *left* edge and slides
+                    // in towards the middle. Positive would park it off the
+                    // right and slide the wrong way across the screen.
                     translateX: anim.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [drawerWidth, 0],
+                      outputRange: [-drawerWidth, 0],
                     }),
                   },
                 ],
@@ -431,7 +434,15 @@ const styles = StyleSheet.create({
   },
   bar: { width: 17, height: 2, borderRadius: 1 },
 
-  overlay: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end' },
+  /**
+   * The drawer sits against the left edge, under the button that opens it.
+   *
+   * It used to be `flex-end`, which put the panel on the right while the
+   * hamburger stayed on the left — so the thing you tapped and the thing that
+   * appeared were at opposite ends of the screen, and the panel looked like it
+   * had come from somewhere else entirely.
+   */
+  overlay: { flex: 1, flexDirection: 'row', justifyContent: 'flex-start' },
   backdropFill: {
     position: 'absolute',
     top: 0,
@@ -443,12 +454,15 @@ const styles = StyleSheet.create({
   backdropPress: { flex: 1 },
 
   drawer: {
-    borderLeftWidth: 1,
+    // The open edge is now the right-hand one, so that is where the hairline
+    // and the shadow belong — both were on the left, which is the edge that
+    // is flush against the screen and shows neither.
+    borderRightWidth: 1,
     paddingHorizontal: 6,
     shadowColor: '#000',
     shadowOpacity: 0.22,
     shadowRadius: 20,
-    shadowOffset: { width: -6, height: 0 },
+    shadowOffset: { width: 6, height: 0 },
     elevation: 16,
   },
 
