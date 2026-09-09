@@ -144,8 +144,18 @@ function HighlightCard({
   const t = useT();
   const { c } = useTheme();
 
-  const tint = c.tints[index % c.tints.length];
-  const tintBorder = c.tintBorders[index % c.tintBorders.length];
+  /**
+   * White, not a cycled pastel.
+   *
+   * Every card in this list used to take the next tint in the palette, which
+   * turned a list of jobs into a stripe of peach, mint, lavender and butter.
+   * Colour that varies for no reason is colour that means nothing, and a
+   * screen made of it reads as a template rather than a product. The pastels
+   * are still here, as accents on the handful of places where a difference in
+   * colour carries a difference in meaning.
+   */
+  const tint = c.surface;
+  const tintBorder = c.border;
 
   return (
     <Pressable

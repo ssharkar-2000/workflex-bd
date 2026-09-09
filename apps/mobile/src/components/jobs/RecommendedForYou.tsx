@@ -210,13 +210,16 @@ function RecommendationCard({
         hitSlop={6}
         style={[
           styles.match,
-          { backgroundColor: c.primarySoft, borderColor: c.primarySoftBorder },
+          // Purple, not the brand indigo. Purple is reserved for figures the
+          // system worked out, so a reader learns that this colour always
+          // means "computed, and you can open the working".
+          { backgroundColor: c.aiSoft, borderColor: c.aiSoftBorder },
         ]}
       >
-        <Text style={[styles.matchText, { color: c.primary }]}>
+        <Text style={[styles.matchText, { color: c.ai }]}>
           🤖 {t('rec.aiMatch', { percent: item.fit })}
         </Text>
-        <Text style={[styles.matchHint, { color: c.primary }]}>ⓘ</Text>
+        <Text style={[styles.matchHint, { color: c.ai }]}>ⓘ</Text>
       </Pressable>
 
       <View style={styles.facts}>

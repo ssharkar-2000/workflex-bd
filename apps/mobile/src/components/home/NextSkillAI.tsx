@@ -66,7 +66,7 @@ export function NextSkillAI() {
             hitSlop={10}
             accessibilityRole="button"
           >
-            <Text style={[styles.explore, { color: c.primary }]}>
+            <Text style={[styles.explore, { color: c.ai }]}>
               {t('skill.explore')} →
             </Text>
           </Pressable>
@@ -84,7 +84,7 @@ export function NextSkillAI() {
           <View
             style={[
               styles.fill,
-              { width: `${path.readiness}%`, backgroundColor: c.primary },
+              { width: `${path.readiness}%`, backgroundColor: c.ai },
             ]}
           />
         </View>
@@ -113,7 +113,7 @@ export function NextSkillAI() {
             router.push({ pathname: '/(app)/jobs', params: { q: top.skill } })
           }
           accessibilityRole="button"
-          style={[styles.cta, { backgroundColor: c.primary }]}
+          style={[styles.cta, { backgroundColor: c.ai }]}
         >
           <Text style={[styles.ctaText, { color: c.primaryText }]}>
             {t('skill.viewPath')} →
@@ -152,14 +152,14 @@ function GapRow({ gap, onAsk }: { gap: SkillGap; onAsk: () => void }) {
         pressed && styles.gapPressed,
       ]}
     >
-      <View style={[styles.dot, { backgroundColor: c.primary }]} />
+      <View style={[styles.dot, { backgroundColor: c.ai }]} />
       <Text style={[styles.gapSkill, { color: c.text }]} numberOfLines={1}>
         {gap.skill}
       </Text>
       <Text style={[styles.gapRelevance, { color: c.textMuted }]}>
         {t('skill.relevant', { percent: gap.relevance })}
       </Text>
-      <Text style={[styles.gapInfo, { color: c.primary }]}>ⓘ</Text>
+      <Text style={[styles.gapInfo, { color: c.ai }]}>ⓘ</Text>
     </Pressable>
   );
 }
@@ -253,7 +253,7 @@ function WhyThisSkill({
           <Pressable
             onPress={onClose}
             accessibilityRole="button"
-            style={[styles.sheetClose, { backgroundColor: c.primary }]}
+            style={[styles.sheetClose, { backgroundColor: c.ai }]}
           >
             <Text style={[styles.sheetCloseText, { color: c.primaryText }]}>
               {t('common.close')}

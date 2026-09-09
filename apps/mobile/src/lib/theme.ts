@@ -1,17 +1,26 @@
 /**
  * Colour system.
  *
- * Soft pastel, drawn from the supplied reference: a peach → mint → lavender
- * wash behind cream surfaces, deep indigo for anything actionable, and coral
- * as the highlight. Only the values changed here — every token name is the
- * one the screens already use, so layout, animation and the logo geometry are
- * untouched by the reskin.
+ * A warm near-white page, white cards, and colour that has to earn its place.
+ * Each hue owns one meaning: deep blue-purple is the brand and anything you
+ * can act on, purple is anything the system computed, green is success, amber
+ * is caution, red is a problem.
  *
- * Contrast is the accessibility constraint that actually matters. Body text
- * clears WCAG AA (4.5:1) against its own background in both modes, and
- * neither mode pairs pure black with pure white, which glares badly for older
- * eyes. The pastels are deliberately confined to backgrounds: text never sits
- * on a mid-tone pastel, because nothing readable can.
+ * The pastels are still here and still the same four hues, but they are
+ * accents now rather than the default background of every section. They had
+ * been cycled by list index — each job card taking the next colour along — so
+ * a screen was a stripe of peach, mint, lavender and butter that meant
+ * nothing. Colour that varies for no reason teaches people to ignore colour,
+ * which is expensive: it is the same channel the app needs for "this is
+ * urgent" and "this was verified". A tint now appears only where a difference
+ * in colour marks a difference in kind — the two role cards, the activity
+ * tiles, an avatar, a company monogram.
+ *
+ * Contrast is the accessibility constraint that actually matters, and it is
+ * measured rather than judged: every pairing in this file clears WCAG AA
+ * (4.5:1) in both modes. Neither mode pairs pure black with pure white, which
+ * glares badly for older eyes, and text never sits on a mid-tone pastel,
+ * because nothing readable can.
  */
 
 export type ThemeMode = 'light' | 'dark';
@@ -45,6 +54,20 @@ export interface Palette {
   primaryText: string;
 
   accent: string;
+
+  /**
+   * Anything the system worked out rather than recorded.
+   *
+   * Its own role, not a reuse of `primary`, because the two say different
+   * things: primary means "this is the action", `ai` means "this figure was
+   * computed and you can open the working". The match pill, the NextSkill
+   * card and the explanation sheets are the only things entitled to it, so
+   * seeing purple anywhere means a number with reasoning behind it.
+   */
+  ai: string;
+  aiSoft: string;
+  aiSoftBorder: string;
+
   success: string;
   successSoft: string;
   warning: string;
@@ -92,35 +115,50 @@ export interface Palette {
 }
 
 const light: Palette = {
-  bg: '#FBF4EE',
+  // Very light warm white. The old page was a peach cream (#FBF4EE) strong
+  // enough to read as its own colour, which left white cards floating on a
+  // tinted field and made the pastel sections feel like more of the same. At
+  // this value the page is a warm neutral and a white card sits on it as a
+  // card.
+  bg: '#FAF8F5',
   surface: '#FFFFFF',
-  surfaceAlt: '#F3EDE6',
-  border: '#E6DCD2',
+  surfaceAlt: '#F1EEE9',
+  border: '#E6E1DA',
 
-  // Deep indigo rather than black: it belongs to the same family as the
-  // primary, and reads ~15:1 on the cream page.
-  text: '#171733',
-  textMuted: '#585874',
+  // Carries a trace of the primary's blue, so the darkest thing on screen
+  // belongs to the same family as the brand rather than being neutral black.
+  text: '#1A1A2E',
+  textMuted: '#585873',
 
-  textOnBrand: '#171733',
-  textMutedOnBrand: 'rgba(23,23,51,0.68)',
-  // Darkened well past the reference coral so it still clears AA as *text* on
-  // the pale wash (the reference tone measured 3.9:1). The bright coral lives
-  // on as `accent`, which is only ever a fill.
+  textOnBrand: '#1A1A2E',
+  textMutedOnBrand: 'rgba(26,26,46,0.68)',
   accentOnBrand: '#A3421C',
 
-  primary: '#1E1E3C',
-  primaryPressed: '#12122A',
-  primarySoft: '#EAEAF6',
-  primarySoftBorder: '#C7C7E2',
+  // Deep blue-purple. The old primary was so near black that a filled button
+  // read as a black rectangle and the brand had no colour of its own; this is
+  // recognisably indigo while still clearing AA against white by a wide
+  // margin.
+  primary: '#3A34A0',
+  primaryPressed: '#2B2680',
+  primarySoft: '#EEEDFA',
+  primarySoftBorder: '#C9C6EC',
   primaryText: '#FFFFFF',
 
   accent: '#FF8A4C',
-  success: '#176243',
-  successSoft: '#D8EFE2',
-  warning: '#8A5A00',
-  warningSoft: '#FDF0DC',
-  warningBorder: '#EFD3A2',
+
+  // A step round the wheel from primary — clearly purple beside the indigo,
+  // rather than a shade of it that reads as the same colour twice.
+  ai: '#6D28D9',
+  aiSoft: '#F3EDFE',
+  aiSoftBorder: '#D9C9F7',
+
+  success: '#136B3A',
+  successSoft: '#DCF0E4',
+  // Amber rather than the old brown-gold: warm and unmistakably a caution,
+  // and dark enough to be read as text on both the page and its own tint.
+  warning: '#95610A',
+  warningSoft: '#FDF1DC',
+  warningBorder: '#F0D5A4',
   danger: '#B3382B',
   dangerSoft: '#FBE6E2',
   dangerBorder: '#EFB6AC',
@@ -174,17 +212,25 @@ const dark: Palette = {
   accentOnBrand: '#FFAA79',
 
   /**
-   * Coral, not the indigo used in light mode. Indigo is the darkest thing in
-   * the palette, so a filled indigo button on a near-black page would be a
-   * rectangle nobody can see — the accent has to carry the call to action here.
+   * The light mode indigo lifted, not swapped for a different hue.
+   *
+   * It used to be coral here, because the old primary was so dark that a
+   * filled button vanished against a near-black page. A blue-purple can be
+   * raised in lightness and stay itself, so both modes now share a brand
+   * colour instead of the dark theme borrowing the accent.
    */
-  primary: '#FF8A4C',
-  primaryPressed: '#E5763B',
-  primarySoft: '#33201A',
-  primarySoftBorder: '#5D3A29',
-  primaryText: '#2A1206',
+  primary: '#9E97F0',
+  primaryPressed: '#8880E4',
+  primarySoft: '#22203F',
+  primarySoftBorder: '#3D3A66',
+  primaryText: '#15132E',
 
   accent: '#FFAA79',
+
+  ai: '#B9A6FA',
+  aiSoft: '#241C3D',
+  aiSoftBorder: '#3F3163',
+
   success: '#6BD1A0',
   successSoft: '#12302A',
   warning: '#FFC24D',
@@ -194,7 +240,11 @@ const dark: Palette = {
   dangerSoft: '#3A1B1A',
   dangerBorder: '#6B2E2A',
 
-  locked: '#7A7A93',
+  // Lifted from #7A7A93, which measured 4.10:1 on the dark surface and so
+  // failed AA as text. It labels the "Coming next" rows in the drawer and the
+  // resend countdowns — the least important text on those screens, which is
+  // exactly why it has to stay readable rather than fade into the card.
+  locked: '#8E8BA6',
 
   // Deliberately the same values as light mode: the band is the brand lockup
   // and is meant to look identical whichever theme the phone is in.
