@@ -13,7 +13,6 @@ import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { BrandMark } from '../../src/components/BrandMark';
 import { AuroraText } from '../../src/components/AuroraText';
-import { RotatingTagline } from '../../src/components/RotatingTagline';
 import { ShimmerButton } from '../../src/components/ShimmerButton';
 import { GlassCard } from '../../src/components/GlassCard';
 import { LanguageToggle } from '../../src/components/LanguageToggle';
@@ -23,10 +22,12 @@ import { useLaunchStore } from '../../src/store/launch-store';
 import { useT } from '../../src/i18n';
 import { useTheme } from '../../src/lib/use-theme';
 
+// ✓ and ৳ are plain characters, not emoji, so they are drawn in the text
+// colour — with none set they would be black on the dark theme's chips.
 const CHIPS = [
-  { icon: '🪪', key: 'auth.chip.nid' },
+  { icon: '✓', key: 'auth.chip.nid' },
   { icon: '📍', key: 'auth.chip.nearby' },
-  { icon: '💸', key: 'auth.chip.bkash' },
+  { icon: '৳', key: 'auth.chip.bkash' },
 ] as const;
 
 /**
@@ -35,6 +36,12 @@ const CHIPS = [
  * The phone field used to live here, which meant asking for a number before
  * the user knew what they were signing up for. Intent now comes first, and
  * the form is two screens later where it has context.
+ *
+ * The tagline is one fixed line covering both sides of the market. It used to
+ * rotate through three, one per audience, so the product only came across
+ * whole to someone who watched all three — and the bKash line on its own made
+ * it look like a payments app. bKash is still named, in the chips, as one
+ * feature among three rather than as the headline.
  */
 export default function WelcomeScreen() {
   const t = useT();
@@ -144,7 +151,14 @@ export default function WelcomeScreen() {
               {t('auth.eyebrow')}
             </Text>
             <AuroraText fontSize={42}>WorkFlex BD</AuroraText>
-            <RotatingTagline />
+            <Text style={[styles.tagline, { color: c.textOnBrand }]}>
+              {t('auth.tagline')}
+            </Text>
+            <Text
+              style={[styles.taglineSupport, { color: c.textMutedOnBrand }]}
+            >
+              {t('auth.taglineSupport')}
+            </Text>
 
             <View style={styles.chips}>
               {CHIPS.map((chip, i) => (
@@ -164,7 +178,9 @@ export default function WelcomeScreen() {
                   }}
                 >
                   <GlassCard style={styles.chip} intensity={28}>
-                    <Text style={styles.chipIcon}>{chip.icon}</Text>
+                    <Text style={[styles.chipIcon, { color: c.textOnBrand }]}>
+                      {chip.icon}
+                    </Text>
                     <Text style={[styles.chipText, { color: c.textOnBrand }]}>
                       {t(chip.key)}
                     </Text>
@@ -247,6 +263,21 @@ const styles = StyleSheet.create({
     letterSpacing: 2.4,
     marginBottom: 2,
   },
+  tagline: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+    textAlign: 'center',
+    marginTop: 6,
+  },
+  taglineSupport: {
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 6,
+    paddingHorizontal: 8,
+  },
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -262,7 +293,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
-  chipIcon: { fontSize: 13 },
+  chipIcon: { fontSize: 13, fontWeight: '800' },
   chipText: { fontSize: 12, fontWeight: '700' },
 
   footer: { paddingHorizontal: 20, paddingBottom: 10 },
