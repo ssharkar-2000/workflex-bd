@@ -223,16 +223,6 @@ export default function WelcomeScreen() {
               {t('auth.secure')}
             </Text>
           </View>
-
-          <Pressable
-            style={styles.adminLink}
-            onPress={() => router.push('/(auth)/admin-login')}
-            hitSlop={8}
-          >
-            <Text style={[styles.adminLinkText, { color: c.textMutedOnBrand }]}>
-              {t('adminLogin.entry')}
-            </Text>
-          </Pressable>
         </Animated.View>
       </SafeAreaView>
     </View>
@@ -294,6 +284,4 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '700',
   },
-  adminLink: { alignItems: 'center', marginTop: 16 },
-  adminLinkText: { fontSize: 11, fontWeight: '600', opacity: 0.7 },
 });
