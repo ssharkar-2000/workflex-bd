@@ -8,30 +8,36 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
-import { JOB_CATEGORIES } from '@workflex/shared';
 import { useTheme } from '../lib/use-theme';
 
 /**
- * Icons scattered behind every screen, drawn from what the product is about:
- * shifts, trades, hiring, payment, verification. A patterned page reads as a
- * designed surface rather than an empty one, and keeping the vocabulary on
- * topic means the texture also says what the app does.
+ * Icons scattered behind every screen, limited to the six things the product
+ * is about: work, people, the household, place, payment and skill.
+ *
+ * This used to be every job category plus the platform's own mechanics —
+ * twenty-five icons, among them a laptop, books, a road barrier, a heart, a
+ * factory and a shirt. Each was defensible alone, as the emoji for some
+ * category in the taxonomy, but together they read as clip art: a texture
+ * made of unrelated objects says nothing in particular, and it pulled the eye
+ * away from the logo in the middle, which is the one thing on the landing
+ * page that should hold it.
+ *
+ * Two icons per idea rather than one, so a phone's nine slots fill without
+ * repeating: with six icons, three would appear twice on every screen, and a
+ * repeated emoji is what gives a background away as generated. Each second
+ * icon is a concrete instance of the same idea — the toolbox is the trades
+ * half of work, the broom is what household work mostly is, the handshake is
+ * being hired — not a new subject. None repeats an icon from the logo's own
+ * orbit, so the centre keeps its vocabulary to itself.
  */
-const DOODLES = [
-  // Every kind of work the product actually lists, taken from the taxonomy
-  // itself rather than a hand-kept copy of it. Add a category and it joins the
-  // background; rename one and nothing here goes stale.
-  ...JOB_CATEGORIES.map((category) => category.emoji),
-
-  // The platform's own mechanics, which are not job categories but are just as
-  // much what this app is: NID verification, bKash payment, shift times,
-  // nearby work, and being hired.
-  '🪪',
-  '💸',
-  '⏰',
-  '📍',
-  '🤝',
-];
+const CONCEPTS = [
+  ['💼', '🧰'], // Work
+  ['👥', '🤝'], // People
+  ['🏠', '🧹'], // Household
+  ['📍', '🗺️'], // Location
+  ['💰', '💸'], // Payment
+  ['⭐', '🏅'], // Skills
+] as const;
 
 interface Blob {
   size: number;
@@ -123,18 +129,25 @@ export function MeshBackground() {
  * soft edges, and the eye finds the rows anyway. Density is now expressed as
  * area per icon, so a tall phone and a wide browser window get the same
  * *texture* rather than the same count.
+ *
+ * 80,000 rather than the 45,000 it was, with the bounds below lowered to
+ * match: about a third fewer icons overall, measured against this layout
+ * rather than estimated. Desktop windows fall from 21–24 icons to 12–15;
+ * phones fall from 12 to 9, which is the 3×3 floor in `scatter` and the
+ * reason phones stop at a quarter fewer rather than a third.
  */
-const AREA_PER_ICON = 45_000;
+const AREA_PER_ICON = 80_000;
 
 /**
  * Bounds on that density: never so few the page looks bare, never so many it
  * reads as wallpaper. These constrain the target the layout aims at, not the
  * final count — `scatter` rounds the target to whole rows and columns, so a
- * desktop lands a little above the maximum and a phone a little above the
- * minimum. Coverage matters more here than hitting an exact number.
+ * desktop can land a little above the maximum, and a phone sits on the 3×3
+ * floor there rather than on the minimum. Coverage matters more here than
+ * hitting an exact number.
  */
-const MIN_ICONS = 8;
-const MAX_ICONS = 22;
+const MIN_ICONS = 5;
+const MAX_ICONS = 14;
 
 /**
  * Size range.
@@ -183,13 +196,29 @@ interface Doodle {
  *
  * Icons are then taken in sequence, which guarantees a screen shows as many
  * different ones as it has room for. Picking each independently at random
- * looked repetitive — with 25 icons in 10 slots the birthday problem makes a
+ * looked repetitive — with 12 icons in 9 slots the birthday problem makes a
  * duplicate almost certain, and a repeated emoji is the one thing that gives
  * a "random" background away as generated.
+ *
+ * Shuffled in two tiers: one icon from every idea first, then the second of
+ * each. A single shuffle of all twelve leaves it to chance which three a
+ * phone's nine slots drop, and that can be both payment icons and the house —
+ * a background meant to say work, people, home, place, pay and skill saying
+ * nothing about pay. With the tiers, any screen with six or more slots shows
+ * every idea. Each tier gets its own seed, so a second icon never lands a
+ * fixed distance from its first.
  */
-const SHUFFLED = DOODLES.map((icon, i) => ({ icon, at: hash(i * 31 + 7) }))
-  .sort((a, b) => a.at - b.at)
-  .map((entry) => entry.icon);
+function shuffled<T>(items: readonly T[], seed: number): T[] {
+  return items
+    .map((item, i) => ({ item, at: hash(i * 31 + seed) }))
+    .sort((a, b) => a.at - b.at)
+    .map((entry) => entry.item);
+}
+
+const SHUFFLED: string[] = [
+  ...shuffled(CONCEPTS.map((pair) => pair[0]), 7),
+  ...shuffled(CONCEPTS.map((pair) => pair[1]), 53),
+];
 
 /**
  * How far inside its cell an icon may wander, as a fraction of the cell.
