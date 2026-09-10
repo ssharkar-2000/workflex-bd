@@ -706,7 +706,6 @@ export const en = {
     'These codes were never sent. Development aid only.',
   'admin.outbox.empty': 'No messages yet.',
 
-  'adminLogin.entry': 'Admin',
   'adminLogin.title': 'Admin sign-in',
   'adminLogin.subtitle': 'For reviewers only — not a regular account.',
   'adminLogin.email': 'Email',
@@ -1552,7 +1551,6 @@ export const bn: Record<TranslationKey, string> = {
   'admin.outbox.subtitle': 'এই কোডগুলো আসলে পাঠানো হয়নি। শুধু ডেভেলপমেন্ট সহায়ক।',
   'admin.outbox.empty': 'এখনো কোনো বার্তা নেই।',
 
-  'adminLogin.entry': 'অ্যাডমিন',
   'adminLogin.title': 'অ্যাডমিন সাইন-ইন',
   'adminLogin.subtitle': 'শুধু রিভিউয়ারদের জন্য — সাধারণ অ্যাকাউন্ট নয়।',
   'adminLogin.email': 'ইমেইল',
