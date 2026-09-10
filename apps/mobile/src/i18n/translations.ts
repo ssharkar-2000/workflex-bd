@@ -70,13 +70,14 @@ export const en = {
   'common.comingNext': 'Coming next',
   'common.language': 'Language',
 
-  'auth.tagline': 'Any work, any time, anywhere in Bangladesh',
-  'auth.rotate.1': 'Find shift work near you, today',
-  'auth.rotate.2': 'Hire verified people in minutes',
-  'auth.rotate.3': 'Get paid straight to bKash',
-  'auth.chip.nid': 'NID verified',
-  'auth.chip.nearby': 'Jobs nearby',
-  'auth.chip.bkash': 'bKash payout',
+  'auth.tagline': 'Work. Hire. Grow.',
+  // The non-breaking spaces hold "all in one place" together, so on a narrow
+  // screen the line breaks at the comma rather than leaving one word alone.
+  'auth.taglineSupport':
+    'Find work or hire someone, all\u00a0in\u00a0one\u00a0place.',
+  'auth.chip.nid': 'NID Verified',
+  'auth.chip.nearby': 'Nearby Jobs',
+  'auth.chip.bkash': 'bKash Payout',
   'auth.getStarted': 'Get started',
   'auth.enterNumber': 'Enter your mobile number to continue',
   'auth.phonePlaceholder': '1712 345678',
@@ -918,10 +919,10 @@ export const bn: Record<TranslationKey, string> = {
   'common.comingNext': 'শীঘ্রই আসছে',
   'common.language': 'ভাষা',
 
-  'auth.tagline': 'যেকোনো কাজ, যেকোনো সময়, সারা বাংলাদেশে',
-  'auth.rotate.1': 'আজই কাছাকাছি শিফটের কাজ খুঁজুন',
-  'auth.rotate.2': 'কয়েক মিনিটেই যাচাইকৃত কর্মী নিয়োগ দিন',
-  'auth.rotate.3': 'সরাসরি বিকাশে পেমেন্ট নিন',
+  'auth.tagline': 'কাজ। নিয়োগ। উন্নতি।',
+  // Non-breaking spaces keep "সব এক জায়গায়" on one line, as in English.
+  'auth.taglineSupport':
+   'কাজ খুঁজুন বা কর্মী নিয়োগ দিন, সব\u00a0এক\u00a0জায়গায়।',
   'auth.chip.nid': 'এনআইডি যাচাইকৃত',
   'auth.chip.nearby': 'কাছাকাছি কাজ',
   'auth.chip.bkash': 'বিকাশে পেমেন্ট',
