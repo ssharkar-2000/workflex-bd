@@ -9,9 +9,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
@@ -31,6 +32,22 @@ import { useTheme } from '../../src/lib/use-theme';
 import { font, radius } from '../../src/lib/theme';
 
 type Tab = 'login' | 'register';
+
+/**
+ * The brand mark at the top of this screen. It was a fixed 56 — a badge
+ * lost in the space above the tabs. Now it takes the room the Login tab
+ * leaves, the taller of the two: as large as it can be without pushing Sign
+ * in down the screen, up to `max`, and never smaller than it used to be.
+ *
+ * Worked out from the screen rather than measured from the layout, so it is
+ * the same on both tabs and does not shrink when the keyboard opens.
+ */
+const MARK = { min: 56, max: 128 };
+/** The back-and-toggles bar, and everything on the Login tab but the mark. */
+const TOP_BAR = 46;
+const LOGIN_TAB_REST = 503;
+/** Kept free, so a full screen still has a little air at top and bottom. */
+const BREATHING = 24;
 
 
 /**
@@ -53,6 +70,18 @@ export default function LoginScreen() {
   }>();
   const setSession = useAuthStore((s) => s.setSession);
   const errorMessage = useErrorMessage();
+
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const markSize = Math.round(
+    Math.max(
+      MARK.min,
+      Math.min(
+        MARK.max,
+        height - insets.top - insets.bottom - TOP_BAR - LOGIN_TAB_REST - BREATHING,
+      ),
+    ),
+  );
 
   const [tab, setTab] = useState<Tab>(params.tab === 'register' ? 'register' : 'login');
 
@@ -159,7 +188,7 @@ export default function LoginScreen() {
               }}
             >
               <View style={styles.brandRow}>
-                <BrandMark size={56} interactive={false} />
+                <BrandMark size={markSize} interactive={false} />
                 <Text style={[styles.brandName, { color: c.textOnBrand }]}>
                   WorkFlex BD
                 </Text>
@@ -372,8 +401,9 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 16 },
 
   brandRow: { alignItems: 'center', marginBottom: 14 },
+  // A step up from body size, to stay in proportion with the larger mark.
   brandName: {
-    fontSize: font.md,
+    fontSize: font.lg,
     fontWeight: '800',
     marginTop: 6,
     letterSpacing: -0.2,
