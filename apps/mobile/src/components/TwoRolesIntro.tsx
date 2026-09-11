@@ -3,65 +3,76 @@ import {
   AccessibilityInfo,
   Animated,
   Easing,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
+  type StyleProp,
+  type TextStyle,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
-import { useT } from '../i18n';
+import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
+import { JOB_CATEGORIES, jobCategoryName } from '@workflex/shared';
+import { useLocale, useT, type TranslationKey } from '../i18n';
 import { useTheme } from '../lib/use-theme';
 
 /**
- * "One account, two roles": the ten seconds that play before the landing
- * page.
+ * The ten seconds before the landing page: one person, both sides of the
+ * marketplace.
  *
- * The same person finds a job and applies, then turns the phone over, posts
- * one, and someone answers. That is the product's one real differentiator,
- * and it is told without a paragraph of copy — every beat is an action on a
- * phone screen, and the only sentence is the last one.
+ * An animated character searches for part-time work on their phone and gets
+ * the notification that they are hired — then, with a tap leaking at home,
+ * turns recruiter: posts a job for a plumber, has the best one picked by CV
+ * match, and shakes his hand when he arrives. The badge over their head says
+ * it outright: job seeker, then recruiter, then both. That is the product's
+ * differentiator, told as a story rather than a claim.
  *
- * Drawn with views rather than shipped as a video. A video is a heavy
- * download before the first screen on patchy mobile data, is either blurry or
- * wasteful at most of the screen sizes this runs on, and cannot follow the
- * reader's language or their light and dark setting. Here every word comes
- * from the translation table and every colour but one from the theme.
+ * The people are drawn from plain shapes, each limb its own view hinged at
+ * the joint, so a pose is a handful of angles and the whole cast animates on
+ * the native driver. What they see on their phone pops up above them as the
+ * app's own cards — a job search, a push notification, the posting form, a
+ * CV match — in the theme's colours and the reader's language.
  *
- * Everything hangs off one clock running from 0 to 10,000 ms. Each element
- * reads the beat of the storyboard it belongs to, so the piece stays in step
+ * Everything hangs off one clock running from 0 to `BEAT.end`. Each element
+ * reads the part of the storyboard it belongs to, so the piece stays in step
  * by construction, and a beat is retimed by changing its number in `BEAT`.
  */
 
-/** The storyboard in milliseconds, one entry per line of the brief. */
+/** The storyboard in milliseconds. */
 const BEAT = {
-  appear: 0, // a young person appears, holding a phone
-  findJobs: 1000, // they tap Find Jobs
-  list: 2000, // three job cards arrive
-  match: 3000, // one lifts towards them: Perfect Match
-  apply: 4000, // they tap Apply, and the application is sent
-  flip: 5000, // the screen turns over to Post a Job
-  post: 6000, // they type the job and post it
-  meet: 7000, // someone else's profile appears: Interested
-  link: 8000, // the two profiles connect
-  words: 9000, // Find work. Find workers.
-  end: 10000,
+  appear: 0, // the character steps into view, phone in hand
+  search: 450, // a job search pops up from the phone
+  results: 1000, // part-time jobs come back
+  notify: 2000, // WorkFlex BD: you're hired
+  cheer: 2250, // arms up, a jump, confetti
+  think: 3500, // a tap leaking at home; the badge turns recruiter
+  post: 4700, // the plumber job is typed and posted
+  match: 6000, // applicants' CVs are compared; the best one is hired
+  arrive: 7300, // the plumber walks in
+  shake: 7950, // they shake hands
+  words: 8400, // Find work. Find workers.
+  end: 9400,
 } as const;
 
-/** When each tap presses down. The finger and the button it presses share it. */
+/** Every tap on a card, so a button and its press land together. */
 const PRESS = {
-  findJobs: BEAT.findJobs + 450,
-  apply: BEAT.apply + 400,
-  post: BEAT.post + 750,
+  submit: BEAT.post + 900,
+  hire: BEAT.match + 1050,
 } as const;
 
 /** A press: down in 70 ms, back up by 200. */
 const pressTimes = (at: number) => [at, at + 70, at + 200];
 
-/** When the job is typed out, within the post beat. */
-const TYPE_FROM = BEAT.post + 60;
-const TYPE_UNTIL = BEAT.post + 620;
+/** When each field is typed into. */
+const TYPE = {
+  search: { from: BEAT.search + 80, until: BEAT.search + 480 },
+  title: { from: BEAT.post + 150, until: BEAT.post + 600 },
+} as const;
+const CHIP_AT = BEAT.post + 650;
+const BUDGET_AT = BEAT.post + 750;
 
 /**
  * The stage is laid out once at this size and scaled to fit the screen, so
@@ -69,81 +80,136 @@ const TYPE_UNTIL = BEAT.post + 620;
  */
 const STAGE_W = 320;
 const STAGE_H = 600;
-
 /** Height of the progress-and-Skip bar, below the safe-area inset. */
 const BAR = 52;
 
-const HEAD = 76;
-const PERSON_W = 150;
-/** Where the person's head is while they hold the phone. */
-const HOLD = { x: 160, y: 62 };
-/** Where the two profiles stand once they meet. */
-const PAIR = { y: 234, left: 72, right: 248 };
+const CAPTION_TOP = 22;
+/** The closing words sit in the space the cards have left, near the cast. */
+const WORDS_TOP = 110;
+/** Bangla stacks marks above its letters, so the two lines need room between them. */
+const WORDS_GAP = 40;
+/** The cards the character's phone shows, popped up above their head. */
+const CARD = { left: 20, top: 70, width: 280 };
+/** The role badge, just above the character's hair. */
+const BADGE_TOP = 262;
+const GLOW = 440;
 
-const PHONE = { left: 48, top: 126, width: 224, height: 372, bezel: 7 };
-const SCREEN = {
-  top: PHONE.top + PHONE.bezel,
-  width: PHONE.width - PHONE.bezel * 2,
-  height: PHONE.height - PHONE.bezel * 2,
-};
+/**
+ * A person, drawn in a 200 × 310 box: every part is placed from these.
+ * Arms are two segments hinged at the shoulder and elbow; legs hinge at the
+ * hip. An angle of zero is a limb hanging straight down.
+ */
+const FIG = { width: 200, height: 310 };
+const ARM_W = 20;
+const UPPER = 48;
+const FORE = 44;
+const SHOULDER = { left: { x: 66, y: 100 }, right: { x: 134, y: 100 } };
 
-/** Positions inside the phone's screen. */
-const FIND_BUTTON = { top: 176, height: 48 };
-const POST_BUTTON = { top: 186, height: 46 };
-const CARD = {
-  left: 12,
-  width: 186,
-  height: 60,
-  tops: [66, 136, 206],
+/**
+ * The hero's arm poses: the upper arm's angle at the shoulder (`u`) and the
+ * forearm's at the elbow (`f`). Each is solved from the shoulders and arm
+ * lengths above, so the hand lands where the story needs it — on the phone,
+ * in their hair, in the plumber's hand.
+ */
+const POSE = {
+  // Left arm
+  rest: { u: 8, f: -4 },
+  tap: { u: 13, f: -128 }, // hand on the phone's screen
+  cheerLeft: { u: 150, f: 15 },
+  scratch: { u: 137, f: 98 }, // scratching the side of their head
+  // Right arm
+  read: { u: -22, f: 131 }, // phone held up at the chest
+  cheerRight: { u: -150, f: -15 },
+  lowered: { u: -8, f: 30 },
+  shake: { u: -15, f: -25 }, // meets the plumber's hand
 } as const;
-const APPLY = { width: 56, height: 26, right: 10 };
 
-/** How far the matched card rises towards the person, and how much it grows. */
-const LIFT = 24;
-const LIFT_SCALE = 1.06;
+/** The phone is turned in the hand so it stands upright in the reading pose. */
+const PHONE_TILT = -(POSE.read.u + POSE.read.f);
 
-/**
- * Where each tap lands, in stage coordinates — the middle of what is tapped.
- * The screen is centred on the stage, so anything centred on the screen sits
- * at the stage's middle too.
- */
-const TAPS = {
-  findJobs: {
-    x: STAGE_W / 2,
-    y: SCREEN.top + FIND_BUTTON.top + FIND_BUTTON.height / 2,
-  },
-  apply: {
-    x:
-      STAGE_W / 2 +
-      (CARD.width / 2 - APPLY.right - APPLY.width / 2) * LIFT_SCALE,
-    y: SCREEN.top + CARD.tops[0] - LIFT + CARD.height / 2,
-  },
-  post: {
-    x: STAGE_W / 2,
-    y: SCREEN.top + POST_BUTTON.top + POST_BUTTON.height / 2,
-  },
-};
-
-const LINK = {
-  left: PAIR.left + HEAD / 2 + 8,
-  width: PAIR.right - PAIR.left - HEAD - 16,
-};
-const SPARK = 22;
-const FINGER = 34;
-const WORDS_TOP = 340;
-const GLOW = 380;
+/** Where each person stands. The plumber walks in from off the right edge. */
+const HERO_AT = { left: 60, top: 278 };
+const PLUMBER_AT = { left: 150, top: 278 };
+/** How far the hero steps left to make room, and where the plumber starts. */
+const HERO_STEP = -60;
+const PLUMBER_FROM = 230;
 
 /**
- * The one colour not taken from the theme: skin, matched to the medium skin
- * tone of the face above, so the hands read as that person's.
+ * The cast's colours — people and things, not interface, so they are the
+ * same in either theme. The hero wears the brand's warm accent; the plumber
+ * is in work blue with a yellow cap.
  */
-const SKIN = '#C98B62';
+type Look = {
+  skin: string;
+  skinShade: string;
+  hair: string;
+  shirt: string;
+  shirtShade: string;
+  sleeve: number;
+  pants: string;
+  shoe: string;
+  sole: string;
+  overall?: string;
+  cap?: string;
+  mustache?: boolean;
+};
+
+const HERO: Look = {
+  skin: '#C98A5E',
+  skinShade: '#AE7049',
+  hair: '#231B17',
+  shirt: '#F0884C',
+  shirtShade: '#D56E35',
+  sleeve: 26,
+  pants: '#2F3552',
+  shoe: '#F4F4F6',
+  sole: '#BFC3CE',
+};
+
+const PLUMBER: Look = {
+  skin: '#9F6A45',
+  skinShade: '#83553A',
+  hair: '#1D1714',
+  shirt: '#D9DCE4',
+  shirtShade: '#BCC1CD',
+  sleeve: UPPER + ARM_W,
+  pants: '#2F6FB5',
+  shoe: '#4A3324',
+  sole: '#2B1D14',
+  overall: '#2F6FB5',
+  cap: '#F2B233',
+  mustache: true,
+};
+
+/** The app icon on the notification: the same on every phone. */
+const ICON = ['#3A34A0', '#6D28D9'] as const;
+const CONFETTI = ['#3A34A0', '#6D28D9', '#136B3A', '#F0884C', '#F2B233'];
+const WATER = '#4AA3E0';
 
 const JOBS = [
-  { icon: '📚', key: 'intro.job.tutor' },
-  { icon: '🎨', key: 'intro.job.designer' },
-  { icon: '🗂️', key: 'intro.job.assistant' },
+  { initials: 'GM', title: 'intro.job1.title', where: 'intro.job1.where', pay: 600 },
+  { initials: 'SP', title: 'intro.job2.title', where: 'intro.job2.where', pay: 700 },
 ] as const;
+
+const CANDIDATES = [
+  { initials: 'KM', name: 'intro.cand1.name', meta: 'intro.cand1.meta', score: 96 },
+  { initials: 'JH', name: 'intro.cand2.name', meta: 'intro.cand2.meta', score: 88 },
+  { initials: 'SR', name: 'intro.cand3.name', meta: 'intro.cand3.meta', score: 79 },
+] as const;
+
+/** The real category a plumber is posted under. */
+const TRADES_EMOJI =
+  JOB_CATEGORIES.find((cat) => cat.key === 'TRADES')?.emoji ?? '🔧';
+
+/** One line above the scene per part of the story. */
+const CAPTIONS: { key: TranslationKey; from: number; until: number }[] = [
+  { key: 'intro.cap.search', from: BEAT.appear + 150, until: BEAT.notify - 50 },
+  { key: 'intro.cap.hired', from: BEAT.notify + 150, until: BEAT.think - 50 },
+  { key: 'intro.cap.needHelp', from: BEAT.think + 100, until: BEAT.post - 50 },
+  { key: 'intro.cap.post', from: BEAT.post + 100, until: BEAT.match - 50 },
+  { key: 'intro.cap.matched', from: BEAT.match + 100, until: BEAT.arrive - 50 },
+  { key: 'intro.cap.arrive', from: BEAT.arrive + 100, until: BEAT.words - 100 },
+];
 
 type Ease = (value: number) => number;
 
@@ -209,7 +275,7 @@ function turn(
   clock: Animated.Value,
   times: readonly number[],
   degrees: readonly number[],
-  ease: Ease = easeOut,
+  ease: Ease = easeInOut,
 ) {
   const { inputRange, outputRange } = keyframes(times, degrees, ease);
   return clock.interpolate({
@@ -219,17 +285,9 @@ function turn(
   });
 }
 
-/** The ring that closes round each face once the two are connected. */
-function connectedRing(clock: Animated.Value) {
-  return {
-    ring: track(clock, [BEAT.link + 500, BEAT.link + 800], [0, 1]),
-    ringScale: track(
-      clock,
-      [BEAT.link + 500, BEAT.link + 800],
-      [0.85, 1],
-      pop,
-    ),
-  };
+/** Fades something in over `[from, from + fade]` and out over `[until - fade, until]`. */
+function shown(clock: Animated.Value, from: number, until: number, fade = 200) {
+  return track(clock, [from, from + fade, until - fade, until], [0, 1, 1, 0]);
 }
 
 type Clocked = { clock: Animated.Value };
@@ -303,7 +361,7 @@ export function TwoRolesIntro({ onEnd }: { onEnd: () => void }) {
   );
 
   return (
-    <View style={[StyleSheet.absoluteFill, { backgroundColor: c.bg }]}>
+    <View style={[StyleSheet.absoluteFill, styles.root, { backgroundColor: c.bg }]}>
       <View style={[styles.bar, { paddingTop: insets.top + 12 }]}>
         <View style={[styles.progressTrack, { backgroundColor: c.border }]}>
           <Animated.View
@@ -341,19 +399,25 @@ export function TwoRolesIntro({ onEnd }: { onEnd: () => void }) {
           style={[styles.stage, { transform: [{ scale }] }]}
         >
           <Backdrop />
-          <Meeting clock={clock} />
-          <Other clock={clock} />
-          <Phone clock={clock} />
-          <Lead clock={clock} />
-          <Closing clock={clock} />
-          <Finger clock={clock} />
+          <Captions clock={clock} />
+          <Floor clock={clock} />
+          <Plumber clock={clock} />
+          <Hero clock={clock} />
+          <Confetti clock={clock} />
+          <Spark clock={clock} />
+          <Badges clock={clock} />
+          <ThoughtBubble clock={clock} />
+          <SearchCard clock={clock} />
+          <NotifyCard clock={clock} />
+          <PostCard clock={clock} />
+          <MatchCard clock={clock} />
         </View>
       </View>
     </View>
   );
 }
 
-/** A soft pool of the brand colour behind the person, so the stage is not flat. */
+/** A soft pool of the brand colour behind the cast, so the stage is not flat. */
 function Backdrop() {
   const { c } = useTheme();
   return (
@@ -374,789 +438,42 @@ function Backdrop() {
   );
 }
 
-function Head({
-  face,
-  fill,
-  border,
-}: {
-  face: string;
-  fill: string;
-  border: string;
-}) {
-  return (
-    <View style={[styles.head, { backgroundColor: fill, borderColor: border }]}>
-      <Text style={styles.face}>{face}</Text>
-    </View>
-  );
-}
-
-function Pill({
-  icon,
-  label,
-  fill,
-  border,
-  color,
-}: {
-  icon: string;
-  label: string;
-  fill: string;
-  border: string;
-  color: string;
-}) {
-  return (
-    <View style={[styles.pill, { backgroundColor: fill, borderColor: border }]}>
-      <Text style={[styles.pillIcon, { color }]}>{icon}</Text>
-      <Text style={[styles.pillText, { color }]} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-/**
- * Nadia, the person the story follows: holds the phone, finds work, then
- * hires. The same face throughout, with only the role under it changing.
- */
-function Lead({ clock }: Clocked) {
+/** The line at the top that says what is happening, then the closing words. */
+function Captions({ clock }: Clocked) {
   const t = useT();
   const { c } = useTheme();
   const m = useMemo(
     () => ({
-      opacity: track(clock, [BEAT.appear, BEAT.appear + 350], [0, 1]),
-      scale: track(clock, [BEAT.appear, BEAT.appear + 600], [0.6, 1], pop),
-      // Crosses to meet the other profile as the phone goes.
-      x: track(
-        clock,
-        [BEAT.meet, BEAT.meet + 700],
-        [0, PAIR.left - HOLD.x],
-        easeInOut,
-      ),
-      y: track(
-        clock,
-        [BEAT.meet, BEAT.meet + 700],
-        [0, PAIR.y - HOLD.y],
-        easeInOut,
-      ),
-      // The role flips over with the screen: same person, other role.
-      seeker: track(
-        clock,
-        [BEAT.appear + 250, BEAT.appear + 550, BEAT.flip + 499, BEAT.flip + 500],
-        [0, 1, 1, 0],
-      ),
-      seekerTurn: turn(clock, [BEAT.flip, BEAT.flip + 500], [0, 90], easeIn),
-      hiring: track(clock, [BEAT.flip + 499, BEAT.flip + 500], [0, 1]),
-      hiringTurn: turn(clock, [BEAT.flip + 500, BEAT.flip + 1000], [-90, 0]),
-      name: track(clock, [BEAT.meet + 500, BEAT.meet + 900], [0, 1]),
-      ...connectedRing(clock),
-    }),
-    [clock],
-  );
-
-  return (
-    <Animated.View
-      style={[
-        styles.person,
-        {
-          left: HOLD.x - PERSON_W / 2,
-          top: HOLD.y - HEAD / 2,
-          opacity: m.opacity,
-          transform: [
-            { translateX: m.x },
-            { translateY: m.y },
-            { scale: m.scale },
-          ],
-        },
-      ]}
-    >
-      <View>
-        <Animated.View
-          style={[
-            styles.ring,
-            {
-              borderColor: c.primary,
-              opacity: m.ring,
-              transform: [{ scale: m.ringScale }],
-            },
-          ]}
-        />
-        <Head face="🧑🏽" fill={c.tints[2]} border={c.tintBorders[2]} />
-      </View>
-      <View style={styles.pillSlot}>
-        <Animated.View
-          style={[
-            styles.pillCentre,
-            {
-              opacity: m.seeker,
-              transform: [{ perspective: 400 }, { rotateX: m.seekerTurn }],
-            },
-          ]}
-        >
-          <Pill
-            icon="🔍"
-            label={t('intro.role.seeker')}
-            fill={c.tints[1]}
-            border={c.tintBorders[1]}
-            color={c.text}
-          />
-        </Animated.View>
-        <Animated.View
-          style={[
-            styles.pillCentre,
-            {
-              opacity: m.hiring,
-              transform: [{ perspective: 400 }, { rotateX: m.hiringTurn }],
-            },
-          ]}
-        >
-          <Pill
-            icon="📢"
-            label={t('intro.role.hiring')}
-            fill={c.tints[0]}
-            border={c.tintBorders[0]}
-            color={c.text}
-          />
-        </Animated.View>
-      </View>
-      <Animated.Text style={[styles.name, { color: c.text, opacity: m.name }]}>
-        {t('intro.name')}
-      </Animated.Text>
-    </Animated.View>
-  );
-}
-
-/** Rahim, who answers the post. */
-function Other({ clock }: Clocked) {
-  const t = useT();
-  const { c } = useTheme();
-  const m = useMemo(
-    () => ({
-      opacity: track(clock, [BEAT.meet + 300, BEAT.meet + 700], [0, 1]),
-      x: track(clock, [BEAT.meet + 300, BEAT.meet + 900], [56, 0]),
-      interested: track(clock, [BEAT.meet + 800, BEAT.meet + 1000], [0, 1]),
-      interestedScale: track(
-        clock,
-        [BEAT.meet + 800, BEAT.meet + 1100],
-        [0.5, 1],
-        pop,
-      ),
-      ...connectedRing(clock),
-    }),
-    [clock],
-  );
-
-  return (
-    <Animated.View
-      style={[
-        styles.person,
-        {
-          left: PAIR.right - PERSON_W / 2,
-          top: PAIR.y - HEAD / 2,
-          opacity: m.opacity,
-          transform: [{ translateX: m.x }],
-        },
-      ]}
-    >
-      <View>
-        <Animated.View
-          style={[
-            styles.ring,
-            {
-              borderColor: c.primary,
-              opacity: m.ring,
-              transform: [{ scale: m.ringScale }],
-            },
-          ]}
-        />
-        <Head face="🧑🏾" fill={c.tints[3]} border={c.tintBorders[3]} />
-      </View>
-      <View style={styles.pillSlot}>
-        <Animated.View
-          style={[
-            styles.pillCentre,
-            {
-              opacity: m.interested,
-              transform: [{ scale: m.interestedScale }],
-            },
-          ]}
-        >
-          <Pill
-            icon="✋"
-            label={t('intro.interested')}
-            fill={c.successSoft}
-            border={c.successSoft}
-            color={c.success}
-          />
-        </Animated.View>
-      </View>
-      <Text style={[styles.name, { color: c.text }]}>
-        {t('intro.otherName')}
-      </Text>
-    </Animated.View>
-  );
-}
-
-/** The phone, and the three screens the story passes through. */
-function Phone({ clock }: Clocked) {
-  const { c } = useTheme();
-  const m = useMemo(
-    () => ({
-      opacity: track(
-        clock,
-        [BEAT.appear + 150, BEAT.appear + 550, BEAT.meet, BEAT.meet + 450],
-        [0, 1, 1, 0],
-      ),
-      y: track(
-        clock,
-        [BEAT.appear + 150, BEAT.appear + 750, BEAT.meet, BEAT.meet + 450],
-        [48, 0, 0, 36],
-      ),
-      scale: track(clock, [BEAT.meet, BEAT.meet + 450], [1, 0.88]),
-    }),
-    [clock],
-  );
-
-  return (
-    <Animated.View
-      style={[
-        styles.phone,
-        {
-          opacity: m.opacity,
-          transform: [{ translateY: m.y }, { scale: m.scale }],
-        },
-      ]}
-    >
-      <View style={[styles.bezel, { backgroundColor: c.text }]} />
-      <View style={[styles.screen, { backgroundColor: c.surface }]}>
-        <HomeScreen clock={clock} />
-        <JobList clock={clock} />
-        <PostJob clock={clock} />
-        <View style={[styles.island, { backgroundColor: c.text }]} />
-      </View>
-      {/* Over the screen's edge, the way fingers wrap round a real one. */}
-      <View style={[styles.hand, styles.handLeft]} />
-      <View style={[styles.hand, styles.handRight]} />
-    </Animated.View>
-  );
-}
-
-function HomeScreen({ clock }: Clocked) {
-  const t = useT();
-  const { c } = useTheme();
-  const m = useMemo(
-    () => ({
-      opacity: track(
-        clock,
-        [BEAT.findJobs + 800, BEAT.findJobs + 1050],
-        [1, 0],
-      ),
-      x: track(
-        clock,
-        [BEAT.findJobs + 800, BEAT.findJobs + 1100],
-        [0, -36],
-        easeIn,
-      ),
-      press: track(clock, pressTimes(PRESS.findJobs), [1, 0.95, 1]),
-    }),
-    [clock],
-  );
-
-  return (
-    <Animated.View
-      style={[
-        styles.page,
-        { opacity: m.opacity, transform: [{ translateX: m.x }] },
-      ]}
-    >
-      <Text style={[styles.hello, { color: c.text }]}>
-        {t('intro.hi', { name: t('intro.name') })}
-      </Text>
-      <Text style={[styles.helloSub, { color: c.textMuted }]}>
-        {t('intro.today')}
-      </Text>
-      <Animated.View
-        style={[
-          styles.bigButton,
-          {
-            top: FIND_BUTTON.top,
-            height: FIND_BUTTON.height,
-            backgroundColor: c.primary,
-            transform: [{ scale: m.press }],
-          },
-        ]}
-      >
-        <Text style={[styles.bigButtonText, { color: c.primaryText }]}>
-          {`🔍  ${t('intro.findJobs')}`}
-        </Text>
-      </Animated.View>
-      <View
-        style={[
-          styles.bigButton,
-          {
-            top: FIND_BUTTON.top + FIND_BUTTON.height + 12,
-            height: FIND_BUTTON.height,
-            backgroundColor: c.primarySoft,
-            borderColor: c.primarySoftBorder,
-            borderWidth: 1,
-          },
-        ]}
-      >
-        <Text style={[styles.bigButtonText, { color: c.primary }]}>
-          {`📢  ${t('intro.postJob')}`}
-        </Text>
-      </View>
-    </Animated.View>
-  );
-}
-
-function JobList({ clock }: Clocked) {
-  const t = useT();
-  const { c } = useTheme();
-  const m = useMemo(
-    () => ({
-      opacity: track(
-        clock,
-        [BEAT.list - 100, BEAT.list + 150, BEAT.flip + 499, BEAT.flip + 500],
-        [0, 1, 1, 0],
-      ),
-      x: track(clock, [BEAT.list - 100, BEAT.list + 200], [36, 0]),
-      // Turns away until it is edge-on; the post screen turns in from there.
-      turn: turn(clock, [BEAT.flip, BEAT.flip + 500], [0, 90], easeIn),
-      title: track(clock, [BEAT.match, BEAT.match + 300], [1, 0]),
-    }),
-    [clock],
-  );
-
-  return (
-    <Animated.View
-      style={[
-        styles.page,
-        {
-          opacity: m.opacity,
-          transform: [
-            { perspective: 900 },
-            { translateX: m.x },
-            { rotateY: m.turn },
-          ],
-        },
-      ]}
-    >
-      <Animated.Text
-        style={[styles.pageTitle, { color: c.text, opacity: m.title }]}
-      >
-        {t('intro.jobsForYou')}
-      </Animated.Text>
-      <JobCard clock={clock} index={1} />
-      <JobCard clock={clock} index={2} />
-      <MatchedCard clock={clock} />
-    </Animated.View>
-  );
-}
-
-function CardContent({
-  icon,
-  title,
-  tint,
-  reserve = false,
-}: {
-  icon: string;
-  title: string;
-  tint: string;
-  /** Leave room on the right for the Apply button. */
-  reserve?: boolean;
-}) {
-  const { c } = useTheme();
-  return (
-    <>
-      <View style={[styles.cardIcon, { backgroundColor: tint }]}>
-        <Text style={styles.cardEmoji}>{icon}</Text>
-      </View>
-      <View style={[styles.cardBody, reserve && styles.cardBodyReserve]}>
-        <Text style={[styles.cardTitle, { color: c.text }]} numberOfLines={2}>
-          {title}
-        </Text>
-        <View style={[styles.skeleton, { backgroundColor: c.surfaceAlt }]} />
-      </View>
-    </>
-  );
-}
-
-/** The two cards that are not the match: they arrive, then step back. */
-function JobCard({ clock, index }: Clocked & { index: 1 | 2 }) {
-  const t = useT();
-  const { c } = useTheme();
-  const job = JOBS[index];
-  const m = useMemo(() => {
-    const from = BEAT.list + 100 + 150 * index;
-    return {
-      opacity: track(
-        clock,
-        [from, from + 300, BEAT.match, BEAT.match + 400],
-        [0, 1, 1, 0.35],
-      ),
-      y: track(clock, [from, from + 350], [18, 0]),
-    };
-  }, [clock, index]);
-
-  return (
-    <Animated.View
-      style={[
-        styles.card,
-        styles.cardFace,
-        {
-          top: CARD.tops[index],
-          backgroundColor: c.surface,
-          borderColor: c.border,
-          opacity: m.opacity,
-          transform: [{ translateY: m.y }],
-        },
-      ]}
-    >
-      <CardContent icon={job.icon} title={t(job.key)} tint={c.tints[index]} />
-    </Animated.View>
-  );
-}
-
-/**
- * The tutor job: rises towards the person, is flagged as the match, and is
- * applied to. Drawn last in the list so it passes over the others.
- */
-function MatchedCard({ clock }: Clocked) {
-  const t = useT();
-  const { c } = useTheme();
-  const job = JOBS[0];
-  const m = useMemo(
-    () => ({
-      opacity: track(clock, [BEAT.list + 100, BEAT.list + 400], [0, 1]),
-      y: track(
-        clock,
-        [BEAT.list + 100, BEAT.list + 450, BEAT.match, BEAT.match + 500],
-        [18, 0, 0, -LIFT],
-      ),
-      scale: track(clock, [BEAT.match, BEAT.match + 500], [1, LIFT_SCALE]),
-      glow: track(clock, [BEAT.match + 100, BEAT.match + 500], [0, 1]),
-      badge: track(clock, [BEAT.match + 300, BEAT.match + 500], [0, 1]),
-      badgeScale: track(
-        clock,
-        [BEAT.match + 300, BEAT.match + 650],
-        [0.6, 1],
-        pop,
-      ),
-      apply: track(
-        clock,
-        [BEAT.match + 400, BEAT.match + 700, PRESS.apply + 100, PRESS.apply + 200],
-        [0, 1, 1, 0],
-      ),
-      applyPress: track(clock, pressTimes(PRESS.apply), [1, 0.9, 1]),
-      check: track(clock, [PRESS.apply + 100, PRESS.apply + 250], [0, 1]),
-      checkScale: track(
-        clock,
-        [PRESS.apply + 100, PRESS.apply + 350],
-        [0.5, 1],
-        pop,
-      ),
-      sent: track(clock, [PRESS.apply + 150, PRESS.apply + 400], [0, 1]),
-      sentY: track(clock, [PRESS.apply + 150, PRESS.apply + 400], [-8, 0]),
-    }),
-    [clock],
-  );
-
-  return (
-    <Animated.View
-      style={[
-        styles.card,
-        {
-          top: CARD.tops[0],
-          opacity: m.opacity,
-          transform: [{ translateY: m.y }, { scale: m.scale }],
-        },
-      ]}
-    >
-      {/* Purple, like every other figure the system worked out. */}
-      <Animated.View
-        style={[
-          styles.matchGlow,
-          {
-            backgroundColor: c.aiSoft,
-            borderColor: c.aiSoftBorder,
-            opacity: m.glow,
-          },
-        ]}
-      />
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          styles.cardFace,
-          { backgroundColor: c.surface, borderColor: c.border },
-        ]}
-      >
-        <CardContent
-          icon={job.icon}
-          title={t(job.key)}
-          tint={c.tints[0]}
-          reserve
-        />
-      </View>
-      <Animated.View
-        style={[
-          styles.apply,
-          {
-            backgroundColor: c.primary,
-            opacity: m.apply,
-            transform: [{ scale: m.applyPress }],
-          },
-        ]}
-      >
-        <Text style={[styles.applyText, { color: c.primaryText }]}>
-          {t('intro.apply')}
-        </Text>
-      </Animated.View>
-      <Animated.View
-        style={[
-          styles.apply,
-          {
-            backgroundColor: c.successSoft,
-            opacity: m.check,
-            transform: [{ scale: m.checkScale }],
-          },
-        ]}
-      >
-        <Text style={[styles.applyText, { color: c.success }]}>✓</Text>
-      </Animated.View>
-      <Animated.View
-        style={[
-          styles.flag,
-          { top: -13, opacity: m.badge, transform: [{ scale: m.badgeScale }] },
-        ]}
-      >
-        <Pill
-          icon="✨"
-          label={t('intro.perfectMatch')}
-          fill={c.aiSoft}
-          border={c.aiSoftBorder}
-          color={c.ai}
-        />
-      </Animated.View>
-      <Animated.View
-        style={[
-          styles.flag,
-          {
-            top: CARD.height - 11,
-            opacity: m.sent,
-            transform: [{ translateY: m.sentY }],
-          },
-        ]}
-      >
-        <Pill
-          icon="✓"
-          label={t('intro.sent')}
-          fill={c.successSoft}
-          border={c.successSoft}
-          color={c.success}
-        />
-      </Animated.View>
-    </Animated.View>
-  );
-}
-
-function PostJob({ clock }: Clocked) {
-  const t = useT();
-  const { c } = useTheme();
-  const m = useMemo(
-    () => ({
-      opacity: track(clock, [BEAT.flip + 499, BEAT.flip + 500], [0, 1]),
-      turn: turn(clock, [BEAT.flip + 500, BEAT.flip + 1000], [-90, 0]),
-      press: track(clock, pressTimes(PRESS.post), [1, 0.95, 1]),
-      posted: track(clock, [PRESS.post + 100, PRESS.post + 200], [0, 1]),
-    }),
-    [clock],
-  );
-
-  return (
-    <Animated.View
-      style={[
-        styles.page,
-        {
-          opacity: m.opacity,
-          transform: [{ perspective: 900 }, { rotateY: m.turn }],
-        },
-      ]}
-    >
-      <Text style={[styles.pageTitle, { color: c.text }]}>
-        {`📢  ${t('intro.postJob')}`}
-      </Text>
-      <Text style={[styles.fieldLabel, { color: c.textMuted }]}>
-        {t('intro.need')}
-      </Text>
-      <View
-        style={[
-          styles.field,
-          { backgroundColor: c.surfaceAlt, borderColor: c.primary },
-        ]}
-      >
-        <TypedLine clock={clock} text={t('intro.jobText')} />
-      </View>
-      <Animated.View
-        style={[
-          styles.bigButton,
-          {
-            top: POST_BUTTON.top,
-            height: POST_BUTTON.height,
-            backgroundColor: c.primary,
-            transform: [{ scale: m.press }],
-          },
-        ]}
-      >
-        <Text style={[styles.bigButtonText, { color: c.primaryText }]}>
-          {t('intro.post')}
-        </Text>
-        <Animated.View
-          style={[
-            styles.posted,
-            { backgroundColor: c.successSoft, opacity: m.posted },
-          ]}
-        >
-          <Text style={[styles.bigButtonText, { color: c.success }]}>
-            {`✓  ${t('intro.posted')}`}
-          </Text>
-        </Animated.View>
-      </Animated.View>
-    </Animated.View>
-  );
-}
-
-/**
- * Types the job out a word at a time.
- *
- * Words rather than letters, because Bangla letters join: stopping part-way
- * through a word can leave a consonant hanging on a hasant — the mark that
- * joins it to the next — which draws as a visibly broken letter. Words that
- * have not arrived are not rendered at all, so the caret always sits right
- * after the last one.
- */
-function TypedLine({ clock, text }: Clocked & { text: string }) {
-  const { c } = useTheme();
-  const words = useMemo(() => text.split(' '), [text]);
-  const [shown, setShown] = useState(0);
-  const caret = useMemo(
-    () =>
-      track(
-        clock,
-        [BEAT.post, BEAT.post + 60, PRESS.post - 50, PRESS.post + 10],
-        [0, 1, 1, 0],
-      ),
-    [clock],
-  );
-
-  useEffect(() => {
-    const step = (TYPE_UNTIL - TYPE_FROM) / words.length;
-    const id = clock.addListener(({ value }) => {
-      const next =
-        value < TYPE_FROM
-          ? 0
-          : Math.min(words.length, Math.floor((value - TYPE_FROM) / step) + 1);
-      setShown((current) => (current === next ? current : next));
-    });
-    return () => clock.removeListener(id);
-  }, [clock, words.length]);
-
-  return (
-    <View style={styles.typed}>
-      {words.slice(0, shown).map((word, i) => (
-        <Text key={i} style={[styles.typedWord, { color: c.text }]}>
-          {word}
-        </Text>
-      ))}
-      <Animated.View
-        style={[styles.caret, { backgroundColor: c.primary, opacity: caret }]}
-      />
-    </View>
-  );
-}
-
-/** What the two meet over — the job — and the line that connects them. */
-function Meeting({ clock }: Clocked) {
-  const t = useT();
-  const { c } = useTheme();
-  const m = useMemo(
-    () => ({
-      chip: track(clock, [BEAT.meet + 450, BEAT.meet + 850], [0, 1]),
-      chipY: track(clock, [BEAT.meet + 450, BEAT.meet + 850], [10, 0]),
-      line: track(clock, [BEAT.link - 1, BEAT.link], [0, 0.7]),
-      draw: track(clock, [BEAT.link, BEAT.link + 550], [0.001, 1], easeInOut),
-      spark: track(
-        clock,
-        [BEAT.link + 250, BEAT.link + 950],
-        [0, LINK.width],
-        easeInOut,
-      ),
-      sparkOpacity: track(
-        clock,
-        [BEAT.link + 249, BEAT.link + 250, BEAT.link + 850, BEAT.link + 950],
-        [0, 1, 1, 0],
-      ),
-    }),
-    [clock],
-  );
-
-  return (
-    <>
-      <Animated.View
-        style={[
-          styles.row,
-          {
-            top: PAIR.y - HEAD / 2 - 54,
-            opacity: m.chip,
-            transform: [{ translateY: m.chipY }],
-          },
-        ]}
-      >
-        <Pill
-          icon="📚"
-          label={t('intro.jobChip')}
-          fill={c.surface}
-          border={c.border}
-          color={c.text}
-        />
-      </Animated.View>
-      <Animated.View
-        style={[
-          styles.link,
-          {
-            backgroundColor: c.primary,
-            opacity: m.line,
-            transform: [{ scaleX: m.draw }],
-          },
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.spark,
-          { opacity: m.sparkOpacity, transform: [{ translateX: m.spark }] },
-        ]}
-      >
-        <View style={[styles.sparkHalo, { backgroundColor: c.primary }]} />
-        <View style={[styles.sparkDot, { backgroundColor: c.primary }]} />
-      </Animated.View>
-    </>
-  );
-}
-
-/** The only sentence in the piece. */
-function Closing({ clock }: Clocked) {
-  const t = useT();
-  const { c } = useTheme();
-  const m = useMemo(
-    () => ({
+      lines: CAPTIONS.map((cap) => ({
+        opacity: shown(clock, cap.from, cap.until, 250),
+        y: track(clock, [cap.from, cap.from + 300], [8, 0]),
+      })),
       first: track(clock, [BEAT.words, BEAT.words + 400], [0, 1]),
-      firstY: track(clock, [BEAT.words, BEAT.words + 400], [14, 0]),
-      second: track(clock, [BEAT.words + 250, BEAT.words + 650], [0, 1]),
-      secondY: track(clock, [BEAT.words + 250, BEAT.words + 650], [14, 0]),
+      firstY: track(clock, [BEAT.words, BEAT.words + 400], [12, 0]),
+      second: track(clock, [BEAT.words + 200, BEAT.words + 600], [0, 1]),
+      secondY: track(clock, [BEAT.words + 200, BEAT.words + 600], [12, 0]),
     }),
     [clock],
   );
 
   return (
     <>
+      {CAPTIONS.map((cap, i) => (
+        <Animated.Text
+          key={cap.key}
+          numberOfLines={2}
+          style={[
+            styles.caption,
+            {
+              color: c.text,
+              opacity: m.lines[i]!.opacity,
+              transform: [{ translateY: m.lines[i]!.y }],
+            },
+          ]}
+        >
+          {t(cap.key)}
+        </Animated.Text>
+      ))}
       <Animated.Text
         style={[
           styles.words,
@@ -1174,7 +491,7 @@ function Closing({ clock }: Clocked) {
         style={[
           styles.words,
           {
-            top: WORDS_TOP + 42,
+            top: WORDS_TOP + WORDS_GAP,
             color: c.primary,
             opacity: m.second,
             transform: [{ translateY: m.secondY }],
@@ -1187,84 +504,1436 @@ function Closing({ clock }: Clocked) {
   );
 }
 
-/** The reader's thumb: where each tap lands, with a ripple as it presses. */
-function Finger({ clock }: Clocked) {
-  const { c } = useTheme();
-  const m = useMemo(() => {
-    const { findJobs: a, apply: b, post: p } = TAPS;
-    const presses = [PRESS.findJobs, PRESS.apply, PRESS.post];
-    // Comes in from below and to the right, as a thumb does, and only jumps
-    // to the next target at the moment it starts to fade back in.
-    const times = [
-      PRESS.findJobs - 450,
-      PRESS.findJobs - 50,
-      PRESS.apply - 451,
-      PRESS.apply - 450,
-      PRESS.apply - 50,
-      PRESS.post - 451,
-      PRESS.post - 450,
-      PRESS.post - 50,
-    ];
-    const xs = [a.x + 22, a.x, a.x, b.x + 22, b.x, b.x, p.x + 22, p.x];
-    const ys = [a.y + 40, a.y, a.y, b.y + 40, b.y, b.y, p.y + 40, p.y];
-    return {
-      x: track(clock, times, xs.map((x) => x - FINGER / 2)),
-      y: track(clock, times, ys.map((y) => y - FINGER / 2)),
-      opacity: track(
+/** Soft shadows on the floor, which follow the two people and shrink as the hero jumps. */
+function Floor({ clock }: Clocked) {
+  const m = useMemo(
+    () => ({
+      heroX: track(
         clock,
-        presses.flatMap((at) => [at - 450, at - 250, at + 250, at + 450]),
-        presses.flatMap(() => [0, 1, 1, 0]),
+        [BEAT.arrive, BEAT.arrive + 600],
+        [0, HERO_STEP],
+        easeInOut,
       ),
-      press: track(
+      heroScale: track(
         clock,
-        presses.flatMap((at) => pressTimes(at)),
-        presses.flatMap(() => [1, 0.78, 1]),
+        [
+          BEAT.cheer,
+          BEAT.cheer + 150,
+          BEAT.cheer + 300,
+          BEAT.cheer + 450,
+          BEAT.cheer + 600,
+        ],
+        [1, 0.75, 1, 0.88, 1],
       ),
-      ripple: track(
-        clock,
-        presses.flatMap((at) => [at, at + 400]),
-        presses.flatMap(() => [0.6, 2.2]),
-      ),
-      rippleOpacity: track(
-        clock,
-        presses.flatMap((at) => [at - 1, at, at + 400]),
-        presses.flatMap(() => [0, 0.5, 0]),
-      ),
-    };
-  }, [clock]);
+      heroOpacity: track(clock, [0, 300], [0, 1]),
+      plumberX: track(clock, [BEAT.arrive, BEAT.arrive + 700], [PLUMBER_FROM, 0]),
+      plumberOpacity: track(clock, [BEAT.arrive, BEAT.arrive + 150], [0, 1]),
+    }),
+    [clock],
+  );
 
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={[
-        styles.finger,
-        {
-          opacity: m.opacity,
-          transform: [{ translateX: m.x }, { translateY: m.y }],
-        },
-      ]}
-    >
+    <>
       <Animated.View
         style={[
-          styles.ripple,
+          styles.shadow,
           {
-            borderColor: c.text,
-            opacity: m.rippleOpacity,
-            transform: [{ scale: m.ripple }],
+            left: HERO_AT.left + 45,
+            opacity: m.heroOpacity,
+            transform: [{ translateX: m.heroX }, { scaleX: m.heroScale }],
           },
         ]}
       />
       <Animated.View
         style={[
-          styles.touch,
-          { backgroundColor: c.text, transform: [{ scale: m.press }] },
+          styles.shadow,
+          {
+            left: PLUMBER_AT.left + 45,
+            opacity: m.plumberOpacity,
+            transform: [{ translateX: m.plumberX }],
+          },
         ]}
       />
+    </>
+  );
+}
+
+/** Eyes close for a moment at each of these times. */
+function blinks(clock: Animated.Value, at: readonly number[]) {
+  return track(
+    clock,
+    at.flatMap((b) => [b - 1, b, b + 80, b + 160]),
+    at.flatMap(() => [1, 1, 0.1, 1]),
+    Easing.linear,
+  );
+}
+
+/** A value that never moves, for a limb that holds one pose throughout. */
+const still = (clock: Animated.Value, deg: number) =>
+  turn(clock, [0, 1], [deg, deg]);
+
+/** One keyframe of a limb: when, and at what angle. */
+type Key = readonly [ms: number, deg: number];
+
+/** A rotation track from `[ms, degrees]` keyframes. */
+function pose(clock: Animated.Value, keys: readonly Key[]) {
+  const times: number[] = [];
+  for (const [at] of keys) {
+    // Two moves can land on the same millisecond — the end of one press and
+    // the start of the next beat. A 1 ms nudge keeps the track in order.
+    const last = times[times.length - 1];
+    times.push(last === undefined ? at : Math.max(at, last + 1));
+  }
+  return turn(
+    clock,
+    times,
+    keys.map((key) => key[1]),
+  );
+}
+
+/** A limb nodding either side of `deg` — a finger typing, a hand shaking. */
+function nods(from: number, until: number, deg: number, amp = 6, step = 100) {
+  const keys: Key[] = [];
+  for (let at = from + step, i = 0; at < until; at += step, i++) {
+    keys.push([at, deg + (i % 2 === 0 ? amp : -amp)]);
+  }
+  return keys;
+}
+
+/** A finger pressing a button on the screen. */
+const push = (at: number, deg: number): Key[] => [
+  [at - 100, deg],
+  [at, deg - 10],
+  [at + 150, deg],
+];
+
+/** The hand holding the phone giving a little under that press. */
+const give = (at: number, deg: number): Key[] => [
+  [at, deg],
+  [at + 70, deg - 6],
+  [at + 200, deg],
+];
+
+/**
+ * The person the story follows: a job seeker at first, then a recruiter.
+ * The right hand holds the phone; the left types on it. Negative angles lift
+ * the right arm outward, positive the left.
+ */
+function Hero({ clock }: Clocked) {
+  const b = BEAT;
+  const m = useMemo(
+    () => ({
+      opacity: track(clock, [0, 300], [0, 1]),
+      // Walks left to make room when the plumber arrives.
+      x: track(clock, [b.arrive, b.arrive + 600], [0, HERO_STEP], easeInOut),
+      // Steps up into view, jumps twice for joy, bobs as it walks.
+      y: track(
+        clock,
+        [
+          0,
+          350,
+          b.cheer,
+          b.cheer + 150,
+          b.cheer + 300,
+          b.cheer + 450,
+          b.cheer + 600,
+          b.arrive,
+          b.arrive + 150,
+          b.arrive + 300,
+          b.arrive + 450,
+          b.arrive + 600,
+        ],
+        [30, 0, 0, -18, 0, -9, 0, 0, -3, 0, -3, 0],
+      ),
+      // Leans towards the phone while using it, and into the scratch.
+      head: pose(clock, [
+        [0, 0],
+        [b.search, -4],
+        [b.cheer - 100, -4],
+        [b.cheer + 100, 4],
+        [b.think - 250, 4],
+        [b.think - 50, -4],
+        [b.think + 200, -8],
+        [b.think + 850, -8],
+        [b.think + 1050, -4],
+        [b.arrive, -4],
+        [b.arrive + 300, 0],
+      ]),
+      // Right arm: holds the phone up, buzzes with the notification, throws
+      // it up in the cheer, gives under each press, then lowers it and
+      // reaches out to shake hands.
+      rightUpper: pose(clock, [
+        [0, POSE.read.u],
+        [b.cheer - 100, POSE.read.u],
+        [b.cheer + 100, POSE.cheerRight.u],
+        [b.think - 250, POSE.cheerRight.u],
+        [b.think - 50, POSE.read.u],
+        [b.arrive, POSE.read.u],
+        [b.arrive + 300, POSE.lowered.u],
+        [b.shake, POSE.shake.u],
+      ]),
+      rightFore: pose(clock, [
+        [0, POSE.read.f],
+        [b.notify, POSE.read.f],
+        ...nods(b.notify, b.cheer - 100, POSE.read.f, 4, 40),
+        [b.cheer - 100, POSE.read.f],
+        [b.cheer + 100, POSE.cheerRight.f],
+        [b.think - 250, POSE.cheerRight.f],
+        [b.think - 50, POSE.read.f],
+        ...give(PRESS.submit, POSE.read.f),
+        ...give(PRESS.hire, POSE.read.f),
+        [b.arrive, POSE.read.f],
+        [b.arrive + 300, POSE.lowered.f],
+        [b.shake, POSE.shake.f],
+        ...nods(b.shake, b.shake + 500, POSE.shake.f, -8),
+        [b.shake + 500, POSE.shake.f],
+      ]),
+      // Left arm: types the search, cheers, scratches their head over the
+      // leak, types the job out and posts it, then presses Hire.
+      leftUpper: pose(clock, [
+        [0, POSE.rest.u],
+        [TYPE.search.from - 80, POSE.rest.u],
+        [TYPE.search.from + 20, POSE.tap.u],
+        [TYPE.search.until + 70, POSE.tap.u],
+        [TYPE.search.until + 270, POSE.rest.u],
+        [b.cheer - 100, POSE.rest.u],
+        [b.cheer + 100, POSE.cheerLeft.u],
+        [b.think - 250, POSE.cheerLeft.u],
+        [b.think - 50, POSE.rest.u],
+        [b.think + 200, POSE.scratch.u],
+        [b.think + 850, POSE.scratch.u],
+        [b.think + 1050, POSE.rest.u],
+        [b.post + 50, POSE.tap.u],
+        [PRESS.submit + 150, POSE.tap.u],
+        [PRESS.submit + 350, POSE.rest.u],
+        [PRESS.hire - 250, POSE.rest.u],
+        [PRESS.hire - 100, POSE.tap.u],
+        [PRESS.hire + 150, POSE.tap.u],
+        [PRESS.hire + 350, POSE.rest.u],
+      ]),
+      leftFore: pose(clock, [
+        [0, POSE.rest.f],
+        [TYPE.search.from - 80, POSE.rest.f],
+        [TYPE.search.from + 20, POSE.tap.f],
+        ...nods(TYPE.search.from + 20, TYPE.search.until, POSE.tap.f),
+        [TYPE.search.until + 70, POSE.tap.f],
+        [TYPE.search.until + 270, POSE.rest.f],
+        [b.cheer - 100, POSE.rest.f],
+        [b.cheer + 100, POSE.cheerLeft.f],
+        [b.think - 250, POSE.cheerLeft.f],
+        [b.think - 50, POSE.rest.f],
+        [b.think + 200, POSE.scratch.f],
+        ...nods(b.think + 200, b.think + 850, POSE.scratch.f, 10),
+        [b.think + 850, POSE.scratch.f],
+        [b.think + 1050, POSE.rest.f],
+        [b.post + 50, POSE.tap.f],
+        ...nods(b.post + 50, PRESS.submit - 100, POSE.tap.f),
+        ...push(PRESS.submit, POSE.tap.f),
+        [PRESS.submit + 350, POSE.rest.f],
+        [PRESS.hire - 250, POSE.rest.f],
+        [PRESS.hire - 100, POSE.tap.f],
+        ...push(PRESS.hire, POSE.tap.f),
+        [PRESS.hire + 350, POSE.rest.f],
+      ]),
+      leftLeg: turn(
+        clock,
+        [b.arrive, b.arrive + 150, b.arrive + 300, b.arrive + 450, b.arrive + 600],
+        [0, 14, -14, 14, 0],
+      ),
+      rightLeg: turn(
+        clock,
+        [b.arrive, b.arrive + 150, b.arrive + 300, b.arrive + 450, b.arrive + 600],
+        [0, -14, 14, -14, 0],
+      ),
+      blink: blinks(clock, [1500, 4250, 6600, 8900]),
+      brow: track(
+        clock,
+        [b.notify, b.notify + 100, b.notify + 1100, b.notify + 1300],
+        [0, -3, -3, 0],
+      ),
+      grin: track(
+        clock,
+        [2150, 2250, 3300, 3450, b.shake, b.shake + 150],
+        [0, 1, 1, 0, 0, 1],
+      ),
+      phone: track(clock, [7400, 7600], [1, 0]),
+    }),
+    [clock, b],
+  );
+  const smile = useMemo(
+    () => Animated.subtract(1, m.grin) as unknown as Animated.AnimatedInterpolation<number>,
+    [m.grin],
+  );
+
+  return (
+    <Figure
+      look={HERO}
+      at={HERO_AT}
+      rig={{ ...m, smile }}
+      rightHand={
+        // Its back is what faces us: the screen faces the person holding it.
+        <Animated.View style={[styles.heldPhone, { opacity: m.phone }]}>
+          <View style={styles.phoneCamera} />
+        </Animated.View>
+      }
+    />
+  );
+}
+
+/** The plumber the CV match found: walks in with his toolbox and shakes hands. */
+function Plumber({ clock }: Clocked) {
+  const b = BEAT;
+  const m = useMemo(() => {
+    const walk = [
+      b.arrive,
+      b.arrive + 175,
+      b.arrive + 350,
+      b.arrive + 525,
+      b.arrive + 700,
+    ];
+    return {
+      opacity: track(clock, [b.arrive, b.arrive + 150], [0, 1]),
+      x: track(clock, [b.arrive, b.arrive + 700], [PLUMBER_FROM, 0]),
+      y: track(clock, walk, [0, -3, 0, -3, 0]),
+      head: turn(clock, [b.shake, b.shake + 150, b.shake + 300], [0, 5, 0]),
+      // Left arm reaches for the hero's hand; the right carries the toolbox.
+      leftUpper: turn(clock, [0, b.shake - 250, b.shake], [6, 6, 15]),
+      leftFore: turn(
+        clock,
+        [
+          0,
+          b.shake - 250,
+          b.shake,
+          b.shake + 100,
+          b.shake + 200,
+          b.shake + 300,
+          b.shake + 400,
+          b.shake + 500,
+        ],
+        [-8, -8, 25, 33, 17, 33, 17, 25],
+      ),
+      rightUpper: still(clock, -4),
+      rightFore: still(clock, 4),
+      leftLeg: turn(clock, walk, [0, 14, -14, 14, 0]),
+      rightLeg: turn(clock, walk, [0, -14, 14, -14, 0]),
+      blink: blinks(clock, [8700]),
+      brow: track(clock, [0, 1], [0, 0]),
+      grin: track(clock, [b.shake, b.shake + 150], [0, 1]),
+    };
+  }, [clock, b]);
+  const smile = useMemo(
+    () => Animated.subtract(1, m.grin) as unknown as Animated.AnimatedInterpolation<number>,
+    [m.grin],
+  );
+
+  return (
+    <Figure
+      look={PLUMBER}
+      at={PLUMBER_AT}
+      rig={{ ...m, smile }}
+      rightHand={
+        <View style={styles.toolbox}>
+          <View style={styles.toolboxHandle} />
+          <View style={styles.toolboxLid} />
+        </View>
+      }
+    />
+  );
+}
+
+type Motion = Animated.AnimatedInterpolation<number>;
+type Angle = Animated.AnimatedInterpolation<string>;
+
+type Rig = {
+  opacity: Motion;
+  x: Motion;
+  y: Motion;
+  head: Angle;
+  leftUpper: Angle;
+  leftFore: Angle;
+  rightUpper: Angle;
+  rightFore: Angle;
+  leftLeg: Angle;
+  rightLeg: Angle;
+  blink: Motion;
+  brow: Motion;
+  grin: Motion;
+  smile: Motion;
+};
+
+/**
+ * A person, from plain shapes. Each limb is its own view hinged at the joint
+ * — the forearm lives inside the upper arm, so it swings with it — which keeps
+ * every movement a rotation the native driver can run.
+ */
+function Figure({
+  look,
+  rig,
+  at,
+  rightHand,
+}: {
+  look: Look;
+  rig: Rig;
+  at: { left: number; top: number };
+  rightHand?: React.ReactNode;
+}) {
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.figure,
+        {
+          left: at.left,
+          top: at.top,
+          opacity: rig.opacity,
+          transform: [{ translateX: rig.x }, { translateY: rig.y }],
+        },
+      ]}
+    >
+      <Animated.View
+        style={[
+          styles.leg,
+          styles.legLeft,
+          { backgroundColor: look.pants, transform: [{ rotate: rig.leftLeg }] },
+        ]}
+      >
+        <View
+          style={[
+            styles.shoe,
+            styles.shoeLeft,
+            { backgroundColor: look.shoe, borderBottomColor: look.sole },
+          ]}
+        />
+      </Animated.View>
+      <Animated.View
+        style={[
+          styles.leg,
+          styles.legRight,
+          { backgroundColor: look.pants, transform: [{ rotate: rig.rightLeg }] },
+        ]}
+      >
+        <View
+          style={[
+            styles.shoe,
+            styles.shoeRight,
+            { backgroundColor: look.shoe, borderBottomColor: look.sole },
+          ]}
+        />
+      </Animated.View>
+      <View style={[styles.hips, { backgroundColor: look.pants }]} />
+
+      <View style={[styles.neck, { backgroundColor: look.skinShade }]} />
+      <View style={[styles.torso, { backgroundColor: look.shirt }]}>
+        <View style={[styles.torsoShade, { backgroundColor: look.shirtShade }]} />
+        {look.overall ? (
+          <>
+            <View style={[styles.bib, { backgroundColor: look.overall }]} />
+            <View
+              style={[styles.strap, styles.strapLeft, { backgroundColor: look.overall }]}
+            />
+            <View
+              style={[styles.strap, styles.strapRight, { backgroundColor: look.overall }]}
+            />
+          </>
+        ) : null}
+        <View style={[styles.neckline, { backgroundColor: look.skinShade }]} />
+      </View>
+
+      <Animated.View style={[styles.head, { transform: [{ rotate: rig.head }] }]}>
+        <View style={[styles.ear, styles.earLeft, { backgroundColor: look.skinShade }]} />
+        <View style={[styles.ear, styles.earRight, { backgroundColor: look.skinShade }]} />
+        <View style={[styles.face, { backgroundColor: look.skin }]} />
+        {look.cap ? (
+          <>
+            <View style={[styles.capCrown, { backgroundColor: look.cap }]} />
+            <View style={[styles.capBrim, { backgroundColor: look.cap }]} />
+          </>
+        ) : (
+          <>
+            <View style={[styles.hair, { backgroundColor: look.hair }]} />
+            <View style={[styles.fringe, { backgroundColor: look.hair }]} />
+          </>
+        )}
+        <Animated.View style={[styles.brows, { transform: [{ translateY: rig.brow }] }]}>
+          <View style={[styles.brow, { backgroundColor: look.hair }]} />
+          <View style={[styles.brow, { backgroundColor: look.hair }]} />
+        </Animated.View>
+        <Animated.View style={[styles.eyes, { transform: [{ scaleY: rig.blink }] }]}>
+          <View style={styles.eye} />
+          <View style={styles.eye} />
+        </Animated.View>
+        <View style={[styles.cheek, styles.cheekLeft]} />
+        <View style={[styles.cheek, styles.cheekRight]} />
+        {look.mustache ? (
+          <View style={[styles.mustache, { backgroundColor: look.hair }]} />
+        ) : null}
+        <Animated.View style={[styles.smile, { opacity: rig.smile }]} />
+        <Animated.View style={[styles.grin, { opacity: rig.grin }]} />
+      </Animated.View>
+
+      <Arm
+        look={look}
+        shoulder={SHOULDER.left}
+        upper={rig.leftUpper}
+        fore={rig.leftFore}
+      />
+      <Arm
+        look={look}
+        shoulder={SHOULDER.right}
+        upper={rig.rightUpper}
+        fore={rig.rightFore}
+      >
+        {rightHand}
+      </Arm>
     </Animated.View>
   );
 }
 
+/**
+ * Upper arm hinged at the shoulder, forearm hinged at the elbow inside it.
+ * What the hand carries is drawn before the hand, so the fingers close over
+ * it rather than disappearing behind it.
+ */
+function Arm({
+  look,
+  shoulder,
+  upper,
+  fore,
+  children,
+}: {
+  look: Look;
+  shoulder: { x: number; y: number };
+  upper: Angle;
+  fore: Angle;
+  children?: React.ReactNode;
+}) {
+  return (
+    <Animated.View
+      style={[
+        styles.upperArm,
+        {
+          left: shoulder.x - ARM_W / 2,
+          top: shoulder.y - ARM_W / 2,
+          backgroundColor: look.skin,
+          transform: [{ rotate: upper }],
+        },
+      ]}
+    >
+      <View
+        style={[styles.sleeve, { height: look.sleeve, backgroundColor: look.shirt }]}
+      />
+      <Animated.View
+        style={[
+          styles.forearm,
+          { backgroundColor: look.skin, transform: [{ rotate: fore }] },
+        ]}
+      >
+        {children}
+        <View style={[styles.hand, { backgroundColor: look.skin }]} />
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+/** A repeatable scatter: the same confetti every time, still looking thrown. */
+const scatter = (i: number, n: number) => {
+  const x = Math.sin((i + 1) * 12.9898 * n) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+const CONFETTI_PIECES = Array.from({ length: 16 }, (_, i) => ({
+  color: CONFETTI[i % CONFETTI.length]!,
+  dx: (scatter(i, 1) - 0.5) * 240,
+  peak: -70 - scatter(i, 2) * 80,
+  fall: 60 + scatter(i, 3) * 90,
+  spin: (scatter(i, 4) - 0.5) * 720,
+  width: 6 + Math.round(scatter(i, 5) * 4),
+  height: 9 + Math.round(scatter(i, 6) * 5),
+  delay: Math.round(scatter(i, 7) * 120),
+}));
+
+/** Thrown up over the hero's head when the job comes through. */
+function Confetti({ clock }: Clocked) {
+  const pieces = useMemo(
+    () =>
+      CONFETTI_PIECES.map((p) => {
+        const from = BEAT.cheer + p.delay;
+        return {
+          ...p,
+          x: track(clock, [from, from + 1100], [0, p.dx]),
+          y: track(clock, [from, from + 380, from + 1100], [0, p.peak, p.fall]),
+          spin: turn(clock, [from, from + 1100], [0, p.spin], Easing.linear),
+          opacity: track(
+            clock,
+            [from - 1, from, from + 900, from + 1100],
+            [0, 1, 1, 0],
+          ),
+        };
+      }),
+    [clock],
+  );
+
+  return (
+    <>
+      {pieces.map((p, i) => (
+        <Animated.View
+          key={i}
+          pointerEvents="none"
+          style={[
+            styles.confetti,
+            {
+              width: p.width,
+              height: p.height,
+              backgroundColor: p.color,
+              opacity: p.opacity,
+              transform: [
+                { translateX: p.x },
+                { translateY: p.y },
+                { rotate: p.spin },
+              ],
+            },
+          ]}
+        />
+      ))}
+    </>
+  );
+}
+
+/** Where the two hands meet, in stage coordinates. */
+const HANDSHAKE = { x: 175, y: HERO_AT.top + 180 };
+
+/** A small burst where the two hands meet. */
+function Spark({ clock }: Clocked) {
+  const { c } = useTheme();
+  const m = useMemo(() => {
+    const from = BEAT.shake + 150;
+    return {
+      out: track(clock, [from, from + 450], [-8, -22]),
+      opacity: track(clock, [from - 1, from, from + 350, from + 550], [0, 1, 1, 0]),
+    };
+  }, [clock]);
+
+  return (
+    <>
+      {[0, 60, 120, 180, 240, 300].map((deg) => (
+        <Animated.View
+          key={deg}
+          pointerEvents="none"
+          style={[
+            styles.ray,
+            {
+              backgroundColor: c.warning,
+              opacity: m.opacity,
+              transform: [{ rotate: `${deg}deg` }, { translateY: m.out }],
+            },
+          ]}
+        />
+      ))}
+    </>
+  );
+}
+
+/**
+ * The badge over the hero's head: job seeker, then — flipping over like the
+ * account switching roles — recruiter. At the end the job seeker badge comes
+ * back above it: the same person is both.
+ */
+function Badges({ clock }: Clocked) {
+  const flip = BEAT.think + 150;
+  const m = useMemo(
+    () => ({
+      x: track(clock, [BEAT.arrive, BEAT.arrive + 600], [0, HERO_STEP], easeInOut),
+      // Rides the hero's two jumps, so their hair never pokes through it.
+      y: track(
+        clock,
+        [
+          BEAT.cheer,
+          BEAT.cheer + 150,
+          BEAT.cheer + 300,
+          BEAT.cheer + 450,
+          BEAT.cheer + 600,
+        ],
+        [0, -18, 0, -9, 0],
+      ),
+      seeker: track(clock, [250, 450, flip, flip + 1], [0, 1, 1, 0]),
+      seekerTurn: turn(clock, [flip - 250, flip], [0, 90], easeIn),
+      recruiter: track(clock, [flip, flip + 1], [0, 1]),
+      recruiterTurn: turn(clock, [flip, flip + 250], [-90, 0], easeOut),
+      both: track(clock, [BEAT.words, BEAT.words + 250], [0, 1]),
+      bothScale: track(clock, [BEAT.words, BEAT.words + 350], [0.6, 1], pop),
+    }),
+    [clock, flip],
+  );
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.badges,
+        { transform: [{ translateX: m.x }, { translateY: m.y }] },
+      ]}
+    >
+      <Animated.View
+        style={[
+          styles.badgeSlot,
+          {
+            opacity: m.seeker,
+            transform: [{ perspective: 400 }, { rotateX: m.seekerTurn }],
+          },
+        ]}
+      >
+        <RolePill role="seeker" />
+      </Animated.View>
+      <Animated.View
+        style={[
+          styles.badgeSlot,
+          {
+            opacity: m.recruiter,
+            transform: [{ perspective: 400 }, { rotateX: m.recruiterTurn }],
+          },
+        ]}
+      >
+        <RolePill role="recruiter" />
+      </Animated.View>
+      <Animated.View
+        style={[
+          styles.badgeSlot,
+          styles.badgeAbove,
+          { opacity: m.both, transform: [{ scale: m.bothScale }] },
+        ]}
+      >
+        <RolePill role="seeker" />
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+/** One role, in the tint the landing page gives it. */
+function RolePill({ role }: { role: 'seeker' | 'recruiter' }) {
+  const t = useT();
+  const { c } = useTheme();
+  const tint = role === 'seeker' ? 1 : 0;
+  return (
+    <View
+      style={[
+        styles.role,
+        { backgroundColor: c.tints[tint], borderColor: c.tintBorders[tint] },
+      ]}
+    >
+      <Text style={[styles.roleText, { color: c.text }]}>
+        {role === 'seeker'
+          ? `🔍  ${t('intro.role.seeker')}`
+          : `📢  ${t('intro.role.recruiter')}`}
+      </Text>
+    </View>
+  );
+}
+
+/** Drops falling from the tap, one every `period` ms, offset by `offset`. */
+function drip(
+  clock: Animated.Value,
+  from: number,
+  until: number,
+  offset: number,
+  period = 600,
+) {
+  const times: number[] = [];
+  const ys: number[] = [];
+  const fades: number[] = [];
+  for (let s = from + offset; s + period <= until; s += period) {
+    times.push(s, s + period * 0.8, s + period * 0.8 + 1);
+    ys.push(0, 24, 0);
+    fades.push(1, 0, 0);
+  }
+  return {
+    y: track(clock, times, ys, easeIn),
+    opacity: track(clock, times, fades, Easing.linear),
+  };
+}
+
+/** The hero wondering about the leaking tap at home. */
+function ThoughtBubble({ clock }: Clocked) {
+  const { c } = useTheme();
+  const m = useMemo(
+    () => ({
+      opacity: shown(clock, BEAT.think, BEAT.post),
+      scale: track(clock, [BEAT.think, BEAT.think + 350], [0.6, 1], pop),
+      drops: [0, 200, 400].map((offset) =>
+        drip(clock, BEAT.think + 200, BEAT.post, offset),
+      ),
+    }),
+    [clock],
+  );
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        StyleSheet.absoluteFill,
+        { opacity: m.opacity },
+      ]}
+    >
+      <View
+        style={[
+          styles.trailDot,
+          styles.trailSmall,
+          { backgroundColor: c.surface, borderColor: c.border },
+        ]}
+      />
+      <View
+        style={[
+          styles.trailDot,
+          styles.trailLarge,
+          { backgroundColor: c.surface, borderColor: c.border },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.bubble,
+          {
+            backgroundColor: c.surface,
+            borderColor: c.border,
+            transform: [{ scale: m.scale }],
+          },
+        ]}
+      >
+        <View style={styles.basin} />
+        <View style={styles.pipe} />
+        <View style={styles.spout} />
+        <View style={styles.valveStem} />
+        <View style={styles.valve} />
+        {m.drops.map((drop, i) => (
+          <Animated.View
+            key={i}
+            style={[
+              styles.drop,
+              { opacity: drop.opacity, transform: [{ translateY: drop.y }] },
+            ]}
+          />
+        ))}
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+/** The job search on the hero's phone, popped up above them. */
+function SearchCard({ clock }: Clocked) {
+  const t = useT();
+  const { c } = useTheme();
+  const m = useMemo(
+    () => ({
+      opacity: shown(clock, BEAT.search, BEAT.notify + 50),
+      scale: track(clock, [BEAT.search, BEAT.search + 300], [0.85, 1], pop),
+      placeholder: track(
+        clock,
+        [TYPE.search.from - 40, TYPE.search.from],
+        [1, 0],
+      ),
+      rows: JOBS.map((_, i) => {
+        const from = BEAT.results + 120 * i;
+        return {
+          opacity: track(clock, [from, from + 220], [0, 1]),
+          y: track(clock, [from, from + 260], [10, 0]),
+          // Grey placeholder rows while the search runs, as the jobs list shows.
+          loading: track(clock, [from - 100, from + 100], [1, 0]),
+        };
+      }),
+    }),
+    [clock],
+  );
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.card,
+        {
+          backgroundColor: c.surface,
+          borderColor: c.border,
+          opacity: m.opacity,
+          transform: [{ scale: m.scale }],
+        },
+      ]}
+    >
+      <View style={[styles.search, { backgroundColor: c.bg, borderColor: c.border }]}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <View style={styles.searchField}>
+          <Animated.Text
+            numberOfLines={1}
+            style={[
+              styles.placeholder,
+              { color: c.textMuted, opacity: m.placeholder },
+            ]}
+          >
+            {t('jobs.searchHint')}
+          </Animated.Text>
+          <TypedText
+            clock={clock}
+            text={t('intro.search')}
+            from={TYPE.search.from}
+            until={TYPE.search.until}
+            caretFrom={BEAT.search + 40}
+            caretUntil={BEAT.results}
+            style={[styles.typedSearch, { color: c.text }]}
+          />
+        </View>
+      </View>
+
+      {JOBS.map((job, i) => (
+        <View key={job.initials} style={[styles.jobRow, { borderColor: c.border }]}>
+          <Animated.View
+            style={[styles.skeleton, { opacity: m.rows[i]!.loading }]}
+          >
+            <View style={[styles.skeletonLogo, { backgroundColor: c.surfaceAlt }]} />
+            <View style={styles.skeletonLines}>
+              <View
+                style={[styles.skeletonLine, { width: 110, backgroundColor: c.surfaceAlt }]}
+              />
+              <View
+                style={[styles.skeletonLine, { width: 70, backgroundColor: c.surfaceAlt }]}
+              />
+            </View>
+          </Animated.View>
+          <Animated.View
+            style={[
+              styles.jobContent,
+              {
+                opacity: m.rows[i]!.opacity,
+                transform: [{ translateY: m.rows[i]!.y }],
+              },
+            ]}
+          >
+            <View
+              style={[styles.logo, { backgroundColor: c.surface, borderColor: c.border }]}
+            >
+              <Text style={[styles.logoText, { color: c.text }]}>{job.initials}</Text>
+            </View>
+            <View style={styles.rowBody}>
+              <Text style={[styles.rowTitle, { color: c.text }]} numberOfLines={1}>
+                {t(job.title)}
+              </Text>
+              <Text style={[styles.rowMeta, { color: c.textMuted }]} numberOfLines={1}>
+                {t(job.where)}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.pill,
+                { backgroundColor: c.successSoft, borderColor: c.success },
+              ]}
+            >
+              <Text style={[styles.pillText, { color: c.success }]}>
+                {`৳${job.pay}`}
+              </Text>
+            </View>
+          </Animated.View>
+        </View>
+      ))}
+    </Animated.View>
+  );
+}
+
+/** The push notification: WorkFlex BD, you're hired. */
+function NotifyCard({ clock }: Clocked) {
+  const t = useT();
+  const { c } = useTheme();
+  const m = useMemo(
+    () => ({
+      opacity: shown(clock, BEAT.notify, BEAT.think - 50),
+      y: track(clock, [BEAT.notify, BEAT.notify + 380], [-40, 0], pop),
+    }),
+    [clock],
+  );
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.card,
+        styles.notify,
+        {
+          backgroundColor: c.surface,
+          borderColor: c.border,
+          opacity: m.opacity,
+          transform: [{ translateY: m.y }],
+        },
+      ]}
+    >
+      <AppIcon size={34} />
+      <View style={styles.notifyBody}>
+        <View style={styles.notifyTop}>
+          <Text style={[styles.notifyApp, { color: c.textMuted }]}>WORKFLEX BD</Text>
+          <Text style={[styles.notifyWhen, { color: c.textMuted }]}>
+            {t('intro.notif.now')}
+          </Text>
+        </View>
+        <Text style={[styles.notifyTitle, { color: c.text }]} numberOfLines={2}>
+          {t('intro.notif.title')}
+        </Text>
+        <Text style={[styles.notifyText, { color: c.text }]} numberOfLines={2}>
+          {t('intro.notif.body')}
+        </Text>
+      </View>
+    </Animated.View>
+  );
+}
+
+/** Posting the plumber job, in the posting form's own fields. */
+function PostCard({ clock }: Clocked) {
+  const t = useT();
+  const { c } = useTheme();
+  const [locale] = useLocale();
+  const m = useMemo(
+    () => ({
+      opacity: shown(clock, BEAT.post, BEAT.match + 50),
+      scale: track(clock, [BEAT.post, BEAT.post + 300], [0.85, 1], pop),
+      chip: track(clock, [CHIP_AT, CHIP_AT + 120], [0, 1]),
+      budget: track(clock, [BUDGET_AT, BUDGET_AT + 150], [0, 1]),
+      press: track(clock, pressTimes(PRESS.submit), [1, 0.95, 1]),
+      posted: track(clock, [PRESS.submit + 70, PRESS.submit + 170], [0, 1]),
+    }),
+    [clock],
+  );
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.card,
+        {
+          backgroundColor: c.surface,
+          borderColor: c.border,
+          opacity: m.opacity,
+          transform: [{ scale: m.scale }],
+        },
+      ]}
+    >
+      <Text style={[styles.cardTitle, { color: c.text }]}>
+        {`📢  ${t('post.title')}`}
+      </Text>
+      <Text style={[styles.label, { color: c.textMuted }]}>{t('post.jobTitle')}</Text>
+      <View
+        style={[styles.input, { backgroundColor: c.surfaceAlt, borderColor: c.primary }]}
+      >
+        <TypedText
+          clock={clock}
+          text={t('intro.plumberJob')}
+          from={TYPE.title.from}
+          until={TYPE.title.until}
+          caretFrom={BEAT.post + 100}
+          caretUntil={CHIP_AT}
+          style={[styles.inputText, { color: c.text }]}
+        />
+      </View>
+      <View style={styles.formRow}>
+        <View
+          style={[styles.chip, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+        >
+          {/* Selected the way the form marks it: tinted, outlined, ticked. */}
+          <Animated.View
+            style={[
+              styles.chipOn,
+              {
+                backgroundColor: c.primarySoft,
+                borderColor: c.primary,
+                opacity: m.chip,
+              },
+            ]}
+          />
+          <Animated.Text
+            style={[styles.chipText, { color: c.text, opacity: m.chip }]}
+          >
+            {'✓ '}
+          </Animated.Text>
+          <Text style={[styles.chipText, { color: c.text }]} numberOfLines={1}>
+            {`${TRADES_EMOJI} ${jobCategoryName('TRADES', locale)}`}
+          </Text>
+        </View>
+        <View
+          style={[styles.money, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+        >
+          <Text style={[styles.moneySign, { color: c.textMuted }]}>৳</Text>
+          <Animated.Text
+            style={[styles.moneyText, { color: c.text, opacity: m.budget }]}
+          >
+            1,500
+          </Animated.Text>
+        </View>
+      </View>
+      <Animated.View
+        style={[
+          styles.button,
+          { backgroundColor: c.primary, transform: [{ scale: m.press }] },
+        ]}
+      >
+        <Text style={[styles.buttonText, { color: c.primaryText }]}>
+          {t('post.submit')}
+        </Text>
+        <Animated.View
+          style={[
+            styles.buttonDone,
+            {
+              backgroundColor: c.successSoft,
+              borderColor: c.success,
+              opacity: m.posted,
+            },
+          ]}
+        >
+          <Text style={[styles.buttonText, { color: c.success }]}>
+            {`✓  ${t('intro.posted')}`}
+          </Text>
+        </Animated.View>
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+/** When the CV comparison settles on its best match. */
+const BEST_AT = BEAT.match + 750;
+
+/** Applicants' CVs compared with the job; the best is flagged, then hired. */
+function MatchCard({ clock }: Clocked) {
+  const t = useT();
+  const { c } = useTheme();
+  const m = useMemo(
+    () => ({
+      // Stays up while the plumber walks in, so "Hired" can be read.
+      opacity: shown(clock, BEAT.match, BEAT.arrive + 400),
+      scale: track(clock, [BEAT.match, BEAT.match + 300], [0.85, 1], pop),
+      // A sweep of AI purple down the list and back: the CVs being read.
+      sweep: track(
+        clock,
+        [BEAT.match + 150, BEAT.match + 500, BEST_AT - 50],
+        [0, 2 * ROW_STEP, 0],
+        easeInOut,
+      ),
+      sweepOpacity: track(
+        clock,
+        [BEAT.match + 150, BEAT.match + 250, BEST_AT - 150, BEST_AT - 50],
+        [0, 0.7, 0.7, 0],
+      ),
+      // The footer turns from "comparing CVs" to naming the best match.
+      comparing: track(clock, [BEST_AT - 100, BEST_AT + 50], [1, 0]),
+      found: track(clock, [BEST_AT, BEST_AT + 200], [0, 1]),
+    }),
+    [clock],
+  );
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.card,
+        {
+          backgroundColor: c.surface,
+          borderColor: c.border,
+          opacity: m.opacity,
+          transform: [{ scale: m.scale }],
+        },
+      ]}
+    >
+      <Text style={[styles.cardTitle, { color: c.text }]} numberOfLines={1}>
+        {`✨  ${t('intro.matching.title')}`}
+      </Text>
+      <View style={styles.rows}>
+        <Animated.View
+          style={[
+            styles.sweep,
+            {
+              backgroundColor: c.aiSoft,
+              opacity: m.sweepOpacity,
+              transform: [{ translateY: m.sweep }],
+            },
+          ]}
+        />
+        <MatchRow clock={clock} index={0} />
+        <MatchRow clock={clock} index={1} />
+        <MatchRow clock={clock} index={2} />
+      </View>
+      <View style={styles.foot}>
+        <Animated.Text
+          numberOfLines={1}
+          style={[styles.cardFoot, { color: c.textMuted, opacity: m.comparing }]}
+        >
+          {t('intro.matching.sub')}
+        </Animated.Text>
+        <Animated.Text
+          numberOfLines={1}
+          style={[
+            styles.cardFoot,
+            styles.footFound,
+            { color: c.ai, opacity: m.found },
+          ]}
+        >
+          {`✨ ${t('intro.best')} · ${t(CANDIDATES[0].name)} · ${CANDIDATES[0].score}%`}
+        </Animated.Text>
+      </View>
+    </Animated.View>
+  );
+}
+
+/** Height of a row in the match list, gap included. */
+const ROW_STEP = 40;
+
+/**
+ * One applicant: their CV score counts up as it is read. The best is ringed,
+ * its score gives way to a Hire button, and the button is pressed.
+ */
+function MatchRow({ clock, index }: Clocked & { index: 0 | 1 | 2 }) {
+  const t = useT();
+  const { c } = useTheme();
+  const cand = CANDIDATES[index];
+  const best = index === 0;
+  const from = BEAT.match + 100 + 80 * index;
+  const m = useMemo(
+    () => ({
+      opacity: track(
+        clock,
+        [from, from + 220, BEST_AT, BEST_AT + 250],
+        [0, 1, 1, best ? 1 : 0.45],
+      ),
+      y: track(clock, [from, from + 260], [10, 0]),
+      ring: track(clock, [BEST_AT, BEST_AT + 200], [0, 1]),
+      hire: track(clock, [BEST_AT + 100, BEST_AT + 200], [0, 1]),
+      press: track(clock, pressTimes(PRESS.hire), [1, 0.9, 1]),
+      hired: track(clock, [PRESS.hire + 70, PRESS.hire + 170], [0, 1]),
+    }),
+    [clock, from, best],
+  );
+
+  return (
+    <Animated.View
+      style={[
+        styles.matchRow,
+        {
+          // No fill of its own, so the scanning sweep shows through it.
+          top: ROW_STEP * index,
+          borderColor: c.border,
+          opacity: m.opacity,
+          transform: [{ translateY: m.y }],
+        },
+      ]}
+    >
+      {best ? (
+        <Animated.View
+          style={[styles.bestRing, { borderColor: c.success, opacity: m.ring }]}
+        />
+      ) : null}
+      <View style={[styles.avatar, { backgroundColor: c.tints[index] }]}>
+        <Text style={[styles.avatarText, { color: c.text }]}>{cand.initials}</Text>
+      </View>
+      <View style={styles.rowBody}>
+        <Text style={[styles.rowTitle, { color: c.text }]} numberOfLines={1}>
+          {t(cand.name)}
+        </Text>
+        <Text style={[styles.rowMeta, { color: c.textMuted }]} numberOfLines={1}>
+          {t(cand.meta)}
+        </Text>
+      </View>
+      {/* A fixed slot, so the wider Hire and Hired pills never squeeze the name. */}
+      <Animated.View
+        style={[styles.slot, best && { transform: [{ scale: m.press }] }]}
+      >
+        <View
+          style={[
+            styles.pill,
+            { backgroundColor: c.aiSoft, borderColor: c.aiSoftBorder },
+          ]}
+        >
+          <Counter
+            clock={clock}
+            from={from + 100}
+            until={from + 500}
+            to={cand.score}
+            style={[styles.pillText, { color: c.ai }]}
+          />
+        </View>
+        {best ? (
+          <>
+            <Animated.View
+              style={[
+                styles.pill,
+                styles.pillOver,
+                {
+                  backgroundColor: c.primary,
+                  borderColor: c.primary,
+                  opacity: m.hire,
+                },
+              ]}
+            >
+              <Text
+                numberOfLines={1}
+                style={[styles.pillText, { color: c.primaryText }]}
+              >
+                {t('intro.hire')}
+              </Text>
+            </Animated.View>
+            <Animated.View
+              style={[
+                styles.pill,
+                styles.pillOver,
+                {
+                  backgroundColor: c.successSoft,
+                  borderColor: c.success,
+                  opacity: m.hired,
+                },
+              ]}
+            >
+              <Text numberOfLines={1} style={[styles.pillText, { color: c.success }]}>
+                {`✓ ${t('intro.hired.status')}`}
+              </Text>
+            </Animated.View>
+          </>
+        ) : null}
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+/**
+ * Types a line out a word at a time.
+ *
+ * Words rather than letters, because Bangla letters join: stopping part-way
+ * through a word can leave a consonant hanging on a hasant — the mark that
+ * joins it to the next — which draws as a visibly broken letter. Words that
+ * have not arrived are not rendered at all, so the caret always sits right
+ * after the last one.
+ */
+function TypedText({
+  clock,
+  text,
+  from,
+  until,
+  caretFrom,
+  caretUntil,
+  style,
+}: Clocked & {
+  text: string;
+  from: number;
+  until: number;
+  caretFrom: number;
+  caretUntil: number;
+  style: StyleProp<TextStyle>;
+}) {
+  const { c } = useTheme();
+  const words = useMemo(() => text.split(' '), [text]);
+  const [count, setCount] = useState(0);
+  const caret = useMemo(
+    () =>
+      track(
+        clock,
+        [caretFrom, caretFrom + 60, caretUntil - 60, caretUntil],
+        [0, 1, 1, 0],
+      ),
+    [clock, caretFrom, caretUntil],
+  );
+
+  useEffect(() => {
+    const step = (until - from) / words.length;
+    const id = clock.addListener(({ value }) => {
+      const next =
+        value < from
+          ? 0
+          : Math.min(words.length, Math.floor((value - from) / step) + 1);
+      setCount((current) => (current === next ? current : next));
+    });
+    return () => clock.removeListener(id);
+  }, [clock, words.length, from, until]);
+
+  return (
+    <View style={styles.typed}>
+      {words.slice(0, count).map((word, i) => (
+        <Text key={i} style={style}>
+          {word}
+        </Text>
+      ))}
+      <Animated.View
+        style={[styles.caret, { backgroundColor: c.primary, opacity: caret }]}
+      />
+    </View>
+  );
+}
+
+/** A percentage that counts up as the CV is read. */
+function Counter({
+  clock,
+  from,
+  until,
+  to,
+  style,
+}: Clocked & {
+  from: number;
+  until: number;
+  to: number;
+  style: StyleProp<TextStyle>;
+}) {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    const id = clock.addListener(({ value: now }) => {
+      const p = Math.min(1, Math.max(0, (now - from) / (until - from)));
+      const next = Math.round(to * easeOut(p));
+      setValue((current) => (current === next ? current : next));
+    });
+    return () => clock.removeListener(id);
+  }, [clock, from, until, to]);
+  return <Text style={style}>{`${value}%`}</Text>;
+}
+
+/** WorkFlex BD's icon as it sits on a home screen: the locator with a bolt. */
+function AppIcon({ size }: { size: number }) {
+  return (
+    <LinearGradient
+      colors={ICON}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[
+        styles.appIcon,
+        { width: size, height: size, borderRadius: size * 0.26 },
+      ]}
+    >
+      <Svg width={size * 0.64} height={size * 0.64} viewBox="0 0 24 24">
+        <Path
+          d="M12 2.5c-4 0-7 3.1-7 7 0 5.2 7 12 7 12s7-6.8 7-12c0-3.9-3-7-7-7z"
+          stroke="#FFFFFF"
+          strokeWidth={2}
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <Path d="M12.8 6.2 9.8 11h2.4l-1 4.2 3.4-5.2h-2.5z" fill="#FFFFFF" />
+      </Svg>
+    </LinearGradient>
+  );
+}
+
+/** A soft drop shadow: elevation on Android, a shadow everywhere else. */
+const lift = (depth: number) =>
+  Platform.select({
+    android: { elevation: depth },
+    default: {
+      shadowColor: '#000',
+      shadowOpacity: 0.12,
+      shadowRadius: depth * 2,
+      shadowOffset: { width: 0, height: depth / 2 },
+    },
+  });
+
+/** Fixed colours for the drawn things — a face, a tap — the same in either theme. */
+const INK = {
+  eye: '#1F1A17',
+  mouth: '#5B2A20',
+  blush: '#F08A72',
+  phone: '#2B2862',
+  camera: '#57539A',
+  box: '#C8412F',
+  boxDark: '#8E2D21',
+  metal: '#9AA3B2',
+  metalDark: '#7D8696',
+  handle: '#D05A4E',
+  basin: '#C9D3E0',
+};
+
 const styles = StyleSheet.create({
+  root: { overflow: 'hidden' },
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1288,254 +1957,605 @@ const styles = StyleSheet.create({
   backdrop: {
     position: 'absolute',
     left: (STAGE_W - GLOW) / 2,
-    top: 290 - GLOW / 2,
+    top: HERO_AT.top + 150 - GLOW / 2,
   },
 
-  person: { position: 'absolute', width: PERSON_W, alignItems: 'center' },
-  head: {
-    width: HEAD,
-    height: HEAD,
-    borderRadius: HEAD / 2,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  face: { fontSize: 42 },
-  ring: {
+  caption: {
     position: 'absolute',
-    top: -7,
-    left: -7,
-    width: HEAD + 14,
-    height: HEAD + 14,
-    borderRadius: (HEAD + 14) / 2,
-    borderWidth: 2,
-  },
-  pillSlot: { alignSelf: 'stretch', height: 24, marginTop: -12 },
-  pillCentre: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  name: { marginTop: 6, fontSize: 13, fontWeight: '800' },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    height: 24,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  pillIcon: { fontSize: 11, fontWeight: '800' },
-  pillText: { fontSize: 11.5, fontWeight: '800' },
-
-  phone: {
-    position: 'absolute',
-    left: PHONE.left,
-    top: PHONE.top,
-    width: PHONE.width,
-    height: PHONE.height,
-  },
-  bezel: { ...StyleSheet.absoluteFill, borderRadius: 32 },
-  screen: {
-    position: 'absolute',
-    left: PHONE.bezel,
-    top: PHONE.bezel,
-    width: SCREEN.width,
-    height: SCREEN.height,
-    borderRadius: 25,
-    overflow: 'hidden',
-  },
-  island: {
-    position: 'absolute',
-    top: 8,
-    left: (SCREEN.width - 52) / 2,
-    width: 52,
-    height: 15,
-    borderRadius: 8,
-  },
-  hand: {
-    position: 'absolute',
-    top: 196,
-    width: 18,
-    height: 58,
-    borderRadius: 9,
-    backgroundColor: SKIN,
-  },
-  handLeft: { left: -10 },
-  handRight: { right: -10 },
-
-  page: { ...StyleSheet.absoluteFill },
-  hello: {
-    position: 'absolute',
-    top: 40,
-    left: 16,
-    right: 16,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  helloSub: {
-    position: 'absolute',
-    top: 64,
-    left: 16,
-    right: 16,
-    fontSize: 11.5,
-    fontWeight: '600',
-  },
-  pageTitle: {
-    position: 'absolute',
-    top: 38,
-    left: 14,
-    right: 14,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  bigButton: {
-    position: 'absolute',
-    left: 14,
-    right: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bigButtonText: { fontSize: 14, fontWeight: '800' },
-  posted: {
-    ...StyleSheet.absoluteFill,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  card: {
-    position: 'absolute',
-    left: CARD.left,
-    width: CARD.width,
-    height: CARD.height,
-  },
-  cardFace: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  cardIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardEmoji: { fontSize: 18 },
-  cardBody: { flex: 1, gap: 7 },
-  cardBodyReserve: { marginRight: APPLY.width },
-  // Two lines rather than an ellipsis: "Part-time Assistant" does not fit one
-  // line of a card this size, and a cut-off job title reads as a bug.
-  cardTitle: { fontSize: 12.5, lineHeight: 16, fontWeight: '800' },
-  skeleton: { width: 64, height: 7, borderRadius: 4 },
-  matchGlow: {
-    position: 'absolute',
-    top: -5,
-    left: -5,
-    right: -5,
-    bottom: -5,
-    borderRadius: 19,
-    borderWidth: 1,
-  },
-  apply: {
-    position: 'absolute',
-    right: APPLY.right,
-    top: (CARD.height - APPLY.height) / 2,
-    width: APPLY.width,
-    height: APPLY.height,
-    borderRadius: APPLY.height / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  applyText: { fontSize: 11.5, fontWeight: '800' },
-  flag: { position: 'absolute', left: -30, right: -30, alignItems: 'center' },
-
-  fieldLabel: {
-    position: 'absolute',
-    top: 72,
-    left: 14,
-    fontSize: 11.5,
-    fontWeight: '600',
-  },
-  field: {
-    position: 'absolute',
-    top: 92,
+    top: CAPTION_TOP,
     left: 12,
     right: 12,
-    height: 78,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1.5,
+    textAlign: 'center',
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: '800',
   },
-  typed: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    columnGap: 4,
-    rowGap: 2,
-  },
-  typedWord: { fontSize: 14, lineHeight: 20, fontWeight: '700' },
-  caret: { width: 2, height: 18, borderRadius: 1 },
-
-  row: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  link: {
-    position: 'absolute',
-    left: LINK.left,
-    top: PAIR.y - 1,
-    width: LINK.width,
-    height: 2,
-    borderRadius: 1,
-    transformOrigin: 'left',
-  },
-  spark: {
-    position: 'absolute',
-    left: LINK.left - SPARK / 2,
-    top: PAIR.y - SPARK / 2,
-    width: SPARK,
-    height: SPARK,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sparkHalo: {
-    ...StyleSheet.absoluteFill,
-    borderRadius: SPARK / 2,
-    opacity: 0.2,
-  },
-  sparkDot: { width: 8, height: 8, borderRadius: 4 },
   words: {
     position: 'absolute',
     left: 0,
     right: 0,
     textAlign: 'center',
-    fontSize: 30,
-    lineHeight: 38,
+    fontSize: 27,
+    lineHeight: 33,
     fontWeight: '900',
-    letterSpacing: -0.6,
+    letterSpacing: -0.4,
+  },
+  shadow: {
+    position: 'absolute',
+    top: HERO_AT.top + 276,
+    width: 110,
+    height: 16,
+    borderRadius: 55,
+    backgroundColor: 'rgba(0,0,0,0.07)',
   },
 
-  finger: {
+  // A person, in the 200 × 310 box `FIG` describes.
+  figure: { position: 'absolute', width: FIG.width, height: FIG.height },
+  leg: {
+    position: 'absolute',
+    top: 190,
+    width: 26,
+    height: 86,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    transformOrigin: '13px 6px',
+  },
+  legLeft: { left: 71 },
+  legRight: { left: 103 },
+  // Each shoe points away from the other, the way a standing figure's feet are drawn.
+  shoe: {
+    position: 'absolute',
+    bottom: -8,
+    width: 36,
+    height: 16,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 4,
+    borderBottomWidth: 4,
+  },
+  shoeLeft: { left: -12 },
+  shoeRight: { left: 2 },
+  hips: {
+    position: 'absolute',
+    left: 64,
+    top: 178,
+    width: 72,
+    height: 24,
+    borderBottomLeftRadius: 6,
+    borderBottomRightRadius: 6,
+  },
+  neck: { position: 'absolute', left: 91, top: 80, width: 18, height: 18 },
+  torso: {
+    position: 'absolute',
+    left: 62,
+    top: 92,
+    width: 76,
+    height: 96,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    overflow: 'hidden',
+  },
+  torsoShade: { position: 'absolute', top: 0, right: 0, bottom: 0, width: 14 },
+  bib: {
+    position: 'absolute',
+    left: 14,
+    right: 14,
+    top: 36,
+    bottom: 0,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+  },
+  strap: { position: 'absolute', top: 0, width: 9, height: 42 },
+  strapLeft: { left: 16 },
+  strapRight: { right: 16 },
+  neckline: {
+    position: 'absolute',
+    top: -10,
+    left: 27,
+    width: 22,
+    height: 20,
+    borderRadius: 11,
+  },
+
+  // The head tilts on the neck.
+  head: {
+    position: 'absolute',
+    left: 64,
+    top: 14,
+    width: 72,
+    height: 78,
+    transformOrigin: '36px 74px',
+  },
+  ear: { position: 'absolute', top: 38, width: 12, height: 17, borderRadius: 6 },
+  earLeft: { left: 2 },
+  earRight: { right: 2 },
+  face: {
+    position: 'absolute',
+    left: 8,
+    top: 10,
+    width: 56,
+    height: 64,
+    borderRadius: 28,
+  },
+  hair: {
+    position: 'absolute',
+    left: 5,
+    top: 2,
+    width: 62,
+    height: 26,
+    borderTopLeftRadius: 31,
+    borderTopRightRadius: 31,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 4,
+  },
+  fringe: {
+    position: 'absolute',
+    left: 34,
+    top: 18,
+    width: 30,
+    height: 18,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 6,
+  },
+  capCrown: {
+    position: 'absolute',
+    left: 6,
+    top: 2,
+    width: 60,
+    height: 28,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 4,
+  },
+  capBrim: {
+    position: 'absolute',
+    left: 2,
+    top: 25,
+    width: 68,
+    height: 8,
+    borderRadius: 4,
+    borderBottomWidth: 2,
+    borderBottomColor: 'rgba(0,0,0,0.18)',
+  },
+  brows: {
+    position: 'absolute',
+    top: 37,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 13,
+  },
+  brow: { width: 11, height: 3, borderRadius: 2 },
+  eyes: {
+    position: 'absolute',
+    top: 43,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 18,
+  },
+  eye: { width: 6, height: 8, borderRadius: 3, backgroundColor: INK.eye },
+  cheek: {
+    position: 'absolute',
+    top: 53,
+    width: 10,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: INK.blush,
+    opacity: 0.35,
+  },
+  cheekLeft: { left: 15 },
+  cheekRight: { right: 15 },
+  mustache: {
+    position: 'absolute',
+    top: 53,
+    left: 25,
+    width: 22,
+    height: 6,
+    borderRadius: 3,
+  },
+  smile: {
+    position: 'absolute',
+    top: 57,
+    left: 29,
+    width: 14,
+    height: 7,
+    borderBottomWidth: 2.5,
+    borderColor: INK.mouth,
+    borderBottomLeftRadius: 7,
+    borderBottomRightRadius: 7,
+  },
+  grin: {
+    position: 'absolute',
+    top: 58,
+    left: 28,
+    width: 16,
+    height: 9,
+    backgroundColor: INK.mouth,
+    borderTopLeftRadius: 2,
+    borderTopRightRadius: 2,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+  },
+
+  // An arm: each segment is centred on its joint, which is its hinge.
+  upperArm: {
+    position: 'absolute',
+    width: ARM_W,
+    height: UPPER + ARM_W,
+    borderRadius: ARM_W / 2,
+    transformOrigin: `${ARM_W / 2}px ${ARM_W / 2}px`,
+  },
+  sleeve: {
+    position: 'absolute',
+    top: -2,
+    left: -2,
+    right: -2,
+    borderRadius: ARM_W / 2 + 2,
+  },
+  forearm: {
     position: 'absolute',
     left: 0,
+    top: UPPER,
+    width: ARM_W,
+    height: FORE + ARM_W,
+    borderRadius: ARM_W / 2,
+    transformOrigin: `${ARM_W / 2}px ${ARM_W / 2}px`,
+  },
+  hand: {
+    position: 'absolute',
+    left: -2,
+    top: FORE - 2,
+    width: ARM_W + 4,
+    height: ARM_W + 4,
+    borderRadius: ARM_W / 2 + 2,
+  },
+  // Held just past the hand, so the fingers close over its edge.
+  heldPhone: {
+    position: 'absolute',
+    left: ARM_W / 2 - 14,
+    top: ARM_W / 2 + FORE + 16 - 24,
+    width: 28,
+    height: 48,
+    borderRadius: 7,
+    backgroundColor: INK.phone,
+    transform: [{ rotate: `${PHONE_TILT}deg` }],
+  },
+  phoneCamera: {
+    position: 'absolute',
+    top: 5,
+    left: 5,
+    width: 9,
+    height: 12,
+    borderRadius: 3,
+    backgroundColor: INK.camera,
+  },
+  toolbox: {
+    position: 'absolute',
+    left: ARM_W / 2 - 23,
+    top: ARM_W / 2 + FORE + 4,
+    width: 46,
+    height: 28,
+    borderRadius: 5,
+    backgroundColor: INK.box,
+  },
+  toolboxHandle: {
+    position: 'absolute',
+    left: 8,
+    top: -10,
+    width: 30,
+    height: 13,
+    borderWidth: 4,
+    borderBottomWidth: 0,
+    borderColor: INK.boxDark,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  toolboxLid: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 8,
+    height: 4,
+    backgroundColor: INK.boxDark,
+  },
+
+  confetti: { position: 'absolute', left: 160, top: 300, borderRadius: 2 },
+  ray: {
+    position: 'absolute',
+    left: HANDSHAKE.x - 2,
+    top: HANDSHAKE.y - 5,
+    width: 4,
+    height: 10,
+    borderRadius: 2,
+  },
+
+  badges: { position: 'absolute', left: 0, right: 0, top: BADGE_TOP, height: 28 },
+  badgeSlot: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
     top: 0,
-    width: FINGER,
-    height: FINGER,
+    alignItems: 'center',
   },
-  touch: {
-    ...StyleSheet.absoluteFill,
-    borderRadius: FINGER / 2,
-    opacity: 0.28,
+  badgeAbove: { top: -34 },
+  role: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 28,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
   },
-  ripple: {
+  roleText: { fontSize: 12.5, fontWeight: '800' },
+
+  // The thought, off the top right of the hero's head.
+  trailDot: { position: 'absolute', borderWidth: 1.5 },
+  trailSmall: { left: 210, top: 298, width: 10, height: 10, borderRadius: 5 },
+  trailLarge: { left: 226, top: 270, width: 17, height: 17, borderRadius: 9 },
+  bubble: {
+    position: 'absolute',
+    left: 184,
+    top: 158,
+    width: 116,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 1.5,
+  },
+  pipe: {
+    position: 'absolute',
+    left: 16,
+    top: 32,
+    width: 48,
+    height: 11,
+    borderRadius: 3,
+    backgroundColor: INK.metal,
+  },
+  spout: {
+    position: 'absolute',
+    left: 54,
+    top: 32,
+    width: 11,
+    height: 24,
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 3,
+    backgroundColor: INK.metal,
+  },
+  valveStem: {
+    position: 'absolute',
+    left: 34,
+    top: 22,
+    width: 6,
+    height: 11,
+    backgroundColor: INK.metalDark,
+  },
+  valve: {
+    position: 'absolute',
+    left: 26,
+    top: 16,
+    width: 22,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: INK.handle,
+  },
+  basin: {
+    position: 'absolute',
+    left: 26,
+    top: 72,
+    width: 66,
+    height: 16,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    backgroundColor: INK.basin,
+  },
+  drop: {
+    position: 'absolute',
+    left: 56,
+    top: 56,
+    width: 7,
+    height: 10,
+    borderRadius: 4,
+    backgroundColor: WATER,
+  },
+
+  // The phone's screens, popped up above the hero.
+  card: {
+    position: 'absolute',
+    left: CARD.left,
+    top: CARD.top,
+    width: CARD.width,
+    padding: 12,
+    gap: 7,
+    borderRadius: 18,
+    borderWidth: 1,
+    ...lift(4),
+  },
+  cardTitle: { fontSize: 14, lineHeight: 18, fontWeight: '800' },
+  cardFoot: { fontSize: 11, lineHeight: 14, fontWeight: '600' },
+
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 38,
+    paddingHorizontal: 12,
+    borderRadius: 19,
+    borderWidth: 1,
+  },
+  searchIcon: { fontSize: 14 },
+  searchField: { flex: 1, height: '100%', justifyContent: 'center' },
+  placeholder: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 10,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  typedSearch: { fontSize: 13.5, lineHeight: 18, fontWeight: '700' },
+  jobRow: {
+    height: 46,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  jobContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  skeleton: {
     ...StyleSheet.absoluteFill,
-    borderRadius: FINGER / 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 8,
+  },
+  skeletonLogo: { width: 30, height: 30, borderRadius: 8 },
+  skeletonLines: { gap: 6 },
+  skeletonLine: { height: 8, borderRadius: 4 },
+  logo: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoText: { fontSize: 11, fontWeight: '800' },
+  rowBody: { flex: 1, gap: 1 },
+  rowTitle: { fontSize: 12.5, lineHeight: 16, fontWeight: '700' },
+  rowMeta: { fontSize: 10.5, lineHeight: 13 },
+  pill: {
+    height: 24,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillText: { fontSize: 11, fontWeight: '800' },
+  // Where a match row's score sits; Hire and Hired take its place, right-aligned.
+  slot: { width: 104, height: 24, alignItems: 'flex-end', justifyContent: 'center' },
+  pillOver: { position: 'absolute', top: 0, right: 0 },
+
+  notify: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  notifyBody: { flex: 1, gap: 2 },
+  notifyTop: { flexDirection: 'row', justifyContent: 'space-between' },
+  notifyApp: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.6 },
+  notifyWhen: { fontSize: 10.5 },
+  notifyTitle: { fontSize: 14, lineHeight: 18, fontWeight: '800' },
+  notifyText: { fontSize: 12, lineHeight: 16 },
+  appIcon: { alignItems: 'center', justifyContent: 'center' },
+
+  label: { fontSize: 11.5, lineHeight: 14, fontWeight: '600' },
+  input: {
+    height: 34,
+    marginTop: -3,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  inputText: { fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  formRow: { flexDirection: 'row', gap: 8, height: 30 },
+  chip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    borderRadius: 15,
+    borderWidth: 1,
+  },
+  // Laid over the chip's own outline, so selecting it swaps one for the other.
+  chipOn: {
+    position: 'absolute',
+    top: -1,
+    left: -1,
+    right: -1,
+    bottom: -1,
+    borderRadius: 15,
+    borderWidth: 1.5,
+  },
+  chipText: { fontSize: 12, fontWeight: '700' },
+  money: {
+    width: 84,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  moneySign: { fontSize: 13, fontWeight: '800' },
+  moneyText: { fontSize: 13, fontWeight: '800' },
+  button: {
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonText: { fontSize: 13.5, fontWeight: '800' },
+  buttonDone: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  rows: { height: 2 * ROW_STEP + 34 },
+  sweep: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 34,
+    borderRadius: 10,
+  },
+  matchRow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  bestRing: {
+    position: 'absolute',
+    top: -2,
+    left: -2,
+    right: -2,
+    bottom: -2,
+    borderRadius: 12,
     borderWidth: 2,
   },
+  avatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: { fontSize: 10, fontWeight: '800' },
+  foot: { height: 14 },
+  footFound: { position: 'absolute', top: 0, left: 0, right: 0, fontWeight: '800' },
+
+  typed: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 4,
+    overflow: 'hidden',
+  },
+  caret: { width: 2, height: 16, borderRadius: 1 },
 });
