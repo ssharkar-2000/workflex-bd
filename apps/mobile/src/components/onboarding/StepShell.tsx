@@ -85,9 +85,9 @@ export function StepShell({
             ) : null}
           </View>
 
-          {/* The system name and nothing else — no logo, no tagline. */}
+          {/* The system name and nothing else — no mark, no tagline. */}
           <View style={styles.bandBody}>
-            <BrandWordmark color={c.bandText} size={font.display} />
+            <BrandWordmark size={font.display} />
           </View>
         </View>
       ) : null}
