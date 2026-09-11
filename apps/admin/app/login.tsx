@@ -3,7 +3,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
+  Pressabazle,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
 import { adminLoginSchema } from '@workflex/shared';
 import { adminLogin } from '../src/api/admin';
+import { BrandName } from '../src/components/BrandName';
 import { errorText } from '../src/lib/error-message';
 import { useAdminStore } from '../src/store/admin-store';
 import { colors, font, radius, shadow, space } from '../src/lib/theme';
@@ -63,7 +64,7 @@ export default function LoginScreen() {
             <View style={styles.logo}>
               <Text style={styles.logoMark}>WF</Text>
             </View>
-            <Text style={styles.brandName}>WorkFlex BD</Text>
+            <BrandName height={40} accessibilityRole="header" />
             <Text style={styles.brandSub}>Admin Portal</Text>
           </View>
 
@@ -153,12 +154,11 @@ const styles = StyleSheet.create({
     marginBottom: space.md,
   },
   logoMark: { color: '#fff', fontSize: font.xl, fontWeight: '800' },
-  brandName: { fontSize: font.xl, fontWeight: '800', color: colors.text },
   brandSub: {
     fontSize: font.sm,
     color: colors.primary,
     fontWeight: '700',
-    marginTop: 2,
+    marginTop: 6,
     letterSpacing: 1,
   },
 
