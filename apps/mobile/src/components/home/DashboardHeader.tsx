@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { AuthUser } from '@workflex/shared';
 import { Avatar } from '../Avatar';
+import { BrandName } from '../BrandName';
 import { NotificationBell } from '../NotificationBell';
 import { DashboardMenu } from '../DashboardMenu';
 import { Greeting, ProfileStrengthBadge } from './DashboardSections';
@@ -66,9 +67,7 @@ export function DashboardHeader({
       <View style={styles.row}>
         <DashboardMenu user={user} onSignOut={onSignOut} />
 
-        <Text style={[styles.wordmark, { color: c.text }]} numberOfLines={1}>
-          {t('app.name')}
-        </Text>
+        <BrandName height={22} label={t('app.name')} />
 
         <View style={styles.spacer} />
 
@@ -128,7 +127,6 @@ export function DashboardHeader({
 const styles = StyleSheet.create({
   header: { gap: space.md, marginBottom: space.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  wordmark: { fontSize: font.md, fontWeight: '800', letterSpacing: -0.3 },
   spacer: { flex: 1 },
 
   search: {
