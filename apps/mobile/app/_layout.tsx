@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import {
   DefaultTheme,
   Stack,
@@ -16,6 +16,7 @@ import { useI18nStore } from '../src/i18n';
 import { useTheme, useThemeStore } from '../src/lib/use-theme';
 import { MeshBackground } from '../src/components/MeshBackground';
 import { BrandMark } from '../src/components/BrandMark';
+import { BrandName } from '../src/components/BrandName';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -80,7 +81,6 @@ const navBackdrop = {
  */
 function RootNavigator() {
   const status = useAuthStore((s) => s.status);
-  const { c } = useTheme();
   useAuthRouting();
 
   return (
@@ -92,9 +92,7 @@ function RootNavigator() {
         // native splash, and a blank screen there reads as a broken app.
         <View style={styles.splash}>
           <BrandMark size={132} interactive={false} />
-          <Text style={[styles.splashMark, { color: c.primary }]}>
-            WorkFlex BD
-          </Text>
+          <BrandName height={44} />
         </View>
       ) : (
         // The navigator paints its own container with the navigation theme's
@@ -123,11 +121,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 18,
     backgroundColor: 'transparent',
-  },
-  splashMark: {
-    fontSize: 28,
-    fontWeight: '900',
-    letterSpacing: -0.8,
   },
 });
 
