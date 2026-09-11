@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
 import { JOB_CATEGORIES, jobCategoryName } from '@workflex/shared';
+import { BrandName } from './BrandName';
 import { useLocale, useT, type TranslationKey } from '../i18n';
 import { useTheme } from '../lib/use-theme';
 
@@ -1462,7 +1463,7 @@ function NotifyCard({ clock }: Clocked) {
       <AppIcon size={34} />
       <View style={styles.notifyBody}>
         <View style={styles.notifyTop}>
-          <Text style={[styles.notifyApp, { color: c.textMuted }]}>WORKFLEX BD</Text>
+          <BrandName height={12} />
           <Text style={[styles.notifyWhen, { color: c.textMuted }]}>
             {t('intro.notif.now')}
           </Text>
@@ -2446,8 +2447,11 @@ const styles = StyleSheet.create({
 
   notify: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   notifyBody: { flex: 1, gap: 2 },
-  notifyTop: { flexDirection: 'row', justifyContent: 'space-between' },
-  notifyApp: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.6 },
+  notifyTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   notifyWhen: { fontSize: 10.5 },
   notifyTitle: { fontSize: 14, lineHeight: 18, fontWeight: '800' },
   notifyText: { fontSize: 12, lineHeight: 16 },
