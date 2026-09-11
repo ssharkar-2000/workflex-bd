@@ -5,13 +5,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 }  from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { BrandMark } from '../../src/components/BrandMark';
-import { AuroraText } from '../../src/components/AuroraText';
+import { BrandName } from '../../src/components/BrandName';
 import { ShimmerButton } from '../../src/components/ShimmerButton';
 import { GlassCard } from '../../src/components/GlassCard';
 import { LanguageToggle } from '../../src/components/LanguageToggle';
@@ -67,6 +68,7 @@ export default function WelcomeScreen() {
   const t = useT();
   const router = useRouter();
   const { c, isDark } = useTheme();
+  const { width } = useWindowDimensions();
 
   const hero = useRef(new Animated.Value(0)).current;
   const cta = useRef(new Animated.Value(0)).current;
@@ -212,7 +214,13 @@ export default function WelcomeScreen() {
             <Text style={[styles.eyebrow, { color: c.accentOnBrand }]}>
               {t('auth.eyebrow')}
             </Text>
-            <AuroraText fontSize={42}>WorkFlex BD</AuroraText>
+            {/* The logotype, narrowed on small phones rather than cropped. */}
+            <BrandName
+              height={58}
+              maxWidth={width - 48}
+              accessibilityRole="header"
+              style={styles.name}
+            />
             <Text style={[styles.tagline, { color: c.textOnBrand }]}>
               {t('auth.tagline')}
             </Text>
@@ -325,6 +333,7 @@ const styles = StyleSheet.create({
     letterSpacing: 2.4,
     marginBottom: 2,
   },
+  name: { marginTop: 6, marginBottom: 2 },
   tagline: {
     fontSize: 20,
     fontWeight: '800',
