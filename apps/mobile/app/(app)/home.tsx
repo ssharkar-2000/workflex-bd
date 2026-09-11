@@ -16,7 +16,12 @@ import { fetchMe, logout } from '../../src/api/auth';
 import { updateLocale } from '../../src/api/email';
 import { useErrorMessage } from '../../src/lib/error-message';
 import { useAuthStore } from '../../src/store/auth-store';
-import { useLocale, useT, type TranslationKey } from '../../src/i18n';
+import {
+  useI18nStore,
+  useLocale,
+  useT,
+  type TranslationKey,
+} from '../../src/i18n';
 import { RecommendedForYou } from '../../src/components/jobs/RecommendedForYou';
 import { NextSkillAI } from '../../src/components/home/NextSkillAI';
 import { TrustScore } from '../../src/components/home/TrustScore';
@@ -39,7 +44,8 @@ export default function HomeScreen() {
   // Feeds the floating Post a job button, which slides away while the
   // reader is moving down the page so it stops covering card buttons.
   const onScroll = useScrollDirectionHandler();
-  const [locale] = useLocale();
+  const [locale, setLocale] = useLocale();
+  const localeChosen = useI18nStore((s) => s.chosen);
   const signOut = useAuthStore((s) => s.signOut);
   const refreshToken = useAuthStore((s) => s.refreshToken);
   const errorMessage = useErrorMessage();
@@ -55,13 +61,20 @@ export default function HomeScreen() {
   // the sections that need it simply do not render yet.
   const { data: summary } = useDashboardSummary();
 
-  // The device is the source of truth for language; the account copy exists so
-  // server-sent messages (SMS, email) match what the user reads in the app.
+  // The language follows the person, not only the phone. A phone nobody has
+  // picked a language on takes the account's, so signing in on a new phone
+  // (or after a reinstall) keeps the language they use everywhere else,
+  // instead of the default quietly overwriting it. Once one has been picked
+  // on this phone, that choice is copied to the account, which is also what
+  // server-sent messages (SMS, email) are written in.
   useEffect(() => {
-    if (data && data.locale !== locale) {
+    if (!data || data.locale === locale) return;
+    if (localeChosen) {
       void updateLocale(locale).catch(() => undefined);
+    } else {
+      void setLocale(data.locale);
     }
-  }, [data, locale]);
+  }, [data, locale, localeChosen, setLocale]);
 
   const onSignOut = async () => {
     try {

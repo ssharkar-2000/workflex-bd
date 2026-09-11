@@ -88,9 +88,6 @@ export const en = {
   'auth.eyebrow': 'WORKFORCE MARKETPLACE',
   'auth.secure': 'Secure OTP verification',
   'auth.getStartedCta': 'Get started',
-  'auth.haveAccount': 'Already have an account?',
-  'auth.logIn': 'Log in',
-  'auth.continueSession': 'Continue where I left off',
 
   // The intro that plays before the landing page (TwoRolesIntro).
   'intro.a11y':
@@ -973,11 +970,8 @@ export const bn: Record<TranslationKey, string> = {
   'auth.eyebrow': 'কর্মসংস্থান প্ল্যাটফর্ম',
   'auth.secure': 'নিরাপদ ওটিপি যাচাইকরণ',
   'auth.getStartedCta': 'শুরু করুন',
-  'auth.haveAccount': 'আগে থেকেই অ্যাকাউন্ট আছে?',
-  'auth.logIn': 'লগইন করুন',
-  'auth.continueSession': 'যেখানে ছিলাম সেখান থেকে শুরু করি',
 
-    // The intro that plays before the landing page (TwoRolesIntro).
+  // The intro that plays before the landing page (TwoRolesIntro).
   'intro.a11y':
     'একজন মানুষ ওয়ার্কফ্লেক্স বিডিতে কাজ পান, আবার সেখানেই প্লাম্বারও নিয়োগ দেন।',
   'intro.skip': 'এড়িয়ে যান',
