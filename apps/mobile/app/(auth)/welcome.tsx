@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,7 +20,6 @@ import { TwoRolesIntro } from '../../src/components/TwoRolesIntro';
 import { useAuthStore } from '../../src/store/auth-store';
 import { useLaunchStore } from '../../src/store/launch-store';
 import { useT } from '../../src/i18n';
-import { font, radius } from '../../src/lib/theme';
 import { useTheme } from '../../src/lib/use-theme';
 
 // ✓ and ৳ are plain characters, not emoji, so they are drawn in the text
@@ -48,10 +46,10 @@ const MARK = { max: 210, min: 140 };
 const SCROLL_PAD = 12;
 
 /**
- * Pure welcome screen — it says what the product is and offers the two ways
- * in: Get started for someone new, Log in for someone coming back. Log in is
- * a button of its own under the question it answers, rather than a line of
- * underlined text, so a returning user can find it at a glance.
+ * Pure welcome screen — it says what the product is and offers one way in:
+ * Get started. There is no second button beside it. The screen it opens has
+ * both tabs, Login and New account, so a returning user is one tap from
+ * signing in there; someone still signed in goes straight to their dashboard.
  *
  * The phone field used to live here, which meant asking for a number before
  * the user knew what they were signing up for. Intent now comes first, and
@@ -277,45 +275,18 @@ export default function WelcomeScreen() {
         >
           <ShimmerButton
             label={t('auth.getStartedCta')}
-            onPress={() =>
-              router.push({ pathname: '/(auth)/login', params: { tab: 'register' } })
-            }
-          />
-
-          {/* Someone signed in is not asked; the button just takes them back. */}
-          {!hasSession && (
-            <Text style={[styles.haveAccount, { color: c.textMutedOnBrand }]}>
-              {t('auth.haveAccount')}
-            </Text>
-          )}
-          <Pressable
             onPress={() => {
-              // A live session skips straight back in; otherwise this is the
-              // shortcut past role selection for a returning user.
+              // With no other button on the page, this is the way back in for
+              // someone still signed in too — straight to their dashboard,
+              // rather than a sign-in form for a password they already gave.
               if (hasSession) {
                 openGate();
                 router.replace('/(app)/home');
               } else {
-                router.push({ pathname: '/(auth)/login', params: { tab: 'login' } });
+                router.push({ pathname: '/(auth)/login', params: { tab: 'register' } });
               }
             }}
-            accessibilityRole="button"
-            accessibilityLabel={
-              hasSession ? t('auth.continueSession') : t('auth.logIn')
-            }
-            style={({ pressed }) => [
-              styles.logIn,
-              hasSession && styles.logInAlone,
-              {
-                backgroundColor: pressed ? c.primarySoft : c.surface,
-                borderColor: c.primary,
-              },
-            ]}
-          >
-            <Text style={[styles.logInText, { color: c.primary }]}>
-              {`${hasSession ? t('auth.continueSession') : t('auth.logIn')}  →`}
-            </Text>
-          </Pressable>
+          />
 
           <View style={styles.secureRow}>
             <Text style={styles.secureIcon}>🔒</Text>
@@ -326,11 +297,15 @@ export default function WelcomeScreen() {
         </Animated.View>
       </SafeAreaView>
 
+      {/*
+        Keeps catching touches until it is gone, fade included. It used to let
+        them through as soon as the fade began, and in a browser the tap on
+        Skip then landed a second time on whatever lay beneath: the release
+        ends the intro, and the click that follows it goes to the page. Skip
+        sits over the language toggle, so skipping switched the language.
+      */}
       {intro !== 'done' && (
-        <Animated.View
-          style={[StyleSheet.absoluteFill, { opacity: introFade }]}
-          pointerEvents={intro === 'leaving' ? 'none' : 'auto'}
-        >
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: introFade }]}>
           <TwoRolesIntro onEnd={endIntro} />
         </Animated.View>
       )}
@@ -394,24 +369,6 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 12, fontWeight: '700' },
 
   footer: { paddingHorizontal: 20, paddingBottom: 10 },
-  haveAccount: {
-    textAlign: 'center',
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 18,
-    marginBottom: 8,
-  },
-  // Second to Get started: the same width and corners, outlined rather than
-  // filled, so the two ways in read as a pair with a clear first choice.
-  logIn: {
-    height: 52,
-    borderRadius: radius.lg,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logInAlone: { marginTop: 14 },
-  logInText: { fontSize: font.md, fontWeight: '800', letterSpacing: 0.2 },
   secureRow: {
     flexDirection: 'row',
     alignItems: 'center',
