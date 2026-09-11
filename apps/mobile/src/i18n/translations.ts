@@ -86,9 +86,10 @@ export const en = {
   'auth.invalidNumber':
     'The mobile number is not correct. Kindly give the correct number.',
   'auth.eyebrow': 'WORKFORCE MARKETPLACE',
-  'auth.secure': 'Secured with OTP verification',
+  'auth.secure': 'Secure OTP verification',
   'auth.getStartedCta': 'Get started',
-  'auth.haveAccount': 'I already have an account',
+  'auth.haveAccount': 'Already have an account?',
+  'auth.logIn': 'Log in',
   'auth.continueSession': 'Continue where I left off',
 
   // The intro that plays before the landing page (TwoRolesIntro).
@@ -970,9 +971,10 @@ export const bn: Record<TranslationKey, string> = {
   'auth.smsNotice': 'নম্বরটি যাচাই করতে আমরা ৬ সংখ্যার একটি কোড পাঠাব।',
   'auth.invalidNumber': 'মোবাইল নম্বরটি সঠিক নয়। অনুগ্রহ করে সঠিক নম্বর দিন।',
   'auth.eyebrow': 'কর্মসংস্থান প্ল্যাটফর্ম',
-  'auth.secure': 'ওটিপি যাচাইকরণে সুরক্ষিত',
+  'auth.secure': 'নিরাপদ ওটিপি যাচাইকরণ',
   'auth.getStartedCta': 'শুরু করুন',
-  'auth.haveAccount': 'আমার অ্যাকাউন্ট আছে',
+  'auth.haveAccount': 'আগে থেকেই অ্যাকাউন্ট আছে?',
+  'auth.logIn': 'লগইন করুন',
   'auth.continueSession': 'যেখানে ছিলাম সেখান থেকে শুরু করি',
 
     // The intro that plays before the landing page (TwoRolesIntro).

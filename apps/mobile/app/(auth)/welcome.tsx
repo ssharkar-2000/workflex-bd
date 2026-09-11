@@ -21,6 +21,7 @@ import { TwoRolesIntro } from '../../src/components/TwoRolesIntro';
 import { useAuthStore } from '../../src/store/auth-store';
 import { useLaunchStore } from '../../src/store/launch-store';
 import { useT } from '../../src/i18n';
+import { font, radius } from '../../src/lib/theme';
 import { useTheme } from '../../src/lib/use-theme';
 
 // ✓ and ৳ are plain characters, not emoji, so they are drawn in the text
@@ -41,8 +42,16 @@ const CHIPS = [
  */
 let introPlayed = false;
 
+/** The brand mark's size: full on most phones, smaller only when it must be. */
+const MARK = { max: 210, min: 140 };
+/** Vertical padding around the scrolling hero. */
+const SCROLL_PAD = 12;
+
 /**
- * Pure welcome screen — it says what the product is and offers one way in.
+ * Pure welcome screen — it says what the product is and offers the two ways
+ * in: Get started for someone new, Log in for someone coming back. Log in is
+ * a button of its own under the question it answers, rather than a line of
+ * underlined text, so a returning user can find it at a glance.
  *
  * The phone field used to live here, which meant asking for a number before
  * the user knew what they were signing up for. Intent now comes first, and
@@ -74,6 +83,17 @@ export default function WelcomeScreen() {
     introPlayed ? 'done' : 'playing',
   );
   const introFade = useRef(new Animated.Value(1)).current;
+
+  // On a short phone the mark gives up size, so the hero still fits above the
+  // two ways in rather than sliding under Get started. It is measured, not
+  // guessed from the screen height: Bangla wraps the supporting line onto
+  // two, and a larger system text size grows everything except the mark.
+  // `rest` is the hero's height without the mark, so the fit is one step.
+  const [fit, setFit] = useState({ view: 0, rest: 0 });
+  const markSize =
+    fit.view && fit.rest
+      ? Math.round(Math.min(MARK.max, Math.max(MARK.min, fit.view - fit.rest)))
+      : MARK.max;
 
   const playEntrance = useCallback(() => {
     Animated.sequence([
@@ -155,8 +175,16 @@ export default function WelcomeScreen() {
         <ScrollView
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
+          onLayout={(e) => {
+            const view = e.nativeEvent.layout.height;
+            setFit((f) => (Math.abs(f.view - view) < 1 ? f : { ...f, view }));
+          }}
         >
           <Animated.View
+            onLayout={(e) => {
+              const rest = e.nativeEvent.layout.height - markSize + 2 * SCROLL_PAD;
+              setFit((f) => (Math.abs(f.rest - rest) < 1 ? f : { ...f, rest }));
+            }}
             style={[
               styles.hero,
               {
@@ -184,7 +212,7 @@ export default function WelcomeScreen() {
                 ],
               }}
             >
-              <BrandMark size={210} />
+              <BrandMark size={markSize} />
             </Animated.View>
 
             <Text style={[styles.eyebrow, { color: c.accentOnBrand }]}>
@@ -254,8 +282,13 @@ export default function WelcomeScreen() {
             }
           />
 
+          {/* Someone signed in is not asked; the button just takes them back. */}
+          {!hasSession && (
+            <Text style={[styles.haveAccount, { color: c.textMutedOnBrand }]}>
+              {t('auth.haveAccount')}
+            </Text>
+          )}
           <Pressable
-            style={styles.signIn}
             onPress={() => {
               // A live session skips straight back in; otherwise this is the
               // shortcut past role selection for a returning user.
@@ -263,13 +296,24 @@ export default function WelcomeScreen() {
                 openGate();
                 router.replace('/(app)/home');
               } else {
-                router.push('/(auth)/login');
+                router.push({ pathname: '/(auth)/login', params: { tab: 'login' } });
               }
             }}
-            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={
+              hasSession ? t('auth.continueSession') : t('auth.logIn')
+            }
+            style={({ pressed }) => [
+              styles.logIn,
+              hasSession && styles.logInAlone,
+              {
+                backgroundColor: pressed ? c.primarySoft : c.surface,
+                borderColor: c.primary,
+              },
+            ]}
           >
-            <Text style={[styles.signInText, { color: c.textOnBrand }]}>
-              {hasSession ? t('auth.continueSession') : t('auth.haveAccount')}
+            <Text style={[styles.logInText, { color: c.primary }]}>
+              {`${hasSession ? t('auth.continueSession') : t('auth.logIn')}  →`}
             </Text>
           </Pressable>
 
@@ -304,7 +348,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
   },
-  scroll: { flexGrow: 1, justifyContent: 'center', paddingVertical: 12 },
+  scroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingVertical: SCROLL_PAD,
+  },
   hero: { alignItems: 'center', paddingHorizontal: 16 },
   eyebrow: {
     fontSize: 11,
@@ -346,18 +394,30 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 12, fontWeight: '700' },
 
   footer: { paddingHorizontal: 20, paddingBottom: 10 },
-  signIn: { alignItems: 'center', marginTop: 14 },
-  signInText: {
+  haveAccount: {
+    textAlign: 'center',
     fontSize: 14,
-    fontWeight: '700',
-    textDecorationLine: 'underline',
+    fontWeight: '600',
+    marginTop: 18,
+    marginBottom: 8,
   },
+  // Second to Get started: the same width and corners, outlined rather than
+  // filled, so the two ways in read as a pair with a clear first choice.
+  logIn: {
+    height: 52,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logInAlone: { marginTop: 14 },
+  logInText: { fontSize: font.md, fontWeight: '800', letterSpacing: 0.2 },
   secureRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    marginTop: 12,
+    marginTop: 14,
   },
   secureIcon: { fontSize: 11 },
   secureText: {
