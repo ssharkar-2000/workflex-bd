@@ -20,6 +20,7 @@ import { bdPhoneSchema, sanitizeDigits } from '@workflex/shared';
 import { login } from '../../src/api/auth';
 import { useErrorMessage } from '../../src/lib/error-message';
 import { BrandMark } from '../../src/components/BrandMark';
+import { BrandName } from '../../src/components/BrandName';
 import { GlassCard } from '../../src/components/GlassCard';
 import { ShimmerButton } from '../../src/components/ShimmerButton';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
@@ -45,7 +46,7 @@ type Tab = 'login' | 'register';
 const MARK = { min: 56, max: 128 };
 /** The back-and-toggles bar, and everything on the Login tab but the mark. */
 const TOP_BAR = 46;
-const LOGIN_TAB_REST = 503;
+const LOGIN_TAB_REST = 517;
 /** Kept free, so a full screen still has a little air at top and bottom. */
 const BREATHING = 24;
 
@@ -189,9 +190,7 @@ export default function LoginScreen() {
             >
               <View style={styles.brandRow}>
                 <BrandMark size={markSize} interactive={false} />
-                <Text style={[styles.brandName, { color: c.textOnBrand }]}>
-                  WorkFlex BD
-                </Text>
+                <BrandName height={34} style={styles.brandName} />
               </View>
 
               <View
@@ -401,13 +400,7 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 16 },
 
   brandRow: { alignItems: 'center', marginBottom: 14 },
-  // A step up from body size, to stay in proportion with the larger mark.
-  brandName: {
-    fontSize: font.lg,
-    fontWeight: '800',
-    marginTop: 6,
-    letterSpacing: -0.2,
-  },
+  brandName: { marginTop: 8 },
 
   tabBar: {
     flexDirection: 'row',
