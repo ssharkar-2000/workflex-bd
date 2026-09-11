@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -17,6 +17,7 @@ import { ShimmerButton } from '../../src/components/ShimmerButton';
 import { GlassCard } from '../../src/components/GlassCard';
 import { LanguageToggle } from '../../src/components/LanguageToggle';
 import { ThemeToggle } from '../../src/components/ThemeToggle';
+import { TwoRolesIntro } from '../../src/components/TwoRolesIntro';
 import { useAuthStore } from '../../src/store/auth-store';
 import { useLaunchStore } from '../../src/store/launch-store';
 import { useT } from '../../src/i18n';
@@ -31,6 +32,16 @@ const CHIPS = [
 ] as const;
 
 /**
+ * Whether the intro has played since the app was opened.
+ *
+ * Kept in the module rather than stored: every cold start lands on this
+ * screen (see the root layout), so the intro plays once per launch, and
+ * coming back here from sign-in in the same session goes straight to the page
+ * instead of replaying ten seconds the reader has just seen.
+ */
+let introPlayed = false;
+
+/**
  * Pure welcome screen — it says what the product is and offers one way in.
  *
  * The phone field used to live here, which meant asking for a number before
@@ -42,6 +53,10 @@ const CHIPS = [
  * whole to someone who watched all three — and the bKash line on its own made
  * it look like a payments app. bKash is still named, in the chips, as one
  * feature among three rather than as the headline.
+ *
+ * On a cold start the two-roles intro plays over the top first. The page
+ * holds its entrance until the intro hands over, then rises into place under
+ * the fading overlay, so the story ends on the page rather than cutting to it.
  */
 export default function WelcomeScreen() {
   const t = useT();
@@ -55,7 +70,12 @@ export default function WelcomeScreen() {
   const float = useRef(new Animated.Value(0)).current;
   const chips = useMemo(() => CHIPS.map(() => new Animated.Value(0)), []);
 
-  useEffect(() => {
+  const [intro, setIntro] = useState<'playing' | 'leaving' | 'done'>(
+    introPlayed ? 'done' : 'playing',
+  );
+  const introFade = useRef(new Animated.Value(1)).current;
+
+  const playEntrance = useCallback(() => {
     Animated.sequence([
       Animated.timing(hero, {
         toValue: 1,
@@ -81,7 +101,15 @@ export default function WelcomeScreen() {
         useNativeDriver: true,
       }),
     ]).start();
+  }, [hero, cta, chips]);
 
+  // With no intro to wait for, the page comes in as soon as it mounts. When
+  // the intro does play, `endIntro` starts the entrance instead.
+  useEffect(() => {
+    if (introPlayed) playEntrance();
+  }, [playEntrance]);
+
+  useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(float, {
@@ -100,7 +128,19 @@ export default function WelcomeScreen() {
     );
     loop.start();
     return () => loop.stop();
-  }, [hero, cta, float, chips]);
+  }, [float]);
+
+  const endIntro = useCallback(() => {
+    introPlayed = true;
+    setIntro('leaving');
+    playEntrance();
+    Animated.timing(introFade, {
+      toValue: 0,
+      duration: 600,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start(() => setIntro('done'));
+  }, [introFade, playEntrance]);
 
   return (
     <View style={styles.root}>
@@ -241,6 +281,15 @@ export default function WelcomeScreen() {
           </View>
         </Animated.View>
       </SafeAreaView>
+
+      {intro !== 'done' && (
+        <Animated.View
+          style={[StyleSheet.absoluteFill, { opacity: introFade }]}
+          pointerEvents={intro === 'leaving' ? 'none' : 'auto'}
+        >
+          <TwoRolesIntro onEnd={endIntro} />
+        </Animated.View>
+      )}
     </View>
   );
 }
