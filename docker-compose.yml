@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   postgres:
     # postgis image, not plain postgres — job search is geo-first ("jobs within 5km")
