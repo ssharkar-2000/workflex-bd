@@ -17,8 +17,6 @@ import { GlassCard } from '../../src/components/GlassCard';
 import { LanguageToggle } from '../../src/components/LanguageToggle';
 import { ThemeToggle } from '../../src/components/ThemeToggle';
 import { TwoRolesIntro } from '../../src/components/TwoRolesIntro';
-import { useAuthStore } from '../../src/store/auth-store';
-import { useLaunchStore } from '../../src/store/launch-store';
 import { useT } from '../../src/i18n';
 import { useTheme } from '../../src/lib/use-theme';
 
@@ -47,9 +45,9 @@ const SCROLL_PAD = 12;
 
 /**
  * Pure welcome screen — it says what the product is and offers one way in:
- * Get started. There is no second button beside it. The screen it opens has
- * both tabs, Login and New account, so a returning user is one tap from
- * signing in there; someone still signed in goes straight to their dashboard.
+ * Get started, which always opens the Login / New account screen. A returning
+ * user signs in there; a new one continues into registration, which runs its
+ * own steps from there (details, SMS check, documents, review).
  *
  * The phone field used to live here, which meant asking for a number before
  * the user knew what they were signing up for. Intent now comes first, and
@@ -69,8 +67,6 @@ export default function WelcomeScreen() {
   const t = useT();
   const router = useRouter();
   const { c, isDark } = useTheme();
-  const openGate = useLaunchStore((s) => s.open);
-  const hasSession = useAuthStore((s) => s.status === 'authenticated');
 
   const hero = useRef(new Animated.Value(0)).current;
   const cta = useRef(new Animated.Value(0)).current;
@@ -273,19 +269,13 @@ export default function WelcomeScreen() {
             },
           ]}
         >
+          {/* Always the Login / New account screen next, whoever taps it —
+              someone new, someone returning, someone still signed in. */}
           <ShimmerButton
             label={t('auth.getStartedCta')}
-            onPress={() => {
-              // With no other button on the page, this is the way back in for
-              // someone still signed in too — straight to their dashboard,
-              // rather than a sign-in form for a password they already gave.
-              if (hasSession) {
-                openGate();
-                router.replace('/(app)/home');
-              } else {
-                router.push({ pathname: '/(auth)/login', params: { tab: 'register' } });
-              }
-            }}
+            onPress={() =>
+              router.push({ pathname: '/(auth)/login', params: { tab: 'register' } })
+            }
           />
 
           <View style={styles.secureRow}>
