@@ -142,3 +142,4 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: font.sm, paddingVertical: 0 },
   clear: { fontSize: font.md, fontWeight: '700' },
 });
+
