@@ -11,7 +11,10 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '../src/store/auth-store';
-import { useLaunchStore } from '../src/store/launch-store';
+import {
+  openGateForPaymentReturn,
+  useLaunchStore,
+} from '../src/store/launch-store';
 import { useI18nStore } from '../src/i18n';
 import { useTheme, useThemeStore } from '../src/lib/use-theme';
 import { MeshBackground } from '../src/components/MeshBackground';
@@ -137,10 +140,13 @@ export default function RootLayout() {
   useEffect(() => {
     // Language and theme before session: the landing screen renders before
     // anyone is signed in, and it must already be in the user's language and
-    // their chosen mode rather than flashing the wrong one.
+    // their chosen mode rather than flashing the wrong one. A return from the
+    // payment gateway is recognised in the same step, before the session
+    // routing first runs.
     void Promise.all([
       hydrateLocale(),
       hydrateTheme(),
+      openGateForPaymentReturn(),
     ]).then(() => hydrate());
   }, [hydrate, hydrateLocale, hydrateTheme]);
 
