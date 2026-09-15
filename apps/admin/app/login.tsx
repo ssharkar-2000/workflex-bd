@@ -3,7 +3,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Pressabazle,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,

@@ -2563,3 +2563,4 @@ const styles = StyleSheet.create({
   },
   caret: { width: 2, height: 16, borderRadius: 1 },
 });
+
