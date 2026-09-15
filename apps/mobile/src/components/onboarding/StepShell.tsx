@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { GlassCard } from '../GlassCard';
 import { BrandWordmark } from './BrandWordmark';
 import { useT } from '../../i18n';
@@ -30,6 +30,7 @@ export function StepShell({
   children,
   footer,
   canGoBack = true,
+  backTo,
   centerHeader = false,
   showBrand = false,
 }: {
@@ -40,6 +41,12 @@ export function StepShell({
   children: ReactNode;
   footer?: ReactNode;
   canGoBack?: boolean;
+  /**
+   * Where Back goes when there is no screen underneath to return to — the
+   * step was opened directly, or reloaded on the web. Without it, Back is
+   * hidden then.
+   */
+  backTo?: Href;
   /** Centres the title and subtitle, as the registration form does. */
   centerHeader?: boolean;
   /** Brand band across the top, for the screens that open the flow. */
@@ -49,6 +56,14 @@ export function StepShell({
   const router = useRouter();
   const { c, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+
+  const onBack = !canGoBack
+    ? null
+    : router.canGoBack()
+      ? () => router.back()
+      : backTo
+        ? () => router.replace(backTo)
+        : null;
 
   return (
     <View style={styles.root}>
@@ -70,9 +85,9 @@ export function StepShell({
           {/* Back sits in its own row so the wordmark below stays centred on
               the band rather than on the space left over beside the arrow. */}
           <View style={styles.bandTop}>
-            {canGoBack && router.canGoBack() ? (
+            {onBack ? (
               <Pressable
-                onPress={() => router.back()}
+                onPress={onBack}
                 hitSlop={16}
                 style={styles.bandBack}
                 accessibilityRole="button"
@@ -117,8 +132,8 @@ export function StepShell({
         >
           <View style={styles.header}>
             {/* The band carries its own back arrow; two would be one too many. */}
-            {canGoBack && !showBrand && router.canGoBack() ? (
-              <Pressable onPress={() => router.back()} hitSlop={12}>
+            {onBack && !showBrand ? (
+              <Pressable onPress={onBack} hitSlop={12}>
                 <Text style={[styles.back, { color: c.textOnBrand }]}>
                   ← {t('ob.back')}
                 </Text>
