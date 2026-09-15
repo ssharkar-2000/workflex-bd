@@ -23,6 +23,11 @@ import { useTheme } from '../lib/use-theme';
  * vectors, so they stay crisp at any size, and the ribbon keeps its real
  * shading rather than an imitation of it.
  *
+ * One change from the artwork, by request: its cyan is navy blue here — the
+ * W's bright faces, its head and arrow, the F and l. Only that band of hues
+ * moved; the blues, violet and purple are the artwork's. Deep navy would sink
+ * into a dark screen, so the fill for dark screens uses a brighter navy.
+ *
  * "ork" is white in the artwork, which is drawn on navy. On a light screen
  * white letters would vanish, so there they are the app's dark ink instead —
  * the usual light-background version of a logo.
@@ -34,7 +39,11 @@ import { useTheme } from '../lib/use-theme';
  * Change the two together.
  */
 
-const FILL = require('./workflex-logo-fill.png');
+/** The fill for each kind of screen (see above). */
+const FILL = {
+  light: require('./workflex-logo-fill-light.png'),
+  dark: require('./workflex-logo-fill-dark.png'),
+};
 
 /** The drawing's own coordinates (the artwork's pixels); sizes scale from these. */
 const VIEW = { x: 28, y: 6, w: 515, h: 97 };
@@ -117,7 +126,7 @@ export function BrandName({
 
         {/* The W, its head and "Flex", in the artwork's own colours. */}
         <Image
-          href={FILL}
+          href={onDark ? FILL.dark : FILL.light}
           x={FILL_BOX.x}
           y={FILL_BOX.y}
           width={FILL_BOX.w}
@@ -144,4 +153,3 @@ export function BrandName({
     </View>
   );
 }
-

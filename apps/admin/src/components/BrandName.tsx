@@ -22,6 +22,11 @@ import Svg, {
  * vectors, so they stay crisp at any size, and the ribbon keeps its real
  * shading rather than an imitation of it.
  *
+ * One change from the artwork, by request: its cyan is navy blue here — the
+ * W's bright faces, its head and arrow, the F and l. Only that band of hues
+ * moved; the blues, violet and purple are the artwork's. Deep navy would sink
+ * into a dark screen, so the fill for dark screens uses a brighter navy.
+ *
  * "ork" is white in the artwork, which is drawn on navy. On a light screen
  * white letters would vanish, so there they are the app's dark ink instead —
  * the usual light-background version of a logo.
@@ -30,11 +35,12 @@ import Svg, {
  * even-odd rule, so they are filled and cut with that rule.
  *
  * A copy of the mobile app's logotype (apps/mobile/src/components/BrandName.tsx)
- * and its fill image, kept here because the two apps share no UI package.
- * Change the two together.
+ * and its light-screen fill, kept here because the two apps share no UI
+ * package. Change the two together.
  */
 
-const FILL = require('./workflex-logo-fill.png');
+/** The admin app is light throughout, so only the light-screen fill is here. */
+const FILL = require('./workflex-logo-fill-light.png');
 
 /** The drawing's own coordinates (the artwork's pixels); sizes scale from these. */
 const VIEW = { x: 28, y: 6, w: 515, h: 97 };
