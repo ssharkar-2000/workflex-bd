@@ -153,4 +153,3 @@ export function BrandName({
     </View>
   );
 }
-
