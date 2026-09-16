@@ -114,6 +114,40 @@ export const envSchema = z.object({
   S3_ACCESS_KEY: z.string().optional(),
   S3_SECRET_KEY: z.string().optional(),
   S3_BUCKET_DOCUMENTS: z.string().default('workflex-documents'),
+
+  // --- wallet top-ups ---
+  // off        — no gateway; the wallet works, adding money does not. What a
+  //              production deployment gets until a gateway is configured.
+  // simulator  — a stand-in payment page served by this API, for developing
+  //              without a merchant account. Development only.
+  // sslcommerz — SSLCommerz's hosted payment page: bKash, Nagad, Rocket,
+  //              cards and internet banking behind one integration.
+  //
+  // Unset means simulator in development and off in production — see
+  // validateEnv.
+  PAYMENT_PROVIDER: z.enum(['off', 'simulator', 'sslcommerz']).default('simulator'),
+  SSLCOMMERZ_STORE_ID: z.string().optional(),
+  SSLCOMMERZ_STORE_PASSWORD: z.string().optional(),
+  /** The sandbox moves no real money, which is why production refuses it. */
+  SSLCOMMERZ_SANDBOX: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+
+  /**
+   * This API's address as the outside world reaches it, ending in /api/v1.
+   * The gateway posts results to it and sends the payer's browser back
+   * through it, so it has to be reachable from both. Optional in
+   * development, where it is taken from each request's own host.
+   */
+  API_PUBLIC_URL: z.string().url().optional(),
+  /**
+   * Web addresses a payer may be sent back to, comma separated — the
+   * production web app, for instance. The app's own link (workflex://) is
+   * always allowed, and outside production so are localhost, LAN addresses
+   * and Expo Go's exp:// links.
+   */
+  APP_WEB_ORIGINS: z.string().default(''),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -130,6 +164,16 @@ export function validateEnv(raw: Record<string, unknown>): Env {
         `Copy .env.example to .env and fill in the missing values.`,
     );
   }
+
+  // In production an unset provider means off, not the simulator. A
+  // deployment nobody has given a gateway should refuse to take money, not
+  // pretend to.
+  if (parsed.data.NODE_ENV === 'production' && raw.PAYMENT_PROVIDER === undefined) {
+    parsed.data.PAYMENT_PROVIDER = 'off';
+  }
+
+  const paymentProblem = paymentConfigProblem(parsed.data);
+  if (paymentProblem) throw new Error(paymentProblem);
 
   // A real deployment must never run on the committed dev placeholders.
   if (parsed.data.NODE_ENV === 'production') {
@@ -192,6 +236,47 @@ function requiredCredentials(env: Env): string[] {
     default:
       return [];
   }
+}
+
+/**
+ * Payment settings that would take or credit money wrongly. Each one is a
+ * refusal to start rather than a warning, because every alternative surfaces
+ * later as someone's money going missing.
+ */
+function paymentConfigProblem(env: Env): string | null {
+  const production = env.NODE_ENV === 'production';
+
+  if (production && env.PAYMENT_PROVIDER === 'simulator') {
+    return (
+      'Refusing to start in production with PAYMENT_PROVIDER=simulator — anyone ' +
+      'could add money to their wallet without paying. Use sslcommerz, or off.'
+    );
+  }
+
+  if (env.PAYMENT_PROVIDER !== 'sslcommerz') return null;
+
+  const missing = (['SSLCOMMERZ_STORE_ID', 'SSLCOMMERZ_STORE_PASSWORD'] as const).filter(
+    (k) => !env[k],
+  );
+  if (missing.length > 0) {
+    return `PAYMENT_PROVIDER=sslcommerz requires: ${missing.join(', ')}`;
+  }
+
+  if (production && env.SSLCOMMERZ_SANDBOX) {
+    return (
+      'Refusing to start in production with SSLCOMMERZ_SANDBOX=true — sandbox ' +
+      'payments are not real money, and they would be credited as if they were.'
+    );
+  }
+
+  if (production && !env.API_PUBLIC_URL) {
+    return (
+      'PAYMENT_PROVIDER=sslcommerz in production requires API_PUBLIC_URL — the ' +
+      'gateway has to be told where to send its results.'
+    );
+  }
+
+  return null;
 }
 
 export function requiredMailCredentials(env: Env): string[] {

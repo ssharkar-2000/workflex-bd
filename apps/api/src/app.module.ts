@@ -20,6 +20,7 @@ import { AdminModule } from './admin/admin.module';
 import { MailModule } from './mail/mail.module';
 import { StorageModule } from './storage/storage.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
+import { WalletModule } from './wallet/wallet.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
     JobsModule,
     MatchingModule,
     AdminModule,
+    WalletModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

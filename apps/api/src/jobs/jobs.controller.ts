@@ -13,10 +13,12 @@ import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
 import {
   applyToJobSchema,
   createJobSchema,
+  decideApplicationSchema,
   jobQuerySchema,
   nearbyQuerySchema,
   type ApplyToJobDto,
   type CreateJobDto,
+  type DecideApplicationDto,
   type JobQuery,
   type NearbyQuery,
 } from '@workflex/shared';
@@ -161,5 +163,27 @@ export class JobsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.jobs.withdraw(userId, id);
+  }
+
+  // --- the poster's side ---
+
+  @Get(':id/applicants')
+  @ApiOperation({ summary: 'Applicants to one of your postings' })
+  async applicants(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.jobs.applicants(userId, id);
+  }
+
+  @Patch(':id/applicants/:userId')
+  @ApiOperation({ summary: 'Shortlist, hire or turn down an applicant' })
+  async decide(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('userId', ParseUUIDPipe) applicantId: string,
+    @Body(new ZodValidationPipe(decideApplicationSchema)) dto: DecideApplicationDto,
+  ) {
+    return this.jobs.decide(userId, id, applicantId, dto);
   }
 }

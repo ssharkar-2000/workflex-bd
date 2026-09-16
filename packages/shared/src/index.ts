@@ -21,3 +21,4 @@ export * from './skill-gap';
 export * from './trust';
 export * from './bd-places';
 export * from './reports';
+export * from './wallet';
