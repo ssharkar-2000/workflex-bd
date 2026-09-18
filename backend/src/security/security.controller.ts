@@ -1,7 +1,6 @@
 import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CurrentUser } from '../common/current-user.decorator';
-import { AuditLogQueryDto } from './dto/security.dto';
+import { PaginationDto } from '../common/pagination.dto';
 import { SecurityService } from './security.service';
 
 @Controller('security')
@@ -15,7 +14,7 @@ export class SecurityController {
   }
 
   @Get('audit-log')
-  auditLog(@Query() query: AuditLogQueryDto) {
+  auditLog(@Query() query: PaginationDto) {
     return this.security.auditLog(query);
   }
 
@@ -25,7 +24,7 @@ export class SecurityController {
   }
 
   @Post('sessions/:id/revoke')
-  revoke(@Param('id') id: string, @CurrentUser() admin: { id: string }) {
-    return this.security.revokeSession(id, admin.id);
+  revoke(@Param('id') id: string) {
+    return this.security.revokeSession(id);
   }
 }

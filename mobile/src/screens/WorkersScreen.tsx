@@ -1,23 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '../api/hooks';
 import { Page, Worker, WorkerStatus } from '../api/types';
 import { Avatar, Chip, ErrorState, FilterTabs, Loading, StatusPill } from '../components';
-import { useI18n } from '../i18n/I18nContext';
-import { buildText, categoryTint, radii, spacing, ThemeColors } from '../theme';
+import { colors, radii, shadow, spacing, text } from '../theme';
 import { experience, taka } from '../theme/format';
-import { useTheme } from '../theme/ThemeContext';
 
 type Filter = 'ALL' | WorkerStatus;
-type Styles = ReturnType<typeof createStyles>;
-type Txt = ReturnType<typeof buildText>;
 
 export function WorkersScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { colors, text, shadow, categoryPalette } = useTheme();
-  const { t } = useI18n();
-  const s = useMemo(() => createStyles(colors, text), [colors, text]);
   const [filter, setFilter] = useState<Filter>('ALL');
 
   const counts = useApi<{
@@ -33,15 +26,15 @@ export function WorkersScreen({ navigation }: any) {
   return (
     <View style={[s.flex, { paddingTop: insets.top + spacing.sm }]}>
       <View style={s.header}>
-        <Text style={text.screenTitle}>{t('workers.title')}</Text>
+        <Text style={text.screenTitle}>Explore All Workers</Text>
         <FilterTabs<Filter>
           value={filter}
           onChange={setFilter}
           options={[
-            { value: 'ALL', label: t('common.all'), count: counts.data?.total },
-            { value: 'ACTIVE', label: t('workers.active'), count: counts.data?.active },
-            { value: 'PENDING', label: t('workers.pending'), count: counts.data?.pending },
-            { value: 'SUSPENDED', label: t('workers.suspended'), count: counts.data?.suspended },
+            { value: 'ALL', label: 'All', count: counts.data?.total },
+            { value: 'ACTIVE', label: 'Active', count: counts.data?.active },
+            { value: 'PENDING', label: 'Pending', count: counts.data?.pending },
+            { value: 'SUSPENDED', label: 'Suspended', count: counts.data?.suspended },
           ]}
         />
       </View>
@@ -61,11 +54,6 @@ export function WorkersScreen({ navigation }: any) {
             <WorkerCard
               worker={item}
               onPress={() => navigation.navigate('WorkerProfile', { id: item.id })}
-              styles={s}
-              text={text}
-              shadow={shadow}
-              t={t}
-              tint={categoryTint(categoryPalette, item.id).bg}
             />
           )}
         />
@@ -74,40 +62,22 @@ export function WorkersScreen({ navigation }: any) {
   );
 }
 
-function WorkerCard({
-  worker,
-  onPress,
-  styles,
-  text,
-  shadow,
-  t,
-  tint,
-}: {
-  worker: Worker;
-  onPress: () => void;
-  styles: Styles;
-  text: Txt;
-  shadow: { card: object };
-  t: (key: string, vars?: Record<string, string | number>) => string;
-  tint?: string;
-}) {
+function WorkerCard({ worker, onPress }: { worker: Worker; onPress: () => void }) {
   const skills = worker.skills ?? [];
   const shown = skills.slice(0, 3);
   const extra = skills.length - shown.length;
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, shadow.card, tint ? { backgroundColor: tint } : null, pressed && styles.pressed]}>
-      <View style={styles.cardTop}>
+    <Pressable onPress={onPress} style={({ pressed }) => [s.card, shadow.card, pressed && s.pressed]}>
+      <View style={s.cardTop}>
         <Avatar initials={worker.initials} />
-        <View style={styles.grow}>
-          <View style={styles.nameRow}>
-            <Text style={text.cardTitle} numberOfLines={1}>
-              {worker.fullName}
-            </Text>
+        <View style={s.grow}>
+          <View style={s.nameRow}>
+            <Text style={text.cardTitle}>{worker.fullName}</Text>
             <StatusPill value={worker.status} />
           </View>
-          <Text style={text.caption} numberOfLines={1}>
-            {worker.profession} · {experience(worker.experienceMonths, t)}
+          <Text style={text.caption}>
+            {worker.profession} · {experience(worker.experienceMonths)}
           </Text>
           <Text style={[text.micro, { marginTop: 2 }]} numberOfLines={1}>
             📍 {worker.address}
@@ -115,66 +85,64 @@ function WorkerCard({
         </View>
       </View>
 
-      <View style={styles.chipRow}>
+      <View style={s.chipRow}>
         {shown.map((skill) => (
           <Chip key={skill.name} label={skill.name} />
         ))}
-        {extra > 0 ? <Chip label={t('workers.moreSkills', { count: extra })} /> : null}
+        {extra > 0 ? <Chip label={`+${extra} more`} /> : null}
       </View>
 
-      <View style={styles.statRow}>
-        <Stat value={worker.rating.toFixed(1)} label={t('workers.rating')} styles={styles} text={text} />
-        <Stat value={String(worker.totalJobs)} label={t('menu.jobs')} styles={styles} text={text} />
-        <Stat value={`${worker.trustScore}%`} label={t('workers.trust')} styles={styles} text={text} />
-        <Stat value={worker.salaryMin ? taka(worker.salaryMin) : '—'} label={t('workers.salary')} styles={styles} text={text} />
+      <View style={s.statRow}>
+        <Stat value={worker.rating.toFixed(1)} label="Rating" />
+        <Stat value={String(worker.totalJobs)} label="Jobs" />
+        <Stat value={`${worker.trustScore}%`} label="Trust" />
+        <Stat value={worker.salaryMin ? taka(worker.salaryMin) : '—'} label="Salary" />
       </View>
 
-      <View style={styles.footer}>
+      <View style={s.footer}>
         <Text style={text.micro} numberOfLines={1}>
-          {t('workers.last', { company: worker.lastCompany ?? t('workers.noHistory') })}
+          Last: {worker.lastCompany ?? 'No history'}
         </Text>
-        <Chip label={worker.availability === 'FULL_TIME' ? t('workers.fullTime') : t('workers.partTime')} />
+        <Chip label={worker.availability === 'FULL_TIME' ? 'Full-time' : 'Part-time'} />
       </View>
     </Pressable>
   );
 }
 
-function Stat({ value, label, styles, text }: { value: string; label: string; styles: Styles; text: Txt }) {
+function Stat({ value, label }: { value: string; label: string }) {
   return (
-    <View style={styles.stat}>
-      <Text style={styles.statValue}>{value}</Text>
+    <View style={s.stat}>
+      <Text style={s.statValue}>{value}</Text>
       <Text style={text.micro}>{label}</Text>
     </View>
   );
 }
 
-function createStyles(colors: ThemeColors, text: Txt) {
-  return StyleSheet.create({
-    flex: { flex: 1, backgroundColor: colors.background },
-    header: { paddingHorizontal: spacing.lg },
-    list: { padding: spacing.lg, paddingTop: spacing.sm, gap: spacing.md },
+const s = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: colors.background },
+  header: { paddingHorizontal: spacing.lg },
+  list: { padding: spacing.lg, paddingTop: spacing.sm, gap: spacing.md },
 
-    card: { backgroundColor: colors.card, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.md },
-    pressed: { opacity: 0.9 },
-    cardTop: { flexDirection: 'row', gap: spacing.md },
-    grow: { flex: 1 },
-    nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  card: { backgroundColor: colors.card, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.md },
+  pressed: { opacity: 0.9 },
+  cardTop: { flexDirection: 'row', gap: spacing.md },
+  grow: { flex: 1 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
 
-    statRow: {
-      flexDirection: 'row',
-      backgroundColor: colors.background,
-      borderRadius: radii.md,
-      paddingVertical: spacing.md,
-    },
-    stat: { flex: 1, alignItems: 'center' },
-    statValue: { fontSize: 14, fontWeight: '700', color: colors.textDark },
+  statRow: {
+    flexDirection: 'row',
+    backgroundColor: colors.background,
+    borderRadius: radii.md,
+    paddingVertical: spacing.md,
+  },
+  stat: { flex: 1, alignItems: 'center' },
+  statValue: { fontSize: 14, fontWeight: '700', color: colors.textDark },
 
-    footer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: spacing.sm,
-    },
-  });
-}
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+});

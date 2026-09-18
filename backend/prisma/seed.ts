@@ -28,9 +28,6 @@ const prisma = new PrismaClient();
 const taka = (amount: number) => BigInt(amount * 100);
 const daysAgo = (n: number) => new Date(Date.now() - n * 864e5);
 const minutesAgo = (n: number) => new Date(Date.now() - n * 60_000);
-/// Added for the items 7-14 seed data (a ban notice mid-window, an interview
-/// still to happen) — everything else here looks backwards, these look ahead.
-const hoursFromNow = (n: number) => new Date(Date.now() + n * 3600_000);
 
 async function main() {
   // Order matters — children first.
@@ -40,12 +37,6 @@ async function main() {
   await prisma.systemSetting.deleteMany();
   await prisma.jobApplication.deleteMany();
   await prisma.job.deleteMany();
-  // New in the items 7-14 pass — deleted before the rows they hang off.
-  await prisma.userNotification.deleteMany();
-  await prisma.scheduledBan.deleteMany();
-  await prisma.interview.deleteMany();
-  await prisma.storedDocument.deleteMany();
-  await prisma.complaintReply.deleteMany();
   await prisma.jobCategory.deleteMany();
   await prisma.transaction.deleteMany();
   await prisma.verificationRequest.deleteMany();
@@ -101,9 +92,6 @@ async function main() {
       { code: 'EM-004', fullName: 'Imran Chowdhury', email: 'imran@citytech.com.bd', companyId: companies['City Tech Solutions'].id, verified: false },
     ],
   });
-  const employers = Object.fromEntries(
-    (await prisma.employer.findMany()).map((e) => [e.code, e] as const),
-  );
 
   // -------------------------------------------------------------------------
   // Workers — the six profiles from "Explore All Workers"
@@ -301,80 +289,16 @@ async function main() {
   });
 
   // -------------------------------------------------------------------------
-  // Transactions — the five rows on the Payments screen, plus ~5 weeks of
-  // history for WK-001 so "1st to last transaction / at least 1 month of
-  // cash-in & cash-out" has something real to show on the Worker Profile.
+  // Transactions — the five rows on the Payments screen
   // -------------------------------------------------------------------------
   await prisma.transaction.createMany({
     data: [
-      { code: 'TXN-8825', type: TransactionType.SALARY_PAYMENT, status: TransactionStatus.COMPLETED, amount: taka(25_000), fromLabel: 'Bashundhara Group', toLabel: 'Md. Rafiqul Islam', workerId: workers['WK-001'].id, employerId: employers['EM-002'].id, jobId: jobs['JOB-0003'].id, occurredAt: daysAgo(0) },
+      { code: 'TXN-8825', type: TransactionType.SALARY_PAYMENT, status: TransactionStatus.COMPLETED, amount: taka(25_000), fromLabel: 'Bashundhara Group', toLabel: 'Md. Rafiqul Islam', workerId: workers['WK-001'].id, occurredAt: daysAgo(0) },
       { code: 'TXN-8824', type: TransactionType.WITHDRAWAL, status: TransactionStatus.COMPLETED, amount: taka(15_000), fromLabel: 'Farida Khatun', toLabel: 'bKash Wallet', workerId: workers['WK-004'].id, occurredAt: daysAgo(0) },
-      { code: 'TXN-8823', type: TransactionType.PLATFORM_FEE, status: TransactionStatus.COMPLETED, amount: taka(2_400), fromLabel: 'Square Hospitals', toLabel: 'WorkFlex BD', employerId: employers['EM-003'].id, occurredAt: daysAgo(1) },
+      { code: 'TXN-8823', type: TransactionType.PLATFORM_FEE, status: TransactionStatus.COMPLETED, amount: taka(2_400), fromLabel: 'Square Hospitals', toLabel: 'WorkFlex BD', occurredAt: daysAgo(1) },
       { code: 'TXN-8822', type: TransactionType.REFUND, status: TransactionStatus.PENDING, amount: taka(5_000), fromLabel: 'WorkFlex BD', toLabel: 'City Bank Ltd.', refundReason: 'Duplicate salary disbursement', occurredAt: daysAgo(1) },
-      { code: 'TXN-8821', type: TransactionType.SALARY_PAYMENT, status: TransactionStatus.FAILED, amount: taka(18_500), fromLabel: 'Radisson Blu Dhaka', toLabel: 'Sultana Begum', workerId: workers['WK-002'].id, employerId: employers['EM-001'].id, failureReason: 'Beneficiary account number rejected by the receiving bank.', occurredAt: daysAgo(2) },
-
-      // WK-001's older history — first-to-last view on the Worker Profile.
-      { code: 'TXN-8820', type: TransactionType.SALARY_PAYMENT, status: TransactionStatus.COMPLETED, amount: taka(24_000), fromLabel: 'Dhaka Electric Supply Co.', toLabel: 'Md. Rafiqul Islam', workerId: workers['WK-001'].id, jobId: jobs['JOB-0001'].id, occurredAt: daysAgo(9) },
-      { code: 'TXN-8819', type: TransactionType.WITHDRAWAL, status: TransactionStatus.COMPLETED, amount: taka(20_000), fromLabel: 'Md. Rafiqul Islam', toLabel: 'Nagad Wallet', workerId: workers['WK-001'].id, occurredAt: daysAgo(11) },
-      { code: 'TXN-8818', type: TransactionType.SALARY_PAYMENT, status: TransactionStatus.COMPLETED, amount: taka(26_500), fromLabel: 'Bashundhara Group', toLabel: 'Md. Rafiqul Islam', workerId: workers['WK-001'].id, employerId: employers['EM-002'].id, jobId: jobs['JOB-0003'].id, occurredAt: daysAgo(19) },
-      { code: 'TXN-8817', type: TransactionType.PLATFORM_FEE, status: TransactionStatus.COMPLETED, amount: taka(1_200), fromLabel: 'Md. Rafiqul Islam', toLabel: 'WorkFlex BD', workerId: workers['WK-001'].id, occurredAt: daysAgo(20) },
-      { code: 'TXN-8816', type: TransactionType.SALARY_PAYMENT, status: TransactionStatus.COMPLETED, amount: taka(23_000), fromLabel: 'Navana Construction', toLabel: 'Md. Rafiqul Islam', workerId: workers['WK-001'].id, occurredAt: daysAgo(33) },
-      { code: 'TXN-8815', type: TransactionType.WITHDRAWAL, status: TransactionStatus.COMPLETED, amount: taka(22_000), fromLabel: 'Md. Rafiqul Islam', toLabel: 'City Bank Ltd.', workerId: workers['WK-001'].id, occurredAt: daysAgo(34) },
+      { code: 'TXN-8821', type: TransactionType.SALARY_PAYMENT, status: TransactionStatus.FAILED, amount: taka(18_500), fromLabel: 'Radisson Blu Dhaka', toLabel: 'Sultana Begum', workerId: workers['WK-002'].id, failureReason: 'Beneficiary account number rejected by the receiving bank.', occurredAt: daysAgo(2) },
     ],
-  });
-
-  // Wallet balances = sum of completed cash-in minus completed cash-out.
-  // (See PaymentsService — SALARY_PAYMENT/REFUND credit a worker's wallet,
-  // WITHDRAWAL/PLATFORM_FEE debit it.)
-  const cashInTypes = [TransactionType.SALARY_PAYMENT, TransactionType.REFUND];
-  const cashOutTypes = [TransactionType.WITHDRAWAL, TransactionType.PLATFORM_FEE];
-  for (const code of Object.keys(workers)) {
-    const workerId = workers[code].id;
-    const [cashIn, cashOut] = await Promise.all([
-      prisma.transaction.aggregate({ _sum: { amount: true }, where: { workerId, status: TransactionStatus.COMPLETED, type: { in: cashInTypes } } }),
-      prisma.transaction.aggregate({ _sum: { amount: true }, where: { workerId, status: TransactionStatus.COMPLETED, type: { in: cashOutTypes } } }),
-    ]);
-    const balance = (cashIn._sum.amount ?? 0n) - (cashOut._sum.amount ?? 0n);
-    await prisma.worker.update({ where: { id: workerId }, data: { balance } });
-  }
-  for (const code of Object.keys(employers)) {
-    const employerId = employers[code].id;
-    const feesPaid = await prisma.transaction.aggregate({
-      _sum: { amount: true },
-      where: { employerId, status: TransactionStatus.COMPLETED, type: TransactionType.PLATFORM_FEE },
-    });
-    // Employers don't earn from the platform, so their "balance" here is a
-    // simple prepaid-credit placeholder — a flat starting float minus fees
-    // spent, just so the field isn't always zero in the demo data.
-    const balance = taka(50_000) - (feesPaid._sum.amount ?? 0n);
-    await prisma.employer.update({ where: { id: employerId }, data: { balance } });
-  }
-
-  // -------------------------------------------------------------------------
-  // Subscriptions — "kon user kon dhoroner subscription kena ache"
-  // -------------------------------------------------------------------------
-  await prisma.subscription.createMany({
-    data: [
-      { subscriberType: 'WORKER', workerId: workers['WK-001'].id, plan: 'PRO', price: taka(499), startedAt: daysAgo(20), expiresAt: daysAgo(-10) },
-      { subscriberType: 'WORKER', workerId: workers['WK-004'].id, plan: 'BASIC', price: taka(199), startedAt: daysAgo(5), expiresAt: daysAgo(-25) },
-      { subscriberType: 'WORKER', workerId: workers['WK-002'].id, plan: 'FREE', price: taka(0), startedAt: daysAgo(90) },
-      { subscriberType: 'WORKER', workerId: workers['WK-006'].id, plan: 'FREE', price: taka(0), startedAt: daysAgo(60) },
-      { subscriberType: 'EMPLOYER', employerId: employers['EM-002'].id, plan: 'PRO', price: taka(1_499), startedAt: daysAgo(15), expiresAt: daysAgo(-15) },
-      { subscriberType: 'EMPLOYER', employerId: employers['EM-001'].id, plan: 'BASIC', price: taka(699), startedAt: daysAgo(40), expiresAt: daysAgo(-2) },
-      { subscriberType: 'EMPLOYER', employerId: employers['EM-003'].id, plan: 'FREE', price: taka(0), startedAt: daysAgo(70) },
-    ],
-  });
-
-  // -------------------------------------------------------------------------
-  // A sample scheduled maintenance window, ~2 hours out, so the System
-  // screen and the 60/30-minute notification cron have something to act on.
-  // -------------------------------------------------------------------------
-  await prisma.maintenanceWindow.create({
-    data: {
-      title: 'Database upgrade',
-      message: 'The app will be briefly unavailable while we upgrade the database.',
-      scheduledAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
-    },
   });
 
   // -------------------------------------------------------------------------
@@ -448,10 +372,10 @@ async function main() {
 
   await prisma.complaint.createMany({
     data: [
-      { code: 'SUP-1041', subject: 'Salary not received for July', body: 'Worker reports the July disbursement never arrived despite the job being marked complete.', reporterName: 'Sultana Begum', status: ComplaintStatus.OPEN, createdAt: daysAgo(6) },
-      { code: 'SUP-1040', subject: 'Employer cancelled after check-in', body: 'Worker travelled to site and the shift was cancelled on arrival with no compensation.', reporterName: 'Karim Uddin', status: ComplaintStatus.IN_PROGRESS, createdAt: daysAgo(5) },
-      { code: 'SUP-1039', subject: 'Cannot upload NID photo', body: 'Upload fails at 80% every attempt on the verification screen.', reporterName: 'Abdul Karim', status: ComplaintStatus.OPEN, createdAt: daysAgo(0) },
-      { code: 'SUP-1038', subject: 'Duplicate charge on platform fee', body: 'Fee deducted twice for the same posting.', reporterName: 'Imran Chowdhury', status: ComplaintStatus.RESOLVED, resolution: 'Duplicate fee refunded via TXN-8822.', resolvedAt: daysAgo(1), createdAt: daysAgo(4) },
+      { code: 'SUP-1041', subject: 'Salary not received for July', body: 'Worker reports the July disbursement never arrived despite the job being marked complete.', reporterName: 'Sultana Begum', status: ComplaintStatus.OPEN },
+      { code: 'SUP-1040', subject: 'Employer cancelled after check-in', body: 'Worker travelled to site and the shift was cancelled on arrival with no compensation.', reporterName: 'Karim Uddin', status: ComplaintStatus.IN_PROGRESS },
+      { code: 'SUP-1039', subject: 'Cannot upload NID photo', body: 'Upload fails at 80% every attempt on the verification screen.', reporterName: 'Abdul Karim', status: ComplaintStatus.OPEN },
+      { code: 'SUP-1038', subject: 'Duplicate charge on platform fee', body: 'Fee deducted twice for the same posting.', reporterName: 'Imran Chowdhury', status: ComplaintStatus.RESOLVED, resolution: 'Duplicate fee refunded via TXN-8822.', resolvedAt: daysAgo(1) },
     ],
   });
 
@@ -557,178 +481,6 @@ async function main() {
       { kind: CmsBlockKind.FAQ, slug: 'faq-withdraw', title: 'How do I withdraw to bKash?', body: 'Open Payments, tap Withdraw, and choose your linked bKash wallet.', position: 2, published: false },
     ],
   });
-
-  // -------------------------------------------------------------------------
-  // Item 12 — every company needs an escalation contact, otherwise an
-  // escalated alert has nobody to go to. The first employer on each company
-  // is flagged as its manager.
-  // -------------------------------------------------------------------------
-  for (const company of Object.values(companies)) {
-    const first = await prisma.employer.findFirst({
-      where: { companyId: company.id },
-      orderBy: { createdAt: 'asc' },
-    });
-    if (first) {
-      await prisma.employer.update({ where: { id: first.id }, data: { isManager: true } });
-    }
-  }
-
-  // -------------------------------------------------------------------------
-  // Item 10 — interviews, so the list opens with something in it
-  // -------------------------------------------------------------------------
-  const hired = await prisma.jobApplication.findFirst({
-    where: { status: 'HIRED' },
-    orderBy: { hiredAt: 'desc' },
-  });
-  const shortlisted = await prisma.jobApplication.findFirst({ where: { status: 'SHORTLISTED' } });
-
-  if (shortlisted) {
-    await prisma.interview.create({
-      data: {
-        jobId: shortlisted.jobId,
-        workerId: shortlisted.workerId,
-        applicationId: shortlisted.id,
-        scheduledAt: hoursFromNow(26),
-        durationMinutes: 30,
-        mode: 'IN_PERSON',
-        location: 'Level 4, Bashundhara City, Panthapath, Dhaka',
-        interviewerName: 'Farhana Akter',
-        notes: 'Bring original NID and one photocopy.',
-      },
-    });
-  }
-  if (hired) {
-    await prisma.interview.create({
-      data: {
-        jobId: hired.jobId,
-        workerId: hired.workerId,
-        applicationId: hired.id,
-        scheduledAt: daysAgo(3),
-        durationMinutes: 45,
-        mode: 'PHONE',
-        location: '+8801711000111',
-        status: 'COMPLETED',
-        outcome: 'Strong candidate — offered the role the same day.',
-      },
-    });
-  }
-
-  // -------------------------------------------------------------------------
-  // Item 11 — documents filed under user id + job id. The storage key here
-  // matches exactly what DocumentsService.buildStorageKey() produces, so the
-  // seeded rows are indistinguishable from ones created through the API.
-  // -------------------------------------------------------------------------
-  const docWorker = workers['WK-001'];
-  const docJob = jobs['JOB-0001'];
-  await prisma.storedDocument.createMany({
-    data: [
-      {
-        ownerType: 'WORKER',
-        workerId: docWorker.id,
-        kind: 'NID',
-        fileName: 'nid-front.jpg',
-        storageKey: `worker/${docWorker.id}/general/nid/nid-front.jpg`,
-        mimeType: 'image/jpeg',
-        sizeBytes: 284_112,
-        note: 'Verified against the NID check on file.',
-      },
-      {
-        ownerType: 'WORKER',
-        workerId: docWorker.id,
-        kind: 'CV',
-        fileName: 'cv.pdf',
-        storageKey: `worker/${docWorker.id}/general/cv/cv.pdf`,
-        mimeType: 'application/pdf',
-        sizeBytes: 101_540,
-      },
-      {
-        ownerType: 'WORKER',
-        workerId: docWorker.id,
-        jobId: docJob.id,
-        kind: 'CONTRACT',
-        fileName: 'signed-contract.pdf',
-        storageKey: `worker/${docWorker.id}/job/${docJob.id}/contract/signed-contract.pdf`,
-        mimeType: 'application/pdf',
-        sizeBytes: 342_880,
-        note: 'Signed copy returned by the employer.',
-      },
-    ],
-  });
-
-  // -------------------------------------------------------------------------
-  // Item 8 — one live ban notice, mid-window, so the countdown and the
-  // cancel/ban-now actions have something to act on.
-  // -------------------------------------------------------------------------
-  const banWorker = workers['WK-005'];
-  const ban = await prisma.scheduledBan.create({
-    data: {
-      workerId: banWorker.id,
-      reason: 'Irregular transaction activity: 11 transactions in 24 hours, withdrawals exceed money received',
-      noticeText:
-        'We found unusual payment activity on your account. It will be suspended in 24 hours unless our review clears it. ' +
-        'If you believe this is a mistake, reply from the Help section before then.',
-      effectiveAt: hoursFromNow(19),
-    },
-  });
-
-  // -------------------------------------------------------------------------
-  // Items 7/8/9 — messages already sent to users, so the outbox is not empty
-  // -------------------------------------------------------------------------
-  const rejectedJob = await prisma.job.findFirst({ where: { status: 'REJECTED' } });
-  const rejectedEmployer = rejectedJob
-    ? await prisma.employer.findFirst({ where: { companyId: rejectedJob.companyId } })
-    : null;
-
-  await prisma.userNotification.createMany({
-    data: [
-      {
-        kind: 'BAN_WARNING',
-        audience: 'WORKER',
-        workerId: banWorker.id,
-        title: 'Your account will be suspended in 24 hours',
-        body: 'We found unusual payment activity on your account.',
-        reason: 'Irregular transaction activity',
-        entityType: 'ScheduledBan',
-        entityId: ban.id,
-        createdAt: minutesAgo(300),
-      },
-      ...(rejectedJob && rejectedEmployer
-        ? [
-            {
-              kind: 'JOB_REJECTED' as const,
-              audience: 'EMPLOYER' as const,
-              employerId: rejectedEmployer.id,
-              title: `Your job post "${rejectedJob.title}" was not approved`,
-              body: 'You can edit the post and submit it again once the point below is fixed.',
-              reason: rejectedJob.rejectionReason ?? 'Did not meet posting guidelines',
-              entityType: 'Job',
-              entityId: rejectedJob.id,
-              createdAt: daysAgo(1),
-            },
-          ]
-        : []),
-    ],
-  });
-
-  // -------------------------------------------------------------------------
-  // Item 9 — a help thread that already shows the instant auto-reply
-  // -------------------------------------------------------------------------
-  const firstComplaint = await prisma.complaint.findFirst({ orderBy: { createdAt: 'desc' } });
-  if (firstComplaint) {
-    await prisma.complaintReply.create({
-      data: {
-        complaintId: firstComplaint.id,
-        authorType: 'SYSTEM',
-        authorName: 'WorkFlex Support',
-        auto: true,
-        message: `Thanks — we have your message and opened ticket ${firstComplaint.code} for it. A support agent will reply here, and you will get a notification as soon as they do.`,
-      },
-    });
-    await prisma.complaint.update({
-      where: { id: firstComplaint.id },
-      data: { autoRepliedAt: new Date() },
-    });
-  }
 
   // -------------------------------------------------------------------------
   // System settings

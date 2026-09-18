@@ -1,13 +1,11 @@
-import React, { useMemo, useState } from 'react';
-import { Alert as RNAlert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert as RNAlert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../api/client';
-import { friendlyError } from '../api/errors';
 import { useApi } from '../api/hooks';
 import { Worker } from '../api/types';
 import {
   Avatar,
-  BackButton,
   Button,
   Card,
   Chip,
@@ -18,20 +16,12 @@ import {
   SectionHeader,
   StatusPill,
 } from '../components';
-import { useI18n } from '../i18n/I18nContext';
-import { buildText, categoryTint, radii, spacing, ThemeColors } from '../theme';
+import { colors, radii, spacing, text } from '../theme';
 import { experience, longDate, taka } from '../theme/format';
-import { useTheme } from '../theme/ThemeContext';
-
-type Styles = ReturnType<typeof createStyles>;
-type Txt = ReturnType<typeof buildText>;
 
 export function WorkerProfileScreen({ route, navigation }: any) {
   const { id } = route.params;
   const insets = useSafeAreaInsets();
-  const { colors, text, categoryPalette, shadow } = useTheme();
-  const { t } = useI18n();
-  const s = useMemo(() => createStyles(colors, text), [colors, text]);
   const { data: worker, loading, error, refetch } = useApi<Worker>(`/workers/${id}`);
   const [busy, setBusy] = useState(false);
 
@@ -44,8 +34,8 @@ export function WorkerProfileScreen({ route, navigation }: any) {
     try {
       await api(`/workers/${id}/${path}`, { method: 'POST', body });
       await refetch();
-    } catch (e) {
-      RNAlert.alert(t('alertDetail.actionFailed'), friendlyError(e, t));
+    } catch (e: any) {
+      RNAlert.alert('Action failed', e.message);
     } finally {
       setBusy(false);
     }
@@ -53,14 +43,14 @@ export function WorkerProfileScreen({ route, navigation }: any) {
 
   const confirmSuspend = () => {
     RNAlert.alert(
-      t('workerProfile.suspendTitle'),
-      t('workerProfile.suspendBody', { name: worker.fullName }),
+      'Suspend this worker?',
+      `${worker.fullName} will lose access to new jobs until reinstated.`,
       [
-        { text: t('common.cancel'), style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: t('workerProfile.suspend'),
+          text: 'Suspend',
           style: 'destructive',
-          onPress: () => act('suspend', { reason: t('workerProfile.defaultSuspendReason') }),
+          onPress: () => act('suspend', { reason: 'Suspended by admin review' }),
         },
       ],
     );
@@ -74,17 +64,14 @@ export function WorkerProfileScreen({ route, navigation }: any) {
       style={s.flex}
       contentContainerStyle={[s.content, { paddingTop: insets.top + spacing.sm }]}
     >
-      <BackButton onPress={() => navigation.goBack()} />
-      <Text style={text.screenTitle}>{t('workerProfile.title')}</Text>
+      <Text style={text.screenTitle}>Worker Profile</Text>
 
-      <Card style={{ marginTop: spacing.lg, backgroundColor: categoryTint(categoryPalette, 'identity').bg }}>
+      <Card style={{ marginTop: spacing.lg }}>
         <View style={s.identity}>
           <Avatar initials={worker.initials} size={64} />
           <View style={s.grow}>
-            <Text style={s.name} numberOfLines={1}>
-              {worker.fullName}
-            </Text>
-            <Text style={text.caption} numberOfLines={1}>
+            <Text style={s.name}>{worker.fullName}</Text>
+            <Text style={text.caption}>
               {worker.profession} · {worker.code}
             </Text>
             <View style={s.ratingRow}>
@@ -97,48 +84,28 @@ export function WorkerProfileScreen({ route, navigation }: any) {
 
         <View style={s.trust}>
           <View style={s.trustHead}>
-            <Text style={text.label}>{t('workerProfile.trustScore')}</Text>
+            <Text style={text.label}>Trust Score</Text>
             <Text style={[text.label, { color: trustColor }]}>{worker.trustScore}/100</Text>
           </View>
           <Meter percent={worker.trustScore} color={trustColor} />
         </View>
 
         <View style={s.statRow}>
-          <Stat value={String(worker.totalJobs)} label={t('workerProfile.totalJobs')} styles={s} text={text} />
-          <Stat value={taka(worker.totalEarnings, true)} label={t('workerProfile.totalEarnings')} styles={s} text={text} />
-          <Stat value={`${worker.completionRate}%`} label={t('workerProfile.completionRate')} styles={s} text={text} />
+          <Stat value={String(worker.totalJobs)} label="Total Jobs" />
+          <Stat value={taka(worker.totalEarnings, true)} label="Total Earnings" />
+          <Stat value={`${worker.completionRate}%`} label="Completion Rate" />
         </View>
       </Card>
 
-      <Pressable
-        onPress={() => navigation.navigate('WorkerTransactions', { id, fullName: worker.fullName, balance: worker.balance })}
-        style={({ pressed }) => [
-          s.balanceRow,
-          shadow.card,
-          { backgroundColor: categoryTint(categoryPalette, 'balance').bg },
-          pressed && { opacity: 0.9 },
-        ]}
-      >
-        <View>
-          <Text style={[text.caption, { color: categoryTint(categoryPalette, 'balance').fg }]}>
-            {t('workerTransactions.balance')}
-          </Text>
-          <Text style={[s.balanceValue, { color: categoryTint(categoryPalette, 'balance').fg }]}>
-            {taka(worker.balance, true)}
-          </Text>
-        </View>
-        <Text style={[s.balanceArrow, { color: categoryTint(categoryPalette, 'balance').fg }]}>›</Text>
-      </Pressable>
-
       {worker.bio ? (
-        <Card style={{ marginTop: spacing.lg, backgroundColor: categoryTint(categoryPalette, 'bio').bg }}>
-          <SectionHeader title={t('workerProfile.bio')} />
+        <Card style={{ marginTop: spacing.lg }}>
+          <SectionHeader title="Bio" />
           <Text style={text.body}>{worker.bio}</Text>
         </Card>
       ) : null}
 
-      <Card style={{ marginTop: spacing.lg, backgroundColor: categoryTint(categoryPalette, 'skills').bg }}>
-        <SectionHeader title={t('workerProfile.skills')} />
+      <Card style={{ marginTop: spacing.lg }}>
+        <SectionHeader title="Skills" />
         <View style={s.chipRow}>
           {(worker.skills ?? []).map((skill) => (
             <Chip key={skill.name} label={skill.name} />
@@ -146,16 +113,16 @@ export function WorkerProfileScreen({ route, navigation }: any) {
         </View>
       </Card>
 
-      <Card style={{ marginTop: spacing.lg, backgroundColor: categoryTint(categoryPalette, 'details').bg }}>
-        <DetailRow label={t('workerProfile.phone')} value={worker.phone} />
-        <DetailRow label={t('workerProfile.email')} value={worker.email ?? '—'} />
-        <DetailRow label={t('workerProfile.address')} value={worker.address} />
-        <DetailRow label={t('workerProfile.joined')} value={longDate(worker.joinedAt)} />
-        <DetailRow label={t('workerProfile.experience')} value={experience(worker.experienceMonths, t)} />
-        <DetailRow label={t('workerProfile.education')} value={worker.education ?? '—'} />
-        <DetailRow label={t('workerProfile.lastCompany')} value={worker.lastCompany ?? '—'} />
+      <Card style={{ marginTop: spacing.lg }}>
+        <DetailRow label="Phone" value={worker.phone} />
+        <DetailRow label="Email" value={worker.email ?? '—'} />
+        <DetailRow label="Address" value={worker.address} />
+        <DetailRow label="Joined" value={longDate(worker.joinedAt)} />
+        <DetailRow label="Experience" value={experience(worker.experienceMonths)} />
+        <DetailRow label="Education" value={worker.education ?? '—'} />
+        <DetailRow label="Last Company" value={worker.lastCompany ?? '—'} />
         <DetailRow
-          label={t('workerProfile.preferredSalary')}
+          label="Preferred Salary"
           value={
             worker.salaryMin && worker.salaryMax
               ? `${taka(worker.salaryMin)}–${taka(worker.salaryMax)}`
@@ -163,18 +130,18 @@ export function WorkerProfileScreen({ route, navigation }: any) {
           }
         />
         <DetailRow
-          label={t('workerProfile.availability')}
-          value={worker.availability === 'FULL_TIME' ? t('workers.fullTime') : t('workers.partTime')}
+          label="Availability"
+          value={worker.availability === 'FULL_TIME' ? 'Full-time' : 'Part-time'}
         />
       </Card>
 
       {(worker.certifications ?? []).length > 0 ? (
-        <Card style={{ marginTop: spacing.lg, backgroundColor: categoryTint(categoryPalette, 'certifications').bg }}>
-          <SectionHeader title={t('workerProfile.certifications')} />
+        <Card style={{ marginTop: spacing.lg }}>
+          <SectionHeader title="Certifications" />
           {worker.certifications!.map((cert) => (
             <View key={cert.id} style={s.certRow}>
               <Text style={s.certTick}>✓</Text>
-              <Text style={text.body} numberOfLines={1}>
+              <Text style={text.body}>
                 {cert.name}
                 {cert.issuer ? ` (${cert.issuer})` : ''}
               </Text>
@@ -185,36 +152,23 @@ export function WorkerProfileScreen({ route, navigation }: any) {
 
       <View style={s.actions}>
         <Button
-          label={t('workerProfile.editProfile')}
+          label="Edit Profile"
           variant="outline"
           onPress={() => navigation.navigate('EditWorker', { id })}
         />
         <Button
-          label={t('workerProfile.viewHistory')}
+          label="View History"
           variant="outline"
           onPress={() => navigation.navigate('JobHistory', { id, name: worker.fullName })}
         />
-        {/* Item 11 — every document filed under this worker's id, grouped by
-            job, with their profile at the top of that screen. */}
-        <Button
-          label={t('workerProfile.documents')}
-          variant="outline"
-          onPress={() => navigation.navigate('Documents', { workerId: id })}
-        />
-        {/* Item 10 — the interviews this worker has been called to. */}
-        <Button
-          label={t('workerProfile.interviews')}
-          variant="outline"
-          onPress={() => navigation.navigate('Interviews', { workerId: id })}
-        />
         {worker.status === 'SUSPENDED' ? (
-          <Button label={t('workerProfile.reinstate')} variant="success" loading={busy} onPress={() => act('reinstate')} />
+          <Button label="Reinstate" variant="success" loading={busy} onPress={() => act('reinstate')} />
         ) : (
           <>
             {worker.status !== 'ACTIVE' ? (
-              <Button label={t('common.verify')} variant="success" loading={busy} onPress={() => act('verify')} />
+              <Button label="Verify" variant="success" loading={busy} onPress={() => act('verify')} />
             ) : null}
-            <Button label={t('workerProfile.suspend')} variant="danger" loading={busy} onPress={confirmSuspend} />
+            <Button label="Suspend" variant="danger" loading={busy} onPress={confirmSuspend} />
           </>
         )}
       </View>
@@ -222,53 +176,41 @@ export function WorkerProfileScreen({ route, navigation }: any) {
   );
 }
 
-function Stat({ value, label, styles, text }: { value: string; label: string; styles: Styles; text: Txt }) {
+function Stat({ value, label }: { value: string; label: string }) {
   return (
-    <View style={styles.stat}>
-      <Text style={styles.statValue}>{value}</Text>
+    <View style={s.stat}>
+      <Text style={s.statValue}>{value}</Text>
       <Text style={[text.micro, { textAlign: 'center' }]}>{label}</Text>
     </View>
   );
 }
 
-function createStyles(colors: ThemeColors, text: Txt) {
-  return StyleSheet.create({
-    flex: { flex: 1, backgroundColor: colors.background },
-    content: { padding: spacing.lg, paddingBottom: spacing.xxl * 2 },
+const s = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: colors.background },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxl * 2 },
 
-    identity: { flexDirection: 'row', gap: spacing.lg, alignItems: 'center' },
-    balanceRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      borderRadius: radii.lg,
-      padding: spacing.lg,
-      marginTop: spacing.lg,
-    },
-    balanceValue: { fontSize: 20, fontWeight: '800', marginTop: 2 },
-    balanceArrow: { fontSize: 22, fontWeight: '700' },
-    grow: { flex: 1 },
-    name: { fontSize: 18, fontWeight: '700', color: colors.textDark },
-    ratingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
-    rating: { fontSize: 13, fontWeight: '700', color: colors.amber },
+  identity: { flexDirection: 'row', gap: spacing.lg, alignItems: 'center' },
+  grow: { flex: 1 },
+  name: { fontSize: 18, fontWeight: '700', color: colors.textDark },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
+  rating: { fontSize: 13, fontWeight: '700', color: colors.amber },
 
-    trust: { marginTop: spacing.xl },
-    trustHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.xs },
+  trust: { marginTop: spacing.xl },
+  trustHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.xs },
 
-    statRow: {
-      flexDirection: 'row',
-      marginTop: spacing.xl,
-      backgroundColor: colors.background,
-      borderRadius: radii.md,
-      paddingVertical: spacing.lg,
-    },
-    stat: { flex: 1, alignItems: 'center', paddingHorizontal: spacing.xs },
-    statValue: { fontSize: 15, fontWeight: '700', color: colors.textDark },
+  statRow: {
+    flexDirection: 'row',
+    marginTop: spacing.xl,
+    backgroundColor: colors.background,
+    borderRadius: radii.md,
+    paddingVertical: spacing.lg,
+  },
+  stat: { flex: 1, alignItems: 'center', paddingHorizontal: spacing.xs },
+  statValue: { fontSize: 15, fontWeight: '700', color: colors.textDark },
 
-    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-    certRow: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs },
-    certTick: { color: colors.greenText, fontWeight: '700' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  certRow: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs },
+  certTick: { color: colors.greenText, fontWeight: '700' },
 
-    actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xl },
-  });
-}
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xl },
+});

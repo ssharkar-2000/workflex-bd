@@ -1,0 +1,31 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      // npm hoists most packages to the workspace root but keeps react-native
+      // in apps/mobile/node_modules. A hoisted package such as
+      // react-native-safe-area-context then cannot resolve `react-native`
+      // types, so its props silently lose everything ViewProps provides.
+      // Metro already handles this via nodeModulesPaths in metro.config.js;
+      // this pins the same resolution for TypeScript.
+      "react-native": [
+        "./node_modules/react-native",
+        "../../node_modules/react-native"
+      ],
+      "react-native/*": [
+        "./node_modules/react-native/*",
+        "../../node_modules/react-native/*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ],
+  "exclude": ["node_modules"]
+}

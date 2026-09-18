@@ -1,23 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { AuditService } from '../common/audit.service';
 import { paginate } from '../common/pagination.dto';
 import { PaginationDto } from '../common/pagination.dto';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class SecurityService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly audit: AuditService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /// The audit trail every module writes to, made readable.
-  async auditLog(query: PaginationDto & { action?: string; entityType?: string; entityId?: string }) {
+  async auditLog(query: PaginationDto & { action?: string; entityType?: string }) {
     const where: Prisma.AuditLogWhereInput = {
       ...(query.action ? { action: { startsWith: query.action } } : {}),
       ...(query.entityType ? { entityType: query.entityType } : {}),
-      ...(query.entityId ? { entityId: query.entityId } : {}),
       ...(query.search ? { action: { contains: query.search, mode: 'insensitive' } } : {}),
     };
 
@@ -52,16 +47,10 @@ export class SecurityService {
     }));
   }
 
-  async revokeSession(id: string, adminId: string) {
+  async revokeSession(id: string) {
     await this.prisma.refreshToken.update({
       where: { id },
       data: { revokedAt: new Date() },
-    });
-    await this.audit.record({
-      adminId,
-      action: 'security.session.revoke',
-      entityType: 'RefreshToken',
-      entityId: id,
     });
     return { revoked: true };
   }

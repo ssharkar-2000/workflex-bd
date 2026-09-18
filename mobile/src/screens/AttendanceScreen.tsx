@@ -1,21 +1,16 @@
-import React, { useMemo, useState } from 'react';
-import { Alert as RNAlert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { api } from '../api/client';
-import { friendlyError } from '../api/errors';
 import { useApi } from '../api/hooks';
 import { Page } from '../api/types';
-import { Avatar, BackButton, Button, EmptyState, ErrorState, FilterTabs, Loading, Meter, StatusPill } from '../components';
-import { useI18n } from '../i18n/I18nContext';
-import { buildText, categoryTint, radii, spacing, ThemeColors } from '../theme';
-import { useTheme } from '../theme/ThemeContext';
+import { Avatar, EmptyState, ErrorState, FilterTabs, Loading, Meter, StatusPill } from '../components';
+import { colors, radii, shadow, spacing, text } from '../theme';
 
 type AttendanceRecord = {
   id: string;
   status: 'PRESENT' | 'LATE' | 'ABSENT' | 'ON_LEAVE';
   checkInAt: string | null;
   checkOutAt: string | null;
-  workingHours: number | null;
   gpsFlagged: boolean;
   worker: { id: string; fullName: string; initials: string; profession: string };
   job: { id: string; title: string } | null;
@@ -46,11 +41,7 @@ function clock(iso: string | null): string {
 
 export function AttendanceScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { colors, text, shadow, categoryPalette } = useTheme();
-  const { t } = useI18n();
-  const s = useMemo(() => createStyles(colors, text), [colors, text]);
   const [filter, setFilter] = useState<Filter>('ALL');
-  const [busyId, setBusyId] = useState<string | null>(null);
 
   const summary = useApi<Summary>('/attendance/summary');
   const query = filter === 'ALL' ? '' : `?status=${filter}`;
@@ -58,18 +49,6 @@ export function AttendanceScreen({ navigation }: any) {
     `/attendance${query}`,
     [filter],
   );
-
-  const checkOut = async (id: string) => {
-    setBusyId(id);
-    try {
-      await api(`/attendance/${id}/check-out`, { method: 'POST' });
-      await refetch();
-    } catch (e) {
-      RNAlert.alert(t('attendance.couldNotCheckOut'), friendlyError(e, t));
-    } finally {
-      setBusyId(null);
-    }
-  };
 
   return (
     <View style={[s.flex, { paddingTop: insets.top + spacing.sm }]}>
@@ -81,31 +60,31 @@ export function AttendanceScreen({ navigation }: any) {
         refreshing={loading}
         ListHeaderComponent={
           <View>
-            <BackButton onPress={() => navigation.goBack()} />
-            <Text style={text.screenTitle}>{t('attendance.title')}</Text>
+            <Text style={text.screenTitle}>Attendance</Text>
             <Text style={[text.caption, { marginTop: spacing.xs }]}>
-              {summary.data?.date ?? t('attendance.today')}
+              {summary.data?.date ?? 'Today'}
             </Text>
 
             {summary.data ? (
               <View style={[s.summary, shadow.card]}>
                 <View style={s.rateRow}>
-                  <Text style={text.label}>{t('attendance.attendanceRate')}</Text>
+                  <Text style={text.label}>Attendance rate</Text>
                   <Text style={s.rate}>{summary.data.attendanceRate}%</Text>
                 </View>
                 <Meter percent={summary.data.attendanceRate} color={colors.greenText} />
 
                 <View style={s.tiles}>
-                  <Tile value={summary.data.present} label={t('attendance.present')} color={colors.greenText} text={text} styles={s} />
-                  <Tile value={summary.data.late} label={t('attendance.late')} color={colors.amber} text={text} styles={s} />
-                  <Tile value={summary.data.absent} label={t('attendance.absent')} color={colors.red} text={text} styles={s} />
-                  <Tile value={summary.data.onLeave} label={t('attendance.onLeave')} color={colors.slate} text={text} styles={s} />
+                  <Tile value={summary.data.present} label="Present" color={colors.greenText} />
+                  <Tile value={summary.data.late} label="Late" color={colors.amber} />
+                  <Tile value={summary.data.absent} label="Absent" color={colors.red} />
+                  <Tile value={summary.data.onLeave} label="On leave" color={colors.slate} />
                 </View>
 
                 {summary.data.gpsFlagged > 0 ? (
                   <View style={s.flagged}>
                     <Text style={s.flaggedText}>
-                      {t('attendance.gpsFlaggedWarning', { count: summary.data.gpsFlagged })}
+                      ⚠ {summary.data.gpsFlagged} check-in
+                      {summary.data.gpsFlagged === 1 ? '' : 's'} flagged for GPS mismatch
                     </Text>
                   </View>
                 ) : null}
@@ -116,11 +95,11 @@ export function AttendanceScreen({ navigation }: any) {
               value={filter}
               onChange={setFilter}
               options={[
-                { value: 'ALL', label: t('common.all') },
-                { value: 'PRESENT', label: t('attendance.present') },
-                { value: 'LATE', label: t('attendance.late') },
-                { value: 'ABSENT', label: t('attendance.absent') },
-                { value: 'ON_LEAVE', label: t('attendance.leave') },
+                { value: 'ALL', label: 'All' },
+                { value: 'PRESENT', label: 'Present' },
+                { value: 'LATE', label: 'Late' },
+                { value: 'ABSENT', label: 'Absent' },
+                { value: 'ON_LEAVE', label: 'Leave' },
               ]}
             />
           </View>
@@ -131,103 +110,77 @@ export function AttendanceScreen({ navigation }: any) {
           ) : loading ? (
             <Loading />
           ) : (
-            <EmptyState title={t('attendance.emptyTitle')} hint={t('attendance.emptyHint')} />
+            <EmptyState title="Nothing recorded" hint="No attendance rows for this day yet." />
           )
         }
         renderItem={({ item }) => (
-          <View style={[s.card, shadow.card, { backgroundColor: categoryTint(categoryPalette, item.id).bg }]}>
-            <Pressable
-              onPress={() => navigation.navigate('WorkerProfile', { id: item.worker.id })}
-              style={s.cardTop}
-            >
-              <Avatar initials={item.worker.initials} size={40} />
-              <View style={s.grow}>
-                <View style={s.row}>
-                  <Text style={text.cardTitle} numberOfLines={1}>
-                    {item.worker.fullName}
-                  </Text>
-                  <StatusPill value={item.status} />
-                </View>
-                <Text style={text.caption} numberOfLines={1}>
-                  {item.job?.title ?? item.worker.profession}
+          <Pressable
+            onPress={() => navigation.navigate('WorkerProfile', { id: item.worker.id })}
+            style={({ pressed }) => [s.card, shadow.card, pressed && { opacity: 0.9 }]}
+          >
+            <Avatar initials={item.worker.initials} size={40} />
+            <View style={s.grow}>
+              <View style={s.row}>
+                <Text style={text.cardTitle} numberOfLines={1}>
+                  {item.worker.fullName}
                 </Text>
-                <Text style={[text.micro, { marginTop: 2 }]} numberOfLines={1}>
-                  {t('attendance.inOut', { in: clock(item.checkInAt), out: clock(item.checkOutAt) })}
-                  {item.workingHours !== null ? ` · ${t('attendance.hoursWorked', { hours: item.workingHours })}` : ''}
-                  {item.gpsFlagged ? `  ⚠ ${t('attendance.gpsShort')}` : ''}
-                </Text>
+                <StatusPill value={item.status} />
               </View>
-            </Pressable>
-            {item.checkInAt && !item.checkOutAt ? (
-              <Button
-                label={t('attendance.checkOut')}
-                variant="outline"
-                loading={busyId === item.id}
-                onPress={() => checkOut(item.id)}
-                style={s.checkOutButton}
-              />
-            ) : null}
-          </View>
+              <Text style={text.caption} numberOfLines={1}>
+                {item.job?.title ?? item.worker.profession}
+              </Text>
+              <Text style={[text.micro, { marginTop: 2 }]}>
+                In {clock(item.checkInAt)} · Out {clock(item.checkOutAt)}
+                {item.gpsFlagged ? '  ⚠ GPS' : ''}
+              </Text>
+            </View>
+          </Pressable>
         )}
       />
     </View>
   );
 }
 
-function Tile({
-  value,
-  label,
-  color,
-  text,
-  styles,
-}: {
-  value: number;
-  label: string;
-  color: string;
-  text: ReturnType<typeof buildText>;
-  styles: ReturnType<typeof createStyles>;
-}) {
+function Tile({ value, label, color }: { value: number; label: string; color: string }) {
   return (
-    <View style={styles.tile}>
-      <Text style={[styles.tileValue, { color }]}>{value}</Text>
+    <View style={s.tile}>
+      <Text style={[s.tileValue, { color }]}>{value}</Text>
       <Text style={text.micro}>{label}</Text>
     </View>
   );
 }
 
-function createStyles(colors: ThemeColors, text: ReturnType<typeof buildText>) {
-  return StyleSheet.create({
-    flex: { flex: 1, backgroundColor: colors.background },
-    list: { padding: spacing.lg, gap: spacing.md },
-    summary: {
-      backgroundColor: colors.card,
-      borderRadius: radii.lg,
-      padding: spacing.lg,
-      marginTop: spacing.lg,
-      gap: spacing.sm,
-    },
-    rateRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    rate: { fontSize: 18, fontWeight: '700', color: colors.greenText },
-    tiles: { flexDirection: 'row', marginTop: spacing.md },
-    tile: { flex: 1, alignItems: 'center' },
-    tileValue: { fontSize: 18, fontWeight: '700' },
-    flagged: {
-      backgroundColor: colors.amberBg,
-      borderRadius: radii.md,
-      padding: spacing.md,
-      marginTop: spacing.sm,
-    },
-    flaggedText: { ...text.caption, color: colors.amberText, fontWeight: '600' },
+const s = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: colors.background },
+  list: { padding: spacing.lg, gap: spacing.md },
+  summary: {
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    marginTop: spacing.lg,
+    gap: spacing.sm,
+  },
+  rateRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  rate: { fontSize: 18, fontWeight: '700', color: colors.greenText },
+  tiles: { flexDirection: 'row', marginTop: spacing.md },
+  tile: { flex: 1, alignItems: 'center' },
+  tileValue: { fontSize: 18, fontWeight: '700' },
+  flagged: {
+    backgroundColor: colors.amberBg,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+  },
+  flaggedText: { ...text.caption, color: colors.amberText, fontWeight: '600' },
 
-    card: {
-      backgroundColor: colors.card,
-      borderRadius: radii.lg,
-      padding: spacing.lg,
-      gap: spacing.md,
-    },
-    cardTop: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
-    checkOutButton: { alignSelf: 'flex-start' },
-    grow: { flex: 1 },
-    row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  });
-}
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    flexDirection: 'row',
+    gap: spacing.md,
+    alignItems: 'center',
+  },
+  grow: { flex: 1 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+});

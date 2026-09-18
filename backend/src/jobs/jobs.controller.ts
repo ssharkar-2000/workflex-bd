@@ -1,5 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApplicationStatus } from '@prisma/client';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../common/current-user.decorator';
 import { CreateJobDto, ListJobsDto, RejectJobDto, UpdateJobDto } from './dto/job.dto';
@@ -42,39 +41,6 @@ export class JobsController {
     return this.jobs.findOne(id);
   }
 
-  /// Item 23 follow-up — see JobsService.applications().
-  @Get(':id/applications')
-  applications(@Param('id') id: string) {
-    return this.jobs.applications(id);
-  }
-
-  @Post(':id/applications/:applicationId/shortlist')
-  shortlistApplication(
-    @Param('id') id: string,
-    @Param('applicationId') applicationId: string,
-    @CurrentUser() admin: Admin,
-  ) {
-    return this.jobs.setApplicationStatus(id, applicationId, ApplicationStatus.SHORTLISTED, admin.id);
-  }
-
-  @Post(':id/applications/:applicationId/hire')
-  hireApplication(
-    @Param('id') id: string,
-    @Param('applicationId') applicationId: string,
-    @CurrentUser() admin: Admin,
-  ) {
-    return this.jobs.setApplicationStatus(id, applicationId, ApplicationStatus.HIRED, admin.id);
-  }
-
-  @Post(':id/applications/:applicationId/reject')
-  rejectApplication(
-    @Param('id') id: string,
-    @Param('applicationId') applicationId: string,
-    @CurrentUser() admin: Admin,
-  ) {
-    return this.jobs.setApplicationStatus(id, applicationId, ApplicationStatus.REJECTED, admin.id);
-  }
-
   @Post()
   create(@Body() dto: CreateJobDto, @CurrentUser() admin: Admin) {
     return this.jobs.create(dto, admin.id);
@@ -83,11 +49,6 @@ export class JobsController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateJobDto, @CurrentUser() admin: Admin) {
     return this.jobs.update(id, dto, admin.id);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string, @CurrentUser() admin: Admin) {
-    return this.jobs.remove(id, admin.id);
   }
 
   @Post(':id/approve')

@@ -1,15 +1,6 @@
 import { Availability, JobStatus, JobUrgency } from '@prisma/client';
 import { Type } from 'class-transformer';
-import {
-  IsBoolean,
-  IsEnum,
-  IsInt,
-  IsOptional,
-  IsString,
-  MaxLength,
-  Min,
-  MinLength,
-} from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { PaginationDto } from '../../common/pagination.dto';
 
 export class ListJobsDto extends PaginationDto {
@@ -48,7 +39,5 @@ export class UpdateJobDto {
 }
 
 export class RejectJobDto {
-  /// Item 7: this text is sent to the employer as written, so a blank or
-  /// throwaway reason is rejected here as well as in JobsService.reject().
-  @IsString() @MinLength(10) @MaxLength(500) reason!: string;
+  @IsString() @MaxLength(500) reason!: string;
 }

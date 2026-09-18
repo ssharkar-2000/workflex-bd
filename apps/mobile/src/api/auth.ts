@@ -1,0 +1,98 @@
+import {
+  authSessionSchema,
+  authUserSchema,
+  otpRequestResponseSchema,
+  type AuthSession,
+  type AuthUser,
+  type OtpPurpose,
+  type OtpRequestResponse,
+  dashboardSummarySchema,
+  type DashboardSummary,
+  trustScoreSchema,
+  type TrustScore,
+} from '@workflex/shared';
+import { api } from './client';
+import { getOrCreateDeviceId } from '../lib/secure-storage';
+
+/**
+ * Responses are parsed through the same schemas the API validates against, so
+ * a contract change surfaces here as a clear error instead of an undefined
+ * field three screens later.
+ */
+export async function requestOtp(
+  phone: string,
+  purpose: OtpPurpose = 'LOGIN',
+): Promise<OtpRequestResponse> {
+  const { data } = await api.post('/auth/otp/request', { phone, purpose });
+  return otpRequestResponseSchema.parse(data);
+}
+
+export async function verifyOtp(
+  phone: string,
+  code: string,
+  purpose: OtpPurpose = 'LOGIN',
+): Promise<AuthSession> {
+  const deviceId = await getOrCreateDeviceId();
+  const { data } = await api.post('/auth/otp/verify', {
+    phone,
+    code,
+    purpose,
+    deviceId,
+  });
+  return authSessionSchema.parse(data);
+}
+
+export async function login(
+  phone: string,
+  password: string,
+): Promise<AuthSession> {
+  const deviceId = await getOrCreateDeviceId();
+  const { data } = await api.post('/auth/login', { phone, password, deviceId });
+  return authSessionSchema.parse(data);
+}
+
+export async function requestPasswordReset(phone: string): Promise<void> {
+  await api.post('/auth/password/reset/request', { phone });
+}
+
+export async function confirmPasswordReset(input: {
+  phone: string;
+  code: string;
+  password: string;
+  confirmPassword: string;
+}): Promise<void> {
+  await api.post('/auth/password/reset/confirm', input);
+}
+
+export async function fetchMe(): Promise<AuthUser> {
+  const { data } = await api.get('/me');
+  return authUserSchema.parse(data);
+}
+
+export async function logout(refreshToken?: string): Promise<void> {
+  await api.post('/auth/logout', { refreshToken, allDevices: false });
+}
+
+/**
+ * Counts and completeness for the dashboard, in one request.
+ *
+ * Separate from `fetchMe` because it changes far more often — applying for a
+ * job moves these numbers, but not the identity `/me` returns — and because
+ * the dashboard should still render if this one is slow.
+ */
+export async function fetchDashboardSummary(): Promise<DashboardSummary> {
+  const { data } = await api.get('/me/dashboard');
+  return dashboardSummarySchema.parse(data);
+}
+
+/**
+ * The trust score and the records behind it.
+ *
+ * Its own request rather than a field on the dashboard summary: it reads
+ * attendance and reports, which the counts do not touch, and a slow join
+ * should not hold up the numbers at the top of the screen.
+ */
+export async function fetchTrustScore(): Promise<TrustScore> {
+  const { data } = await api.get('/me/trust');
+  return trustScoreSchema.parse(data);
+}

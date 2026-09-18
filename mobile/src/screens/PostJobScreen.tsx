@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Alert as RNAlert,
   KeyboardAvoidingView,
@@ -12,22 +12,15 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../api/client';
-import { friendlyError } from '../api/errors';
 import { useApi } from '../api/hooks';
 import { Button, Card, Loading } from '../components';
-import { useI18n } from '../i18n/I18nContext';
-import { buildText, radii, spacing, ThemeColors } from '../theme';
-import { useTheme } from '../theme/ThemeContext';
+import { colors, radii, spacing, text } from '../theme';
 
 type Category = { id: string; slug: string; name: string; icon: string };
 type Company = { id: string; name: string };
-type Styles = ReturnType<typeof createStyles>;
 
 export function PostJobScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { colors, text } = useTheme();
-  const { t } = useI18n();
-  const s = useMemo(() => createStyles(colors, text), [colors, text]);
   const categories = useApi<Category[]>('/jobs/categories');
   const companies = useApi<Company[]>('/jobs/companies');
 
@@ -46,14 +39,17 @@ export function PostJobScreen({ navigation }: any) {
 
   const submit = async () => {
     if (!companyId || !categoryId) {
-      RNAlert.alert(t('postJob.pickCompanyTitle'), t('postJob.pickCompanyBody'));
+      RNAlert.alert(
+        'Pick a company and category',
+        'Both are needed before a posting can enter the review queue.',
+      );
       return;
     }
 
     const min = Number(form.salaryMin);
     const max = Number(form.salaryMax);
     if (!Number.isFinite(min) || !Number.isFinite(max) || max < min) {
-      RNAlert.alert(t('postJob.checkSalaryTitle'), t('postJob.checkSalaryBody'));
+      RNAlert.alert('Check the salary range', 'Enter both figures in taka, with the maximum at or above the minimum.');
       return;
     }
 
@@ -70,11 +66,11 @@ export function PostJobScreen({ navigation }: any) {
           salaryMax: Math.round(max * 100),
         },
       });
-      RNAlert.alert(t('postJob.postedTitle'), t('postJob.postedBody'), [
-        { text: t('editWorker.done'), onPress: () => navigation.goBack() },
+      RNAlert.alert('Job posted', 'It is now in the review queue.', [
+        { text: 'Done', onPress: () => navigation.goBack() },
       ]);
-    } catch (e) {
-      RNAlert.alert(t('postJob.couldNotPost'), friendlyError(e, t));
+    } catch (e: any) {
+      RNAlert.alert('Could not post', e.message);
     } finally {
       setSaving(false);
     }
@@ -86,18 +82,17 @@ export function PostJobScreen({ navigation }: any) {
         contentContainerStyle={[s.content, { paddingTop: insets.top + spacing.sm }]}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={text.screenTitle}>{t('postJob.title')}</Text>
+        <Text style={text.screenTitle}>Post a Job</Text>
 
         <Card style={{ marginTop: spacing.lg }}>
-          <Field label={t('postJob.jobTitle')} value={form.title} onChange={(v) => setForm({ ...form, title: v })} styles={s} />
+          <Field label="Job title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} />
           <Field
-            label={t('postJob.location')}
+            label="Location"
             value={form.location}
             onChange={(v) => setForm({ ...form, location: v })}
-            styles={s}
           />
 
-          <Text style={s.label}>{t('postJob.company')}</Text>
+          <Text style={s.label}>Company</Text>
           <View style={s.chipRow}>
             {(companies.data ?? []).map((c) => {
               const active = companyId === c.id;
@@ -113,7 +108,7 @@ export function PostJobScreen({ navigation }: any) {
             })}
           </View>
 
-          <Text style={s.label}>{t('postJob.category')}</Text>
+          <Text style={s.label}>Category</Text>
           <View style={s.chipRow}>
             {(categories.data ?? []).map((c) => {
               const active = categoryId === c.id;
@@ -134,36 +129,33 @@ export function PostJobScreen({ navigation }: any) {
           <View style={s.salaryRow}>
             <View style={s.grow}>
               <Field
-                label={t('postJob.salaryFrom')}
+                label="Salary from (৳)"
                 value={form.salaryMin}
                 onChange={(v) => setForm({ ...form, salaryMin: v })}
                 numeric
-                styles={s}
               />
             </View>
             <View style={s.grow}>
               <Field
-                label={t('postJob.salaryTo')}
+                label="Salary to (৳)"
                 value={form.salaryMax}
                 onChange={(v) => setForm({ ...form, salaryMax: v })}
                 numeric
-                styles={s}
               />
             </View>
           </View>
 
           <Field
-            label={t('postJob.description')}
+            label="Description"
             value={form.description}
             onChange={(v) => setForm({ ...form, description: v })}
             multiline
-            styles={s}
           />
         </Card>
 
         <View style={s.actions}>
-          <Button label={t('common.cancel')} variant="outline" onPress={() => navigation.goBack()} />
-          <Button label={t('postJob.postJob')} loading={saving} onPress={submit} />
+          <Button label="Cancel" variant="outline" onPress={() => navigation.goBack()} />
+          <Button label="Post job" loading={saving} onPress={submit} />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -176,23 +168,20 @@ function Field({
   onChange,
   multiline,
   numeric,
-  styles,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   multiline?: boolean;
   numeric?: boolean;
-  styles: Styles;
 }) {
-  const { colors } = useTheme();
   return (
-    <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+    <View style={s.field}>
+      <Text style={s.label}>{label}</Text>
       <TextInput
         value={value}
         onChangeText={onChange}
-        style={[styles.input, multiline && styles.multiline]}
+        style={[s.input, multiline && s.multiline]}
         multiline={multiline}
         keyboardType={numeric ? 'number-pad' : 'default'}
         placeholderTextColor={colors.textLight}
@@ -201,35 +190,33 @@ function Field({
   );
 }
 
-function createStyles(colors: ThemeColors, text: ReturnType<typeof buildText>) {
-  return StyleSheet.create({
-    flex: { flex: 1, backgroundColor: colors.background },
-    content: { padding: spacing.lg, paddingBottom: spacing.xxl * 2 },
-    field: { marginBottom: spacing.md },
-    label: { ...text.label, marginBottom: spacing.xs },
-    input: {
-      minHeight: 46,
-      borderRadius: radii.md,
-      backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-      ...text.body,
-    },
-    multiline: { minHeight: 110, textAlignVertical: 'top' },
-    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md },
-    chip: {
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-      borderRadius: radii.pill,
-      backgroundColor: colors.background,
-    },
-    chipActive: { backgroundColor: colors.primary },
-    chipText: { fontSize: 12, fontWeight: '600', color: colors.textGray },
-    chipTextActive: { color: colors.onPrimary },
-    salaryRow: { flexDirection: 'row', gap: spacing.md },
-    grow: { flex: 1 },
-    actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
-  });
-}
+const s = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: colors.background },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxl * 2 },
+  field: { marginBottom: spacing.md },
+  label: { ...text.label, marginBottom: spacing.xs },
+  input: {
+    minHeight: 46,
+    borderRadius: radii.md,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    ...text.body,
+  },
+  multiline: { minHeight: 110, textAlignVertical: 'top' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md },
+  chip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    backgroundColor: colors.background,
+  },
+  chipActive: { backgroundColor: colors.primary },
+  chipText: { fontSize: 12, fontWeight: '600', color: colors.textGray },
+  chipTextActive: { color: colors.onPrimary },
+  salaryRow: { flexDirection: 'row', gap: spacing.md },
+  grow: { flex: 1 },
+  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
+});

@@ -1,0 +1,29 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      // Same hoisting workaround as apps/mobile: npm keeps react-native in the
+      // app's own node_modules while hoisting its dependents to the root, so
+      // TypeScript needs both locations spelled out or hoisted packages lose
+      // their react-native types.
+      "react-native": [
+        "./node_modules/react-native",
+        "../../node_modules/react-native"
+      ],
+      "react-native/*": [
+        "./node_modules/react-native/*",
+        "../../node_modules/react-native/*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ],
+  "exclude": ["node_modules"]
+}

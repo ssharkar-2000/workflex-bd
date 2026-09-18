@@ -6,15 +6,11 @@ import {
   VerificationStatus,
   WorkerStatus,
 } from '@prisma/client';
-import { PaymentsService } from '../payments/payments.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class DashboardService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly payments: PaymentsService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /// The four "Overview" cards, the Worker Status breakdown, the live alert
   /// strip, and the recent notification list — served together, since the
@@ -75,76 +71,28 @@ export class DashboardService {
     };
   }
 
-  /// Backs the Analytics screen: two series, the four KPI tiles, and the
-  /// payments/refunds breakdown reachable from Payments → Full Analytics.
-  ///
-  /// Item-23 audit follow-up: `revenueSeries`/`workerSeries` previously came
-  /// from the `DailyMetric` table, which is only ever written by the seed
-  /// script (`prisma/seed.ts`) — nothing in the running app inserts new rows
-  /// as real activity happens. In practice this meant the chart looked
-  /// populated right after seeding and then never moved again, no matter
-  /// how much real activity occurred. Replaced with two live queries:
-  /// revenue reuses `PaymentsService.revenueSeries()` (the actual
-  /// `transactions` table, correctly excluding refunds — see that file),
-  /// and worker growth is now a real cumulative count of ACTIVE workers by
-  /// month from the `Worker` table itself.
+  /// Backs the Analytics screen: two series plus the four KPI tiles.
   async analytics() {
-    const months = 6;
-    const since = new Date();
-    since.setMonth(since.getMonth() - (months - 1));
-    since.setDate(1);
-    since.setHours(0, 0, 0, 0);
+    const metrics = await this.prisma.dailyMetric.findMany({ orderBy: { date: 'asc' } });
 
-    const [revenueSeries, activeWorkers, ratings, jobTotals, approvedJobs, hires, paymentsByStatus, refundsAgg, methodRows] =
-      await Promise.all([
-        this.payments.revenueSeries(months),
-        this.prisma.worker.findMany({
-          where: { status: WorkerStatus.ACTIVE },
-          select: { joinedAt: true },
-          orderBy: { joinedAt: 'asc' },
-        }),
-        this.prisma.worker.aggregate({ _avg: { rating: true }, _sum: { reviewCount: true } }),
-        this.prisma.job.count(),
-        this.prisma.job.count({ where: { status: JobStatus.APPROVED } }),
-        this.prisma.jobApplication.findMany({
-          where: { hiredAt: { not: null } },
-          select: { appliedAt: true, hiredAt: true },
-        }),
-        this.prisma.transaction.groupBy({
-          by: ['status'],
-          _sum: { amount: true },
-          _count: { _all: true },
-          orderBy: { status: 'asc' },
-        }),
-        this.prisma.transaction.aggregate({
-          _sum: { amount: true },
-          _count: { _all: true },
-          where: { type: 'REFUND' },
-        }),
-        this.prisma.transaction.groupBy({
-          by: ['method'],
-          _sum: { amount: true },
-          _count: { _all: true },
-          where: { status: TransactionStatus.COMPLETED },
-          orderBy: { method: 'asc' },
-        }),
-      ]);
-
-    // Cumulative active-worker count as of the end of each of the last N
-    // months — a real growth curve built from `Worker.joinedAt`, no
-    // snapshot table required.
-    const monthKeys: string[] = [];
-    for (let i = 0; i < months; i++) {
-      const d = new Date(since);
-      d.setMonth(d.getMonth() + i);
-      monthKeys.push(d.toISOString().slice(0, 7));
+    const byMonth = new Map<string, { revenue: number; workers: number }>();
+    for (const m of metrics) {
+      const key = m.date.toISOString().slice(0, 7);
+      const entry = byMonth.get(key) ?? { revenue: 0, workers: 0 };
+      entry.revenue += Number(m.revenue);
+      entry.workers = Math.max(entry.workers, m.activeWorkers);
+      byMonth.set(key, entry);
     }
-    const workerSeries = monthKeys.map((key) => {
-      const [y, m] = key.split('-').map(Number);
-      const monthEnd = new Date(y, m, 0, 23, 59, 59, 999); // last instant of that month
-      const total = activeWorkers.filter((w) => w.joinedAt <= monthEnd).length;
-      return { month: key, total };
-    });
+
+    const [ratings, jobTotals, approvedJobs, hires] = await this.prisma.$transaction([
+      this.prisma.worker.aggregate({ _avg: { rating: true }, _sum: { reviewCount: true } }),
+      this.prisma.job.count(),
+      this.prisma.job.count({ where: { status: JobStatus.APPROVED } }),
+      this.prisma.jobApplication.findMany({
+        where: { hiredAt: { not: null } },
+        select: { appliedAt: true, hiredAt: true },
+      }),
+    ]);
 
     const avgHireDays =
       hires.length === 0
@@ -154,28 +102,12 @@ export class DashboardService {
           864e5;
 
     return {
-      revenueSeries,
-      workerSeries,
+      revenueSeries: [...byMonth].map(([month, v]) => ({ month, total: v.revenue })),
+      workerSeries: [...byMonth].map(([month, v]) => ({ month, total: v.workers })),
       platformRating: Math.round(Number(ratings._avg.rating ?? 0) * 10) / 10,
       reviewCount: ratings._sum.reviewCount ?? 0,
       jobFillRate: jobTotals === 0 ? 0 : Math.round((approvedJobs / jobTotals) * 1000) / 10,
       avgHireDays: Math.round(avgHireDays * 10) / 10,
-      payments: {
-        byStatus: (paymentsByStatus as any[]).map((r) => ({
-          status: r.status,
-          total: Number(r._sum.amount ?? 0n),
-          count: r._count._all,
-        })),
-        byMethod: (methodRows as any[]).map((r) => ({
-          method: r.method,
-          total: Number(r._sum.amount ?? 0n),
-          count: r._count._all,
-        })),
-        refunds: {
-          total: Number(refundsAgg._sum.amount ?? 0n),
-          count: refundsAgg._count._all,
-        },
-      },
     };
   }
 
