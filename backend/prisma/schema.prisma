@@ -1,0 +1,990 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Admin access
+// ---------------------------------------------------------------------------
+
+enum AdminRole {
+  SUPER_ADMIN
+  MODERATOR
+  SUPPORT
+}
+
+model AdminUser {
+  id           String         @id @default(uuid())
+  email        String         @unique
+  passwordHash String
+  displayName  String
+  role         AdminRole      @default(MODERATOR)
+  language     String         @default("en") // "en" | "bn"
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  sessions     RefreshToken[]
+  auditLogs    AuditLog[]
+  assignedComplaints Complaint[]
+  complaintReplies   ComplaintReply[]
+
+  @@map("admin_users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  adminId   String
+  tokenHash String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  admin     AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@map("refresh_tokens")
+}
+
+/// Every state-changing admin action is recorded — approve, reject, suspend,
+/// refund, escalate. The alert detail frame shows an "Action Taken" field, and
+/// suspend/reject flows all confirm before writing.
+model AuditLog {
+  id         String    @id @default(uuid())
+  adminId    String
+  action     String // "job.approve", "worker.suspend", ...
+  entityType String
+  entityId   String
+  reason     String?
+  metadata   Json?
+  createdAt  DateTime  @default(now())
+  admin      AdminUser @relation(fields: [adminId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Workers
+// ---------------------------------------------------------------------------
+
+enum WorkerStatus {
+  ACTIVE
+  PENDING
+  REJECTED
+  SUSPENDED
+}
+
+enum Availability {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+}
+
+model Worker {
+  id         String @id @default(uuid())
+  /// Human-facing code shown in the UI, e.g. "WK-002".
+  code       String @unique
+  fullName   String
+  /// Initials shown in the avatar circle when no photo exists ("SB").
+  initials   String
+  profession String
+
+  status       WorkerStatus @default(PENDING)
+  availability Availability @default(FULL_TIME)
+
+  phone   String
+  email   String?
+  address String
+
+  bio         String?
+  education   String?
+  lastCompany String?
+  /// Stored in months so "3 years 1 month" renders in either language.
+  experienceMonths Int @default(0)
+
+  /// Aggregates maintained from review rows.
+  rating      Decimal @default(0) @db.Decimal(2, 1)
+  reviewCount Int     @default(0)
+  /// 0-100, drives the "Trust Score" meter.
+  trustScore  Int     @default(0)
+
+  totalJobs      Int    @default(0)
+  completionRate Int    @default(0)
+  /// Money is stored in paisa (integer) to avoid float drift. ৳25,000 = 2500000.
+  totalEarnings  BigInt @default(0)
+  salaryMin      BigInt?
+  salaryMax      BigInt?
+  /// Platform wallet balance (paisa). Admin previously had no way to see this
+  /// at all — every SALARY_PAYMENT/REFUND transaction to this worker credits
+  /// it, every WITHDRAWAL/PLATFORM_FEE debits it (see PaymentsService).
+  balance BigInt @default(0)
+
+  joinedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  skills         WorkerSkill[]
+  certifications Certification[]
+  jobHistory     JobHistoryEntry[]
+  applications   JobApplication[]
+  verifications  VerificationRequest[]
+  alerts         Alert[]
+  transactions   Transaction[]        @relation("TransactionToWorker")
+  attendance     AttendanceRecord[]
+  subscriptions  Subscription[]
+
+  /// Items 7/8/12 — messages this worker receives in their own app.
+  userNotifications UserNotification[]
+  /// Item 8 — 24-hour ban notices raised against this worker.
+  scheduledBans     ScheduledBan[]
+  /// Item 10 — interviews this worker has been called to.
+  interviews        Interview[]
+  /// Item 11 — documents filed under this worker's id.
+  documents         StoredDocument[]
+
+  @@index([status])
+  @@index([profession])
+  @@map("workers")
+}
+
+model WorkerSkill {
+  id       String @id @default(uuid())
+  workerId String
+  name     String
+  worker   Worker @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@unique([workerId, name])
+  @@map("worker_skills")
+}
+
+model Certification {
+  id       String  @id @default(uuid())
+  workerId String
+  name     String
+  issuer   String?
+  year     Int?
+  worker   Worker  @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@map("certifications")
+}
+
+model JobHistoryEntry {
+  id        String    @id @default(uuid())
+  workerId  String
+  company   String
+  role      String
+  startedAt DateTime
+  endedAt   DateTime?
+  worker    Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@index([workerId])
+  @@map("job_history_entries")
+}
+
+// ---------------------------------------------------------------------------
+// Employers and companies
+// ---------------------------------------------------------------------------
+
+model Company {
+  id        String     @id @default(uuid())
+  name      String
+  /// Single letter shown in the job card avatar ("R" for Radisson).
+  initials  String
+  industry  String?
+  address   String?
+  verified  Boolean    @default(false)
+  createdAt DateTime   @default(now())
+  employers Employer[]
+  jobs      Job[]
+  /// Item 12 — which company a suspicious-activity alert came from.
+  alerts    Alert[]
+
+  @@map("companies")
+}
+
+model Employer {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  fullName  String
+  email     String   @unique
+  phone     String?
+  companyId String?
+  verified  Boolean  @default(false)
+  /// Prepaid platform wallet balance (paisa) — job-posting/featured-listing
+  /// fees are debited from this.
+  balance   BigInt   @default(0)
+  createdAt DateTime @default(now())
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  /// Item 12 — a company's escalation contact. When an alert is escalated it
+  /// goes to the company's manager; this flag is how we pick which of a
+  /// company's employer accounts that is. Falls back to the oldest employer
+  /// on the company when nobody is flagged.
+  isManager Boolean @default(false)
+
+  verifications VerificationRequest[]
+  subscriptions Subscription[]
+  transactions  Transaction[]          @relation("TransactionToEmployer")
+
+  userNotifications UserNotification[]
+  documents         StoredDocument[]
+  /// Item 12 — alerts routed to this manager.
+  escalatedAlerts   Alert[]            @relation("AlertEscalatedTo")
+
+  @@map("employers")
+}
+
+// ---------------------------------------------------------------------------
+// Jobs
+// ---------------------------------------------------------------------------
+
+enum JobStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum JobUrgency {
+  NORMAL
+  URGENT
+}
+
+model JobCategory {
+  id   String @id @default(uuid())
+  slug String @unique // "administration", "security", "healthcare", ...
+  name String
+  /// Emoji used as the chip icon in the category filter row.
+  icon String
+  jobs Job[]
+
+  @@map("job_categories")
+}
+
+model Job {
+  id          String @id @default(uuid())
+  code        String @unique
+  title       String
+  description String
+  companyId   String
+  categoryId  String
+  location    String
+
+  salaryMin BigInt
+  salaryMax BigInt
+
+  availability Availability @default(FULL_TIME)
+  /// Minimum experience required, in months ("1+ year" = 12).
+  experienceMonths Int @default(0)
+
+  status   JobStatus  @default(PENDING)
+  urgency  JobUrgency @default(NORMAL)
+  /// "Featured" is a flag on an approved job, not a fifth status — the tab row
+  /// counts All / Pending / Approved / Featured / Rejected independently.
+  featured Boolean    @default(false)
+
+  /// Set when an admin rejects; shown on the Rejected Jobs screen.
+  rejectionReason String?
+  reviewedAt      DateTime?
+
+  views     Int      @default(0)
+  postedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company      Company            @relation(fields: [companyId], references: [id])
+  category     JobCategory        @relation(fields: [categoryId], references: [id])
+  applications JobApplication[]
+  attendance   AttendanceRecord[]
+  transactions Transaction[]
+  /// Item 10 — the interview list for this job.
+  interviews   Interview[]
+  /// Item 11 — documents filed under (user id + job id).
+  documents    StoredDocument[]
+
+  @@index([status])
+  @@index([categoryId])
+  @@map("jobs")
+}
+
+enum ApplicationStatus {
+  APPLIED
+  SHORTLISTED
+  HIRED
+  REJECTED
+}
+
+model JobApplication {
+  id        String            @id @default(uuid())
+  jobId     String
+  workerId  String
+  status    ApplicationStatus @default(APPLIED)
+  appliedAt DateTime          @default(now())
+  hiredAt   DateTime?
+  job       Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  worker    Worker            @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  /// Item 10 — an applicant can be called to more than one round.
+  interviews Interview[]
+
+  @@unique([jobId, workerId])
+  @@map("job_applications")
+}
+
+// ---------------------------------------------------------------------------
+// Payments
+// ---------------------------------------------------------------------------
+
+enum TransactionType {
+  SALARY_PAYMENT
+  WITHDRAWAL
+  PLATFORM_FEE
+  REFUND
+}
+
+enum TransactionStatus {
+  COMPLETED
+  PENDING
+  FAILED
+}
+
+enum PaymentMethod {
+  BKASH
+  NAGAD
+  ROCKET
+  BANK_TRANSFER
+  CARD
+  CASH
+}
+
+model Transaction {
+  id   String @id @default(uuid())
+  /// Shown in the UI as "TXN-8825".
+  code String @unique
+
+  type   TransactionType
+  status TransactionStatus @default(PENDING)
+  /// Paisa. ৳25,000 = 2500000.
+  amount BigInt
+  method PaymentMethod @default(BKASH)
+
+  /// The design renders "Bashundhara Group → Md. Rafiqul Islam", so both sides
+  /// are stored as labels and optionally linked to a worker/employer when known.
+  fromLabel  String
+  toLabel    String
+  workerId   String?
+  employerId String?
+  /// Which job this payment relates to, when applicable (SALARY_PAYMENT is
+  /// almost always tied to a job; WITHDRAWAL/PLATFORM_FEE/REFUND may not be).
+  jobId      String?
+
+  /// Only set on FAILED rows; drives the Failed Transaction modal.
+  failureReason String?
+  /// Only set on REFUND rows.
+  refundReason  String?
+  /// Links a REFUND row back to the original transaction it reverses.
+  relatedTransactionId String?
+  relatedTransaction   Transaction?  @relation("TransactionRefund", fields: [relatedTransactionId], references: [id])
+  refunds              Transaction[] @relation("TransactionRefund")
+
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  worker   Worker?   @relation("TransactionToWorker", fields: [workerId], references: [id])
+  employer Employer? @relation("TransactionToEmployer", fields: [employerId], references: [id])
+  job      Job?      @relation(fields: [jobId], references: [id])
+
+  @@index([status])
+  @@index([occurredAt])
+  @@index([workerId])
+  @@index([employerId])
+  @@map("transactions")
+}
+
+// ---------------------------------------------------------------------------
+// Subscriptions
+// ---------------------------------------------------------------------------
+
+enum SubscriptionPlan {
+  FREE
+  BASIC
+  PRO
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum SubscriberType {
+  WORKER
+  EMPLOYER
+}
+
+model Subscription {
+  id             String             @id @default(uuid())
+  subscriberType SubscriberType
+  workerId       String?
+  employerId     String?
+
+  plan   SubscriptionPlan   @default(FREE)
+  status SubscriptionStatus @default(ACTIVE)
+  /// Paisa. ৳0 for FREE.
+  price  BigInt             @default(0)
+
+  startedAt DateTime  @default(now())
+  /// Null means it doesn't lapse on its own (e.g. FREE, or cancelled manually).
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  worker   Worker?   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  employer Employer? @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  @@index([plan])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+// ---------------------------------------------------------------------------
+// Verification centre
+// ---------------------------------------------------------------------------
+
+enum VerificationType {
+  NID
+  FACE
+  BUSINESS
+  WORKER
+  EMPLOYER
+  COMPANY
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model VerificationRequest {
+  id     String             @id @default(uuid())
+  type   VerificationType
+  status VerificationStatus @default(PENDING)
+  /// Name as displayed in the queue ("Karim Uddin", "City Tech Solutions").
+  subjectName String
+  workerId    String?
+  employerId  String?
+  documentUrl String?
+  reviewNote  String?
+  submittedAt DateTime @default(now())
+  reviewedAt  DateTime?
+
+  worker   Worker?   @relation(fields: [workerId], references: [id])
+  employer Employer? @relation(fields: [employerId], references: [id])
+
+  @@index([status, type])
+  @@map("verification_requests")
+}
+
+// ---------------------------------------------------------------------------
+// AI monitoring
+// ---------------------------------------------------------------------------
+
+enum AlertSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum AlertStatus {
+  OPEN
+  ESCALATED
+  RESOLVED
+}
+
+enum AlertKind {
+  SOS
+  SUSPICIOUS_LOGIN
+  FAKE_GPS
+  FAILED_VERIFICATION
+  FRAUD
+}
+
+model Alert {
+  id       String        @id @default(uuid())
+  kind     AlertKind
+  severity AlertSeverity
+  status   AlertStatus   @default(OPEN)
+  message  String
+
+  /// Free-text subject, since some alerts have no linked account
+  /// ("Unknown User" appears in the design).
+  subjectName String
+  workerId    String?
+
+  /// Item 12 — which company the suspicious activity originated from. Shown
+  /// directly on the alert card/detail so an admin doesn't have to open the
+  /// worker to find out, and used to pick the manager on escalation.
+  companyId String?
+  /// Free-text company label for alerts with no linked company row
+  /// (e.g. an unknown device hitting a login endpoint).
+  companyLabel String?
+
+  latitude    Decimal? @db.Decimal(9, 6)
+  longitude   Decimal? @db.Decimal(9, 6)
+  device      String?
+  actionTaken String?
+
+  /// Item 12 — set when the alert is pushed to a company manager.
+  escalatedToEmployerId String?
+  escalatedAt           DateTime?
+  escalationNote        String?
+
+  detectedAt DateTime  @default(now())
+  resolvedAt DateTime?
+
+  worker            Worker?   @relation(fields: [workerId], references: [id])
+  company           Company?  @relation(fields: [companyId], references: [id])
+  escalatedToManager Employer? @relation("AlertEscalatedTo", fields: [escalatedToEmployerId], references: [id])
+
+  @@index([status, severity])
+  @@index([companyId])
+  @@map("alerts")
+}
+
+// ---------------------------------------------------------------------------
+// Support and notifications
+// ---------------------------------------------------------------------------
+
+enum ComplaintStatus {
+  OPEN
+  IN_PROGRESS
+  ESCALATED
+  RESOLVED
+  CLOSED
+}
+
+model Complaint {
+  id             String          @id @default(uuid())
+  code           String          @unique
+  subject        String
+  body           String
+  status         ComplaintStatus @default(OPEN)
+  reporterName   String
+  /// Item 9 — who to push the reply back to. Plain ids (no relation) so a
+  /// ticket from a guest/unregistered reporter is still valid.
+  reporterWorkerId   String?
+  reporterEmployerId String?
+  /// Set once the instant auto-reply has gone out, so it never double-fires.
+  autoRepliedAt      DateTime?
+  resolution     String?
+  assignedAdminId String?
+  assignedAdmin  AdminUser?      @relation(fields: [assignedAdminId], references: [id])
+  replies        ComplaintReply[]
+  createdAt      DateTime        @default(now())
+  resolvedAt     DateTime?
+
+  @@index([status])
+  @@map("complaints")
+}
+
+/// Item 9 — the help thread is no longer admin-only. A reply can now come
+/// from the user who opened the ticket, from an admin, or from the system
+/// (the instant auto-reply that fires the moment a user sends a message), so
+/// `adminId` is optional and `authorType` says who wrote it.
+enum ReplyAuthor {
+  ADMIN
+  USER
+  SYSTEM
+}
+
+model ComplaintReply {
+  id          String      @id @default(uuid())
+  complaintId String
+  adminId     String?
+  authorType  ReplyAuthor @default(ADMIN)
+  /// Name shown on the bubble for USER/SYSTEM replies (admins use the
+  /// linked admin's displayName instead).
+  authorName  String?
+  message     String
+  /// True for the instant acknowledgement/FAQ answer generated by the
+  /// support bot rather than typed by a person.
+  auto        Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+
+  complaint Complaint  @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  admin     AdminUser? @relation(fields: [adminId], references: [id])
+
+  @@index([complaintId])
+  @@map("complaint_replies")
+}
+
+enum NotificationKind {
+  SOS
+  VERIFICATION
+  PAYMENT
+  FRAUD
+  JOB
+  MAINTENANCE
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  kind      NotificationKind
+  title     String
+  body      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([read, createdAt])
+  @@map("notifications")
+}
+
+// ---------------------------------------------------------------------------
+// Outbound user messages (items 7, 8, 9, 10, 12)
+//
+// `Notification` above is the *admin's* feed. Everything an end user is told —
+// why their job was rejected, that they will be banned in 24 hours, a support
+// reply, an interview call — is a row here instead, addressed to one worker or
+// one employer. Keeping the two apart means a message meant for a user can
+// never leak into the admin feed and vice versa.
+// ---------------------------------------------------------------------------
+
+enum UserNotificationKind {
+  JOB_REJECTED
+  BAN_WARNING
+  BAN_APPLIED
+  BAN_CANCELLED
+  SUPPORT_REPLY
+  ALERT_ESCALATION
+  INTERVIEW
+  GENERAL
+}
+
+enum UserAudience {
+  WORKER
+  EMPLOYER
+}
+
+model UserNotification {
+  id       String               @id @default(uuid())
+  kind     UserNotificationKind
+  audience UserAudience
+  workerId   String?
+  employerId String?
+
+  title String
+  body  String
+  /// Item 7 — the admin's written reason, kept in its own column so the app
+  /// can render it as a quoted "why" block rather than buried in body text.
+  reason String?
+
+  /// What this message is about, for deep-linking from the user's app.
+  entityType String?
+  entityId   String?
+
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  readAt    DateTime?
+
+  worker   Worker?   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  employer Employer? @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  @@index([workerId, read])
+  @@index([employerId, read])
+  @@index([createdAt])
+  @@map("user_notifications")
+}
+
+// ---------------------------------------------------------------------------
+// Item 8 — irregular transactions and the 24-hour ban notice
+//
+// An admin never bans instantly. Raising a ban writes a SCHEDULED row with
+// `effectiveAt = now + 24h` and immediately sends the user a BAN_WARNING with
+// the notice text. A cron (BansCronService) flips SCHEDULED -> EXECUTED once
+// `effectiveAt` passes and suspends the worker then, not before. Cancelling
+// inside the window stops it and tells the user.
+// ---------------------------------------------------------------------------
+
+enum BanStatus {
+  SCHEDULED
+  EXECUTED
+  CANCELLED
+}
+
+model ScheduledBan {
+  id       String @id @default(uuid())
+  workerId String
+
+  /// Admin-facing justification (audited).
+  reason     String
+  /// User-facing notice text sent with the 24-hour warning.
+  noticeText String
+
+  status      BanStatus @default(SCHEDULED)
+  effectiveAt DateTime
+  executedAt  DateTime?
+  cancelledAt DateTime?
+  cancelReason String?
+
+  /// The transaction that triggered the review, when there is one.
+  triggerTransactionId String?
+  createdByAdminId     String?
+  createdAt            DateTime @default(now())
+
+  worker Worker @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@index([status, effectiveAt])
+  @@index([workerId])
+  @@map("scheduled_bans")
+}
+
+// ---------------------------------------------------------------------------
+// Item 10 — interview list, managed by the admin
+// ---------------------------------------------------------------------------
+
+enum InterviewMode {
+  IN_PERSON
+  PHONE
+  VIDEO
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  RESCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model Interview {
+  id            String  @id @default(uuid())
+  jobId         String
+  workerId      String
+  /// The application this interview belongs to, when it was raised from the
+  /// applicant list (interviews can also be added for a worker directly).
+  applicationId String?
+
+  scheduledAt     DateTime
+  durationMinutes Int             @default(30)
+  mode            InterviewMode   @default(IN_PERSON)
+  status          InterviewStatus @default(SCHEDULED)
+
+  /// Address for IN_PERSON, meeting link for VIDEO, number for PHONE.
+  location        String?
+  interviewerName String?
+  notes           String?
+  /// Filled in after the interview happens.
+  outcome String?
+
+  createdByAdminId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  job         Job             @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  worker      Worker          @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  application JobApplication? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  @@index([status, scheduledAt])
+  @@index([jobId])
+  @@index([workerId])
+  @@map("interviews")
+}
+
+// ---------------------------------------------------------------------------
+// Item 11 — document storage keyed on user id + job id
+//
+// `storageKey` is derived, never free-typed: "worker/<workerId>/job/<jobId>/
+// <kind>/<fileName>" (or ".../general/..." when a document isn't tied to a
+// job). That makes the bucket layout predictable, makes "all documents for
+// this user on this job" a prefix query, and makes a duplicate upload of the
+// same file for the same user+job a unique-constraint error instead of two
+// competing copies.
+// ---------------------------------------------------------------------------
+
+enum DocumentOwnerType {
+  WORKER
+  EMPLOYER
+}
+
+enum DocumentKind {
+  NID
+  PASSPORT
+  BIRTH_CERTIFICATE
+  CERTIFICATE
+  CV
+  CONTRACT
+  PHOTO
+  TRADE_LICENSE
+  OTHER
+}
+
+model StoredDocument {
+  id        String            @id @default(uuid())
+  ownerType DocumentOwnerType
+  workerId   String?
+  employerId String?
+  /// Null for documents that belong to the user overall rather than one job.
+  jobId      String?
+
+  kind       DocumentKind @default(OTHER)
+  fileName   String
+  storageKey String       @unique
+  url        String?
+  mimeType   String?
+  sizeBytes  Int?
+  note       String?
+
+  uploadedByAdminId String?
+  uploadedAt        DateTime @default(now())
+
+  worker   Worker?   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  employer Employer? @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  job      Job?      @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([workerId, jobId])
+  @@index([employerId, jobId])
+  @@map("stored_documents")
+}
+
+/// A scheduled downtime window. A cron job (see MaintenanceService) checks
+/// this table every minute and, when `scheduledAt` is ~1 hour or ~30 minutes
+/// away, creates a Notification and emails every admin — then flips the
+/// matching `notified*At` flag so it never fires twice for the same window.
+model MaintenanceWindow {
+  id          String    @id @default(uuid())
+  title       String
+  message     String?
+  scheduledAt DateTime
+  /// Set once the 60-minutes-before notification has gone out.
+  notified60At DateTime?
+  /// Set once the 30-minutes-before notification has gone out.
+  notified30At DateTime?
+  /// Set if an admin cancels the window before it fires.
+  cancelledAt DateTime?
+
+  createdByAdminId String?
+  createdAt         DateTime @default(now())
+
+  @@index([scheduledAt])
+  @@map("maintenance_windows")
+}
+
+/// Pre-aggregated daily rollups. The dashboard and analytics screens plot
+/// monthly revenue and worker growth; recomputing those from raw rows on every
+/// request would not hold up, so a nightly job writes them here.
+model DailyMetric {
+  date          DateTime @id @db.Date
+  revenue       BigInt   @default(0)
+  newWorkers    Int      @default(0)
+  activeWorkers Int      @default(0)
+  jobsPosted    Int      @default(0)
+  jobsApproved  Int      @default(0)
+
+  @@map("daily_metrics")
+}
+
+// ---------------------------------------------------------------------------
+// Attendance
+//
+// No design frames exist for this section, so the shape follows what the rest
+// of the product implies: a worker checks in and out of a job, GPS is captured
+// (the AI monitoring screens flag "fake GPS during check-in"), and an admin can
+// see who is late or absent.
+// ---------------------------------------------------------------------------
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  ON_LEAVE
+}
+
+model AttendanceRecord {
+  id       String           @id @default(uuid())
+  workerId String
+  jobId    String?
+  date     DateTime         @db.Date
+  status   AttendanceStatus @default(PRESENT)
+
+  checkInAt  DateTime?
+  checkOutAt DateTime?
+
+  /// Captured at check-in. The fake-GPS alerts compare this against the job site.
+  latitude  Decimal? @db.Decimal(9, 6)
+  longitude Decimal? @db.Decimal(9, 6)
+  /// Set when the AI monitor flags the coordinates as implausible.
+  gpsFlagged Boolean @default(false)
+
+  note      String?
+  createdAt DateTime @default(now())
+
+  worker Worker @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  job    Job?   @relation(fields: [jobId], references: [id])
+
+  @@unique([workerId, date])
+  @@index([date])
+  @@index([status])
+  @@map("attendance_records")
+}
+
+// ---------------------------------------------------------------------------
+// CMS
+// ---------------------------------------------------------------------------
+
+enum CmsBlockKind {
+  BANNER
+  PAGE
+  FAQ
+}
+
+model CmsBlock {
+  id        String       @id @default(uuid())
+  kind      CmsBlockKind
+  /// URL-safe key the client app fetches by, e.g. "home-hero", "terms".
+  slug      String       @unique
+  title     String
+  titleBn   String?
+  body      String?
+  bodyBn    String?
+  imageUrl  String?
+  /// Ordering within a kind; lower shows first.
+  position  Int          @default(0)
+  published Boolean      @default(false)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([kind, published])
+  @@map("cms_blocks")
+}
+
+// ---------------------------------------------------------------------------
+// System settings
+//
+// Key/value rather than a wide table, so a new toggle is a row instead of a
+// migration. Values are stored as strings and coerced by `valueType`.
+// ---------------------------------------------------------------------------
+
+enum SettingType {
+  STRING
+  NUMBER
+  BOOLEAN
+}
+
+model SystemSetting {
+  key         String      @id
+  value       String
+  valueType   SettingType @default(STRING)
+  label       String
+  description String?
+  /// Grouping for the settings screen: "platform", "payments", "security".
+  group       String      @default("platform")
+  updatedAt   DateTime    @updatedAt
+
+  @@index([group])
+  @@map("system_settings")
+}
