@@ -1,6 +1,15 @@
 import { Availability, JobStatus, JobUrgency } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 import { PaginationDto } from '../../common/pagination.dto';
 
 export class ListJobsDto extends PaginationDto {
@@ -39,5 +48,16 @@ export class UpdateJobDto {
 }
 
 export class RejectJobDto {
-  @IsString() @MaxLength(500) reason!: string;
+  /// Item 7: this text is sent to the employer as written, so a blank or
+  /// throwaway reason is rejected here as well as in JobsService.reject().
+  @IsString() @MinLength(10) @MaxLength(500) reason!: string;
+}
+
+/// Lets the person posting a job type a category that isn't in the preset
+/// list, instead of being limited to whatever was seeded.
+export class CreateJobCategoryDto {
+  @IsString() @MaxLength(80) name!: string;
+  /// A single emoji shown as the chip icon. Defaults to a generic briefcase
+  /// when the caller doesn't send one, so the category still renders fine.
+  @IsOptional() @IsString() @MaxLength(8) icon?: string;
 }
