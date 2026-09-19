@@ -77,7 +77,7 @@ function createStyles(colors: ThemeColors, text: ReturnType<typeof buildText>) {
       backgroundColor: colors.primarySoft,
       borderWidth: 1.5,
       borderColor: colors.primary,
-    },
+},
     buttonText: { fontSize: 14, fontWeight: '600' },
 
     tabs: { gap: 8, paddingVertical: 8 },
