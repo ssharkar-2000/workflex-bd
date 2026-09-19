@@ -1,9 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { JobStatus, Prisma } from '@prisma/client';
+import { ApplicationStatus, JobStatus, Prisma, UserNotificationKind } from '@prisma/client';
 import { AuditService } from '../common/audit.service';
+import { UserNotificationsService } from '../common/user-notifications.service';
 import { paginate } from '../common/pagination.dto';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateJobDto, ListJobsDto, UpdateJobDto } from './dto/job.dto';
+import { CreateJobCategoryDto, CreateJobDto, ListJobsDto, UpdateJobDto } from './dto/job.dto';
 
 const JOB_INCLUDE = {
   company: { select: { id: true, name: true, initials: true } },
@@ -11,11 +12,16 @@ const JOB_INCLUDE = {
   _count: { select: { applications: true } },
 } satisfies Prisma.JobInclude;
 
+/// Item 7 — a rejection notice goes to the employer verbatim, so anything
+/// shorter than this is not an explanation they can act on.
+const REJECTION_REASON_MIN = 10;
+
 @Injectable()
 export class JobsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly userNotifications: UserNotificationsService,
   ) {}
 
   async list(query: ListJobsDto) {
@@ -70,10 +76,16 @@ export class JobsService {
       throw new BadRequestException('Maximum salary cannot be below the minimum.');
     }
 
-    const count = await this.prisma.job.count();
+    // `code` used to be derived from `job.count() + 1`. That breaks the moment
+    // any job is ever deleted: the count drops, so the next post reuses a code
+    // that already exists (e.g. 6 jobs seeded, one deleted -> count is 5, next
+    // post computes JOB-0006 again) and the unique constraint on `code` throws,
+    // which surfaces to the app as "could not post". Deriving the next number
+    // from the highest code actually in use is immune to gaps from deletes.
+    const code = await this.nextJobCode();
     const job = await this.prisma.job.create({
       data: {
-        code: `JOB-${String(count + 1).padStart(4, '0')}`,
+        code,
         title: dto.title,
         description: dto.description,
         companyId: dto.companyId,
@@ -95,6 +107,16 @@ export class JobsService {
       entityId: job.id,
     });
     return job;
+  }
+
+  private async nextJobCode(): Promise<string> {
+    const last = await this.prisma.job.findFirst({
+      orderBy: { code: 'desc' },
+      select: { code: true },
+    });
+    const lastNumber = last ? Number(last.code.split('-')[1]) : 0;
+    const nextNumber = Number.isFinite(lastNumber) ? lastNumber + 1 : 1;
+    return `JOB-${String(nextNumber).padStart(4, '0')}`;
   }
 
   async update(id: string, dto: UpdateJobDto, adminId: string) {
@@ -136,24 +158,54 @@ export class JobsService {
     return job;
   }
 
+  /// Item 7 — "admin je job gula reject korbe, seigular valid reason text
+  /// akare user er kache pathabe."
+  ///
+  /// Two halves. First the reason has to actually be a reason: the screen
+  /// used to post a canned default ("Did not meet posting guidelines") and
+  /// nothing stopped an empty or one-word string reaching the column, so the
+  /// employer would have been told nothing useful. Second — and this is the
+  /// part that did not exist at all — the text is delivered to whoever posted
+  /// the job as a `UserNotification`, instead of only sitting in a column
+  /// that the admin app alone could read.
   async reject(id: string, reason: string, adminId: string) {
-    await this.findOne(id);
+    const trimmed = (reason ?? '').trim();
+    if (trimmed.length < REJECTION_REASON_MIN) {
+      throw new BadRequestException(
+        `Write a reason of at least ${REJECTION_REASON_MIN} characters — the employer is shown this text word for word.`,
+      );
+    }
+
+    const existing = await this.findOne(id);
     const job = await this.prisma.job.update({
       where: { id },
       data: {
         status: JobStatus.REJECTED,
         featured: false,
         reviewedAt: new Date(),
-        rejectionReason: reason,
+        rejectionReason: trimmed,
       },
       include: JOB_INCLUDE,
     });
+
+    await this.userNotifications.sendToCompany(existing.companyId, {
+      kind: UserNotificationKind.JOB_REJECTED,
+      title: `Your job post "${existing.title}" was not approved`,
+      body:
+        `Job ${existing.code} ("${existing.title}") was reviewed and could not be published. ` +
+        'You can edit the post and submit it again once the point below is fixed.',
+      reason: trimmed,
+      entityType: 'Job',
+      entityId: id,
+      email: true,
+    });
+
     await this.audit.record({
       adminId,
       action: 'job.reject',
       entityType: 'Job',
       entityId: id,
-      reason,
+      reason: trimmed,
     });
     return job;
   }
@@ -178,8 +230,127 @@ export class JobsService {
     return job;
   }
 
+  async remove(id: string, adminId: string) {
+    await this.findOne(id);
+
+    const attendanceCount = await this.prisma.attendanceRecord.count({ where: { jobId: id } });
+    if (attendanceCount > 0) {
+      throw new BadRequestException(
+        'This job has attendance history attached and cannot be deleted. Reject it instead to remove it from listings.',
+      );
+    }
+
+    await this.prisma.job.delete({ where: { id } });
+    await this.audit.record({
+      adminId,
+      action: 'job.delete',
+      entityType: 'Job',
+      entityId: id,
+    });
+    return { id, deleted: true };
+  }
+
   categories() {
     return this.prisma.jobCategory.findMany({ orderBy: { name: 'asc' } });
+  }
+
+  /**
+   * Lets whoever is posting a job add a category on the spot instead of
+   * being limited to the preset list. The slug is derived from the name
+   * (lowercased, spaces to hyphens) rather than typed, since it only needs
+   * to be a stable unique key — the name is what's actually shown anywhere.
+   * A category typed twice reuses the existing row rather than erroring,
+   * since from the poster's side "add Plumbing" a second time should just
+   * work, not fail with a duplicate-slug error.
+   */
+  async createCategory(dto: CreateJobCategoryDto, adminId: string) {
+    const name = dto.name.trim();
+    if (!name) throw new BadRequestException('Give the category a name.');
+
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60);
+    if (!slug) throw new BadRequestException('That name has no usable characters.');
+
+    const existing = await this.prisma.jobCategory.findUnique({ where: { slug } });
+    if (existing) return existing;
+
+    const category = await this.prisma.jobCategory.create({
+      data: { slug, name, icon: dto.icon?.trim() || '💼' },
+    });
+
+    await this.audit.record({
+      adminId,
+      action: 'job_category.create',
+      entityType: 'JobCategory',
+      entityId: category.id,
+    });
+
+    return category;
+  }
+
+  /// Item 23 follow-up: JobDetailScreen only ever showed an applicant
+  /// *count* (`_count.applications`) — there was no way to see who actually
+  /// applied. `JobApplication` was already a real, populated table (other
+  /// services already aggregate over it), just nothing listed the rows.
+  async applications(jobId: string) {
+    await this.findOne(jobId);
+    return this.prisma.jobApplication.findMany({
+      where: { jobId },
+      orderBy: { appliedAt: 'desc' },
+      include: {
+        worker: {
+          select: {
+            id: true,
+            code: true,
+            fullName: true,
+            initials: true,
+            profession: true,
+            rating: true,
+            trustScore: true,
+          },
+        },
+      },
+    });
+  }
+
+  async setApplicationStatus(
+    jobId: string,
+    applicationId: string,
+    status: ApplicationStatus,
+    adminId: string,
+  ) {
+    const application = await this.prisma.jobApplication.findUnique({
+      where: { id: applicationId },
+    });
+    if (!application || application.jobId !== jobId) {
+      throw new NotFoundException('That application no longer exists for this job.');
+    }
+
+    const updated = await this.prisma.jobApplication.update({
+      where: { id: applicationId },
+      data: {
+        status,
+        hiredAt: status === ApplicationStatus.HIRED ? new Date() : application.hiredAt,
+      },
+      include: {
+        worker: {
+          select: { id: true, code: true, fullName: true, initials: true, profession: true },
+        },
+      },
+    });
+
+    await this.audit.record({
+      adminId,
+      action: `application.${status.toLowerCase()}`,
+      entityType: 'JobApplication',
+      entityId: applicationId,
+      metadata: { jobId, workerId: application.workerId },
+    });
+
+    return updated;
   }
 
   /// Company picker on the Post a Job form.
