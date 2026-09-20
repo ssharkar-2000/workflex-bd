@@ -194,8 +194,10 @@ export default function ActivityScreen() {
         ) : (
           <JobList
             items={jobs.data?.jobs ?? []}
+            // A poster opens their own posting to see who applied, so the
+            // row goes straight there; the posting itself is one tap on.
             onOpen={(id) =>
-              router.push({ pathname: '/(app)/job/[id]', params: { id } })
+              router.push({ pathname: '/(app)/applicants/[jobId]', params: { jobId: id } })
             }
           />
         )}

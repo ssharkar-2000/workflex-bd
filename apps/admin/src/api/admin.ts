@@ -3,6 +3,9 @@ import {
   adminAuthTokensSchema,
   adminCompanyListSchema,
   adminDashboardSchema,
+  adminTopUpListSchema,
+  adminWalletSummarySchema,
+  adminWithdrawalListSchema,
   adminUserListSchema,
   aiMonitoringSchema,
   attendanceListSchema,
@@ -21,6 +24,8 @@ import {
   type AdminUserList,
   type KycQueueResponse,
   type ReportStatus,
+  type TopUpStatus,
+  type WithdrawalStatus,
 } from '@workflex/shared';
 import { api } from './client';
 import { env } from '../lib/env';
@@ -208,6 +213,44 @@ export async function deleteContent(key: string): Promise<void> {
 export async function fetchAttendance(status?: string) {
   const { data } = await api.get('/admin/attendance', { params: { status } });
   return attendanceListSchema.parse(data);
+}
+
+// --- wallet ---
+// Withdrawals are sent by a person, not an API: the console shows where the
+// money goes, the admin sends it, and records the transfer's transaction ID.
+
+export async function fetchWalletSummary() {
+  const { data } = await api.get('/admin/wallet/summary');
+  return adminWalletSummarySchema.parse(data);
+}
+
+export async function fetchWithdrawals(status: WithdrawalStatus | 'ALL') {
+  const { data } = await api.get('/admin/wallet/withdrawals', { params: { status } });
+  return adminWithdrawalListSchema.parse(data);
+}
+
+export async function markWithdrawalPaid(id: string, reference: string): Promise<void> {
+  await api.post(`/admin/wallet/withdrawals/${id}/paid`, { reference });
+}
+
+/** The money goes back into the person's wallet; the reason is shown to them. */
+export async function rejectWithdrawal(id: string, reason: string): Promise<void> {
+  await api.post(`/admin/wallet/withdrawals/${id}/reject`, { reason });
+}
+
+export async function fetchTopUps(status: TopUpStatus | 'ALL') {
+  const { data } = await api.get('/admin/wallet/top-ups', { params: { status } });
+  return adminTopUpListSchema.parse(data);
+}
+
+/** Credits a held top-up after it has been checked in the gateway's panel. */
+export async function approveTopUp(id: string): Promise<void> {
+  await api.post(`/admin/wallet/top-ups/${id}/approve`);
+}
+
+/** Nothing is credited; the payment is refunded from the gateway's panel. */
+export async function rejectTopUp(id: string, reason: string): Promise<void> {
+  await api.post(`/admin/wallet/top-ups/${id}/reject`, { reason });
 }
 
 export async function changeAdminPassword(input: {

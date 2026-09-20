@@ -4,9 +4,13 @@ import {
   ApiErrorCode,
   DIVISIONS,
   haversineKm,
+  maskPhone,
   resolvePlace,
+  type ApplicantList,
   type ApplicationState,
+  type ApplicationStatus,
   type ApplyToJobDto,
+  type DecideApplicationDto,
   type CreateJobDto,
   type JobApplicationList,
   type JobHighlights,
@@ -752,6 +756,128 @@ export class JobsService {
     });
 
     return { applied: false, status: row.status };
+  }
+
+  /**
+   * The people who applied to one of your postings.
+   *
+   * Opening the list is what "viewed" means: anyone still SUBMITTED becomes
+   * VIEWED here, which the applicant's activity feed reports. Withdrawn
+   * applications stay on the list, marked, for the reason the status exists
+   * — a poster who read one should see it was pulled, not watch it vanish.
+   *
+   * Hired people come first: they are who the poster comes back here to pay.
+   */
+  async applicants(ownerId: string, jobId: string): Promise<ApplicantList> {
+    const job = await this.prisma.job.findUnique({
+      where: { id: jobId },
+      select: { id: true, title: true, postedBy: true, isOpen: true },
+    });
+    if (!job || job.postedBy !== ownerId) {
+      throw AppException.notFound('That job is not yours to manage');
+    }
+
+    await this.prisma.jobApplication.updateMany({
+      where: { jobId, status: 'SUBMITTED' },
+      data: { status: 'VIEWED' },
+    });
+
+    const [rows, paid] = await Promise.all([
+      this.prisma.jobApplication.findMany({
+        where: { jobId },
+        include: {
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+              phone: true,
+              verificationLevel: true,
+            },
+          },
+        },
+      }),
+      this.prisma.walletPayment.groupBy({
+        by: ['payeeId'],
+        where: { jobId, payerId: ownerId },
+        _sum: { amount: true },
+      }),
+    ]);
+    const paidTo = new Map(paid.map((row) => [row.payeeId, row._sum.amount ?? 0]));
+
+    const rank: Record<ApplicationStatus, number> = {
+      ACCEPTED: 0,
+      SHORTLISTED: 1,
+      SUBMITTED: 2,
+      VIEWED: 2,
+      REJECTED: 3,
+      WITHDRAWN: 4,
+    };
+    rows.sort(
+      (a, b) =>
+        rank[a.status] - rank[b.status] || a.appliedAt.getTime() - b.appliedAt.getTime(),
+    );
+
+    return {
+      jobId: job.id,
+      jobTitle: job.title,
+      isOpen: job.isOpen,
+      applicants: rows.map((row) => ({
+        userId: row.userId,
+        name:
+          [row.user.firstName, row.user.lastName].filter(Boolean).join(' ') ||
+          maskPhone(row.user.phone),
+        verified: row.user.verificationLevel >= 1,
+        status: row.status,
+        message: row.message,
+        appliedAt: row.appliedAt.toISOString(),
+        phone: row.status === 'ACCEPTED' ? row.user.phone : null,
+        paidSoFar: paidTo.get(row.userId) ?? 0,
+      })),
+    };
+  }
+
+  /**
+   * Shortlisting, hiring or turning down one applicant.
+   *
+   * Any of the three can follow any other — a shortlist gets cut, a hire
+   * falls through — except from WITHDRAWN: the person pulled out, and the
+   * poster cannot put them back. The condition is in the update itself, so
+   * a withdrawal landing a moment earlier is not overwritten by a hire.
+   */
+  async decide(
+    ownerId: string,
+    jobId: string,
+    applicantId: string,
+    dto: DecideApplicationDto,
+  ): Promise<ApplicantList> {
+    const job = await this.prisma.job.findUnique({
+      where: { id: jobId },
+      select: { postedBy: true },
+    });
+    if (!job || job.postedBy !== ownerId) {
+      throw AppException.notFound('That job is not yours to manage');
+    }
+
+    const changed = await this.prisma.jobApplication.updateMany({
+      where: { jobId, userId: applicantId, status: { not: 'WITHDRAWN' } },
+      data: { status: dto.status },
+    });
+
+    if (changed.count === 0) {
+      const existing = await this.prisma.jobApplication.findUnique({
+        where: { jobId_userId: { jobId, userId: applicantId } },
+        select: { status: true },
+      });
+      if (!existing) throw AppException.notFound('No such application');
+      throw new AppException(
+        ApiErrorCode.APPLICATION_WITHDRAWN,
+        'This person withdrew their application',
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    this.logger.log(`Application ${jobId}/${applicantId} set to ${dto.status} by ${ownerId}`);
+    return this.applicants(ownerId, jobId);
   }
 
   /**

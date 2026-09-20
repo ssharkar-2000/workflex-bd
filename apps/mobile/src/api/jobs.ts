@@ -1,4 +1,5 @@
 import {
+  applicantListSchema,
   applicationStateSchema,
   jobApplicationListSchema,
   jobHighlightsSchema,
@@ -8,7 +9,9 @@ import {
   nearbyJobsSchema,
   jobListingSchema,
   recommendationsSchema,
+  type ApplicantList,
   type ApplicationState,
+  type DecideApplicationDto,
   type JobApplicationList,
   type JobFilterState,
   type CreateJobDto,
@@ -110,6 +113,22 @@ export async function withdrawApplication(id: string): Promise<ApplicationState>
 export async function fetchMyApplications(): Promise<JobApplicationList> {
   const { data } = await api.get('/jobs/applications');
   return jobApplicationListSchema.parse(data);
+}
+
+/** The people who applied to one of your postings. Opening it marks them viewed. */
+export async function fetchApplicants(jobId: string): Promise<ApplicantList> {
+  const { data } = await api.get(`/jobs/${jobId}/applicants`);
+  return applicantListSchema.parse(data);
+}
+
+/** Shortlist, hire or turn down one applicant. Returns the updated list. */
+export async function decideApplication(
+  jobId: string,
+  userId: string,
+  status: DecideApplicationDto['status'],
+): Promise<ApplicantList> {
+  const { data } = await api.patch(`/jobs/${jobId}/applicants/${userId}`, { status });
+  return applicantListSchema.parse(data);
 }
 
 /**

@@ -145,6 +145,12 @@ model User {
   cvProfile          CvProfile?
   reports            Report[]
 
+  wallet           Wallet?
+  topUps           TopUp[]
+  paymentsMade     WalletPayment[] @relation("PaymentsMade")
+  paymentsReceived WalletPayment[] @relation("PaymentsReceived")
+  withdrawals      Withdrawal[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -866,4 +872,230 @@ model Report {
   @@index([category])
   @@index([reporterId])
   @@map("reports")
+}
+
+// --- wallet ---
+//
+// Amounts are whole taka throughout, as integers — see @workflex/shared's
+// wallet.ts for why.
+//
+// No relation here deletes on cascade. Accounts are closed by status, never
+// removed, and a ledger that could vanish along with a user would not be a
+// ledger. The database refuses to delete a user who has money history.
+
+/// One per account, created the first time money moves.
+model Wallet {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @unique @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  /// Everything in the wallet.
+  balance      Int @default(0)
+  /// The part of `balance` that was earned — paid in by someone who hired this
+  /// account — and so may be withdrawn. Always between 0 and `balance`.
+  ///
+  /// Money added through the gateway is spendable but not withdrawable. If it
+  /// were, the wallet would be a way to turn a stolen card into bKash cash:
+  /// top up with the card, withdraw to a mobile wallet, gone. Earnings are
+  /// money another verified account chose to pay for work.
+  withdrawable Int @default(0)
+
+  entries WalletEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("wallets")
+}
+
+enum WalletEntryType {
+  TOP_UP
+  PAYMENT_SENT
+  PAYMENT_RECEIVED
+  WITHDRAWAL
+  /// A withdrawal that was turned down or cancelled, back in the wallet.
+  WITHDRAWAL_RETURNED
+}
+
+/// The ledger.
+///
+/// Append-only: a mistake is corrected by a new entry, never by editing an old
+/// one. Each row records the balance straight after it, so a statement reads
+/// without re-adding history, and a broken ledger shows up as a row whose
+/// balanceAfter minus amount is not the previous row's balanceAfter.
+model WalletEntry {
+  id String @id @default(uuid()) @db.Uuid
+
+  walletId String @db.Uuid
+  wallet   Wallet @relation(fields: [walletId], references: [id], onDelete: Restrict)
+
+  type WalletEntryType
+  /// Signed: positive into the wallet, negative out of it.
+  amount       Int
+  balanceAfter Int
+
+  /// What caused the entry. Exactly one is set.
+  topUpId      String?        @db.Uuid
+  topUp        TopUp?         @relation(fields: [topUpId], references: [id], onDelete: Restrict)
+  paymentId    String?        @db.Uuid
+  payment      WalletPayment? @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  withdrawalId String?        @db.Uuid
+  withdrawal   Withdrawal?    @relation(fields: [withdrawalId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([walletId, createdAt])
+  @@map("wallet_entries")
+}
+
+enum TopUpStatus {
+  /// Sent to the gateway; no answer yet.
+  PENDING
+  /// Confirmed with the gateway and credited.
+  PAID
+  FAILED
+  CANCELLED
+  /// The gateway took the money but flagged it as risky, or its figures did
+  /// not match ours. Nothing is credited until a person approves it.
+  HELD
+  /// A held payment that was turned down. It is refunded through the
+  /// gateway's merchant panel — the wallet never saw it.
+  REJECTED
+}
+
+/// Money added through the payment gateway.
+model TopUp {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  amount Int
+  status TopUpStatus @default(PENDING)
+
+  /// Which gateway took it — "sslcommerz", or "simulator" in development.
+  gateway String
+  /// Our reference, sent to the gateway as `tran_id`.
+  tranId  String @unique
+
+  /// Where the person is sent back to after paying. Checked against an
+  /// allowlist before it is stored, so the gateway cannot be used to bounce
+  /// someone to an arbitrary site.
+  returnUrl String
+
+  // --- from the gateway's validation, never from the callback itself ---
+  valId      String?
+  bankTranId String?
+  /// How it was paid, as the gateway names it: "BKASH-BKash".
+  method     String?
+  /// The gateway's fraud signal: 1 means it asked for the payment to be checked.
+  riskLevel  Int?
+  riskTitle  String?
+
+  /// Admin.id of whoever decided a HELD payment. Not a FK, as on KycSubmission.
+  reviewedBy String?   @db.Uuid
+  reviewedAt DateTime?
+  reviewNote String?
+
+  entries WalletEntry[]
+
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@map("wallet_top_ups")
+}
+
+/// A recruiter paying someone they hired.
+model WalletPayment {
+  id String @id @default(uuid()) @db.Uuid
+
+  payerId String @db.Uuid
+  payer   User   @relation("PaymentsMade", fields: [payerId], references: [id], onDelete: Restrict)
+  payeeId String @db.Uuid
+  payee   User   @relation("PaymentsReceived", fields: [payeeId], references: [id], onDelete: Restrict)
+
+  /// The posting the work was for. Not a FK, for the reason Report gives: a
+  /// posting can be deleted, and the record of a payment must outlive it. The
+  /// title is copied for the same reason.
+  jobId    String @db.Uuid
+  jobTitle String
+
+  amount Int
+  note   String?
+
+  /// The app's key for this confirmation. A repeat is the same payment.
+  requestId String @unique @db.Uuid
+
+  entries WalletEntry[]
+
+  createdAt DateTime @default(now())
+
+  @@index([payerId, createdAt])
+  @@index([payeeId, createdAt])
+  @@index([jobId, payeeId])
+  @@map("wallet_payments")
+}
+
+enum PayoutMethod {
+  BKASH
+  NAGAD
+  BANK
+}
+
+enum WithdrawalStatus {
+  /// Asked for; the money has left the wallet and waits to be sent.
+  PENDING
+  /// Sent. `payoutReference` is the transfer's transaction ID.
+  PAID
+  /// Turned down; the money went back into the wallet.
+  REJECTED
+  /// Called off by the person before it was sent; the money went back.
+  CANCELLED
+}
+
+/// Earnings going out to bKash, Nagad or a bank account.
+///
+/// Sent by a person from the admin console, not by an API. The payment
+/// gateway collects money and has no call for paying it out, and a payout
+/// API (bKash's disbursement service, say) needs its own merchant agreement.
+/// When one exists it slots in where an admin marks the request paid today.
+model Withdrawal {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  amount Int
+  method PayoutMethod
+
+  /// The bKash or Nagad number (+8801XXXXXXXXX), or the bank account number.
+  accountNumber String
+  accountName   String
+  bankName      String?
+  branchName    String?
+  routingNumber String?
+
+  status WithdrawalStatus @default(PENDING)
+
+  /// The app's key for this request. A repeat is the same withdrawal.
+  requestId String @unique @db.Uuid
+
+  payoutReference String?
+  rejectReason    String?
+  /// Admin.id of whoever sent or refused it. Not a FK, as on KycSubmission.
+  processedBy     String?   @db.Uuid
+  processedAt     DateTime?
+
+  entries WalletEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@map("wallet_withdrawals")
 }

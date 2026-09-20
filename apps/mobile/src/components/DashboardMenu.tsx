@@ -71,8 +71,10 @@ const WORKER_ROWS: Row[] = [
 const RECRUITER_ROWS: Row[] = [
   { icon: '➕', label: 'menu.postJob', href: '/(app)/post-job' },
   { icon: '📋', label: 'menu.myPostedJobs', href: '/(app)/activity?tab=jobs' },
-  { icon: '👥', label: 'menu.applicants' },
-  { icon: '🤝', label: 'menu.hiredWorkers' },
+  // Applicants belong to a posting, so this opens the postings, each of
+  // which opens its own applicants.
+  { icon: '👥', label: 'menu.applicants', href: '/(app)/activity?tab=jobs' },
+  { icon: '🤝', label: 'menu.hiredWorkers', href: '/(app)/hired' },
 ];
 
 export function DashboardMenu({
@@ -235,7 +237,10 @@ export function DashboardMenu({
               <Divider />
 
               <Section title={t('menu.sec.money')}>
-                <MenuRow row={{ icon: '👛', label: 'menu.wallet' }} onGo={go} />
+                <MenuRow
+                  row={{ icon: '👛', label: 'menu.wallet', href: '/(app)/wallet' }}
+                  onGo={go}
+                />
               </Section>
 
               <Divider />
