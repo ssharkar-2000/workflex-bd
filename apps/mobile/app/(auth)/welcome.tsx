@@ -2,24 +2,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
-} from 'react-native';
+}  from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { BrandMark } from '../../src/components/BrandMark';
-import { AuroraText } from '../../src/components/AuroraText';
+import { BrandName } from '../../src/components/BrandName';
 import { ShimmerButton } from '../../src/components/ShimmerButton';
 import { GlassCard } from '../../src/components/GlassCard';
 import { LanguageToggle } from '../../src/components/LanguageToggle';
 import { ThemeToggle } from '../../src/components/ThemeToggle';
 import { TwoRolesIntro } from '../../src/components/TwoRolesIntro';
-import { useAuthStore } from '../../src/store/auth-store';
-import { useLaunchStore } from '../../src/store/launch-store';
 import { useT } from '../../src/i18n';
 import { useTheme } from '../../src/lib/use-theme';
 
@@ -41,8 +39,16 @@ const CHIPS = [
  */
 let introPlayed = false;
 
+/** The brand mark's size: full on most phones, smaller only when it must be. */
+const MARK = { max: 210, min: 140 };
+/** Vertical padding around the scrolling hero. */
+const SCROLL_PAD = 12;
+
 /**
- * Pure welcome screen — it says what the product is and offers one way in.
+ * Pure welcome screen — it says what the product is and offers one way in:
+ * Get started, which always opens the Login / New account screen. A returning
+ * user signs in there; a new one continues into registration, which runs its
+ * own steps from there (details, SMS check, documents, review).
  *
  * The phone field used to live here, which meant asking for a number before
  * the user knew what they were signing up for. Intent now comes first, and
@@ -62,8 +68,7 @@ export default function WelcomeScreen() {
   const t = useT();
   const router = useRouter();
   const { c, isDark } = useTheme();
-  const openGate = useLaunchStore((s) => s.open);
-  const hasSession = useAuthStore((s) => s.status === 'authenticated');
+  const { width } = useWindowDimensions();
 
   const hero = useRef(new Animated.Value(0)).current;
   const cta = useRef(new Animated.Value(0)).current;
@@ -74,6 +79,17 @@ export default function WelcomeScreen() {
     introPlayed ? 'done' : 'playing',
   );
   const introFade = useRef(new Animated.Value(1)).current;
+
+  // On a short phone the mark gives up size, so the hero still fits above the
+  // two ways in rather than sliding under Get started. It is measured, not
+  // guessed from the screen height: Bangla wraps the supporting line onto
+  // two, and a larger system text size grows everything except the mark.
+  // `rest` is the hero's height without the mark, so the fit is one step.
+  const [fit, setFit] = useState({ view: 0, rest: 0 });
+  const markSize =
+    fit.view && fit.rest
+      ? Math.round(Math.min(MARK.max, Math.max(MARK.min, fit.view - fit.rest)))
+      : MARK.max;
 
   const playEntrance = useCallback(() => {
     Animated.sequence([
@@ -155,8 +171,16 @@ export default function WelcomeScreen() {
         <ScrollView
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
+          onLayout={(e) => {
+            const view = e.nativeEvent.layout.height;
+            setFit((f) => (Math.abs(f.view - view) < 1 ? f : { ...f, view }));
+          }}
         >
           <Animated.View
+            onLayout={(e) => {
+              const rest = e.nativeEvent.layout.height - markSize + 2 * SCROLL_PAD;
+              setFit((f) => (Math.abs(f.rest - rest) < 1 ? f : { ...f, rest }));
+            }}
             style={[
               styles.hero,
               {
@@ -184,13 +208,19 @@ export default function WelcomeScreen() {
                 ],
               }}
             >
-              <BrandMark size={210} />
+              <BrandMark size={markSize} />
             </Animated.View>
 
             <Text style={[styles.eyebrow, { color: c.accentOnBrand }]}>
               {t('auth.eyebrow')}
             </Text>
-            <AuroraText fontSize={42}>WorkFlex BD</AuroraText>
+            {/* The logotype, narrowed on small phones rather than cropped. */}
+            <BrandName
+              height={58}
+              maxWidth={width - 48}
+              accessibilityRole="header"
+              style={styles.name}
+            />
             <Text style={[styles.tagline, { color: c.textOnBrand }]}>
               {t('auth.tagline')}
             </Text>
@@ -247,31 +277,14 @@ export default function WelcomeScreen() {
             },
           ]}
         >
+          {/* Always the Login / New account screen next, whoever taps it —
+              someone new, someone returning, someone still signed in. */}
           <ShimmerButton
             label={t('auth.getStartedCta')}
             onPress={() =>
               router.push({ pathname: '/(auth)/login', params: { tab: 'register' } })
             }
           />
-
-          <Pressable
-            style={styles.signIn}
-            onPress={() => {
-              // A live session skips straight back in; otherwise this is the
-              // shortcut past role selection for a returning user.
-              if (hasSession) {
-                openGate();
-                router.replace('/(app)/home');
-              } else {
-                router.push('/(auth)/login');
-              }
-            }}
-            hitSlop={8}
-          >
-            <Text style={[styles.signInText, { color: c.textOnBrand }]}>
-              {hasSession ? t('auth.continueSession') : t('auth.haveAccount')}
-            </Text>
-          </Pressable>
 
           <View style={styles.secureRow}>
             <Text style={styles.secureIcon}>🔒</Text>
@@ -282,11 +295,15 @@ export default function WelcomeScreen() {
         </Animated.View>
       </SafeAreaView>
 
+      {/*
+        Keeps catching touches until it is gone, fade included. It used to let
+        them through as soon as the fade began, and in a browser the tap on
+        Skip then landed a second time on whatever lay beneath: the release
+        ends the intro, and the click that follows it goes to the page. Skip
+        sits over the language toggle, so skipping switched the language.
+      */}
       {intro !== 'done' && (
-        <Animated.View
-          style={[StyleSheet.absoluteFill, { opacity: introFade }]}
-          pointerEvents={intro === 'leaving' ? 'none' : 'auto'}
-        >
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: introFade }]}>
           <TwoRolesIntro onEnd={endIntro} />
         </Animated.View>
       )}
@@ -304,7 +321,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
   },
-  scroll: { flexGrow: 1, justifyContent: 'center', paddingVertical: 12 },
+  scroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingVertical: SCROLL_PAD,
+  },
   hero: { alignItems: 'center', paddingHorizontal: 16 },
   eyebrow: {
     fontSize: 11,
@@ -312,6 +333,7 @@ const styles = StyleSheet.create({
     letterSpacing: 2.4,
     marginBottom: 2,
   },
+  name: { marginTop: 6, marginBottom: 2 },
   tagline: {
     fontSize: 20,
     fontWeight: '800',
@@ -346,18 +368,12 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 12, fontWeight: '700' },
 
   footer: { paddingHorizontal: 20, paddingBottom: 10 },
-  signIn: { alignItems: 'center', marginTop: 14 },
-  signInText: {
-    fontSize: 14,
-    fontWeight: '700',
-    textDecorationLine: 'underline',
-  },
   secureRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    marginTop: 12,
+    marginTop: 14,
   },
   secureIcon: { fontSize: 11 },
   secureText: {
@@ -365,3 +381,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+

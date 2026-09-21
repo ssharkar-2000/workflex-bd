@@ -1,139 +1,50 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Easing } from 'react-native';
+import { BrandName } from '../BrandName';
 import { font } from '../../lib/theme';
 
-const NAME = 'WorkFlex BD';
-
 /**
- * The system name on the registration band, animated per letter.
+ * The logotype on the registration band, rising into place as the step
+ * opens.
  *
- * Two moves, both on the native driver so the form and the keyboard keep the
- * JS thread to themselves: the letters cascade up on mount, then a slow wave
- * travels through them every few seconds. Everything is transform and opacity
- * — no colour interpolation, which would force the animation onto JS.
- *
- * One `Animated.Value` per move, read at a per-letter offset, rather than one
- * value and one timer per letter. Eleven timers for a wordmark would be a lot
- * of bookkeeping for an effect this small.
+ * It used to spell the name letter by letter in the band's text colour, with
+ * a wave passing through the letters. The name is now the drawn logotype, one
+ * piece, so it arrives as one: a short fade and lift on the native driver,
+ * then it stays still — it sits above a form someone is typing into.
  */
-export function BrandWordmark({
-  color,
-  size = font.lg,
-}: {
-  color: string;
-  size?: number;
-}) {
-  const chars = useMemo(() => Array.from(NAME), []);
-
-  // Both moves are scaled off the type size, so the wordmark animates the same
-  // way whether it is a compact header or the full brand lockup.
-  const rise = size * 0.34;
-  const dip = size * 0.17;
-
+export function BrandWordmark({ size = font.lg }: { size?: number }) {
+  // `size` is the type size the band was laid out for; the logotype is drawn
+  // a little taller than a line of that type, so it reads at the same scale.
+  const height = Math.round(size * 1.3);
   const enter = useRef(new Animated.Value(0)).current;
-  const wave = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const entrance = Animated.timing(enter, {
       toValue: 1,
-      duration: 900,
+      duration: 700,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     });
-
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(wave, {
-          toValue: 1,
-          duration: 1500,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        }),
-        // Long pause: this sits above a form someone is typing into, so it
-        // should read as an occasional glint, not a thing that keeps moving.
-        Animated.delay(3800),
-      ]),
-    );
-
-    // The wave only starts once the letters have all arrived, so the two
-    // never overlap and fight for the same transform.
-    entrance.start(({ finished }) => {
-      if (finished) loop.start();
-    });
-
-    return () => {
-      entrance.stop();
-      loop.stop();
-    };
-  }, [enter, wave]);
+    entrance.start();
+    return () => entrance.stop();
+  }, [enter]);
 
   return (
-    // Grouped for screen readers: without this the row would be announced one
-    // letter at a time.
-    <View
-      style={styles.row}
-      accessible
-      accessibilityRole="header"
-      accessibilityLabel={NAME}
+    <Animated.View
+      style={{
+        opacity: enter,
+        transform: [
+          {
+            translateY: enter.interpolate({
+              inputRange: [0, 1],
+              outputRange: [height * 0.3, 0],
+            }),
+          },
+        ],
+      }}
     >
-      {chars.map((ch, i) => {
-        // Entrance: each letter opens a little after the one before it.
-        //
-        // Input ranges are the letter's own window and nothing else, with
-        // clamping doing the work outside it. Padding them out to [0, …, 1]
-        // would put a duplicate bound on the first letter, whose window opens
-        // at 0 — and a zero-width segment divides by zero on the native driver.
-        const start = i * 0.055;
-        const end = start + 0.42;
-
-        const opacity = enter.interpolate({
-          inputRange: [start, end],
-          outputRange: [0, 1],
-          extrapolate: 'clamp',
-        });
-        const lift = enter.interpolate({
-          inputRange: [start, end],
-          outputRange: [rise, 0],
-          extrapolate: 'clamp',
-        });
-
-        // Wave: a small dip that travels along the word and settles.
-        const w0 = i * 0.045;
-        const bob = wave.interpolate({
-          inputRange: [w0, w0 + 0.1, w0 + 0.2],
-          outputRange: [0, -dip, 0],
-          extrapolate: 'clamp',
-        });
-
-        return (
-          <Animated.Text
-            key={`${ch}-${i}`}
-            // The letters are laid out in a row and cannot wrap, so an
-            // unbounded system font scale runs the wordmark off both edges.
-            // Capped here only — the form below scales all the way.
-            maxFontSizeMultiplier={1.3}
-            style={[
-              styles.letter,
-              {
-                color,
-                fontSize: size,
-                opacity,
-                transform: [{ translateY: Animated.add(lift, bob) }],
-              },
-            ]}
-          >
-            {ch}
-          </Animated.Text>
-        );
-      })}
-    </View>
+      {/* The band is pale blue in both themes, so the letters take dark ink. */}
+      <BrandName height={height} surface="light" accessibilityRole="header" />
+    </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'flex-end' },
-  letter: {
-    fontWeight: '800',
-    letterSpacing: 0.2,
-  },
-});

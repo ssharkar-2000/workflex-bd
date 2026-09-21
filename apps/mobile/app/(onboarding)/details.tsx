@@ -128,7 +128,9 @@ export default function DetailsScreen() {
       total={total}
       title={t('ob.details.title')}
       subtitle={t('ob.details.subtitle')}
-      canGoBack={offset > 0}
+      // Back to the Login / New account screen this form is opened from. That
+      // is also where Back goes if the form was reloaded and has no history.
+      backTo={{ pathname: '/(auth)/login', params: { tab: 'register' } }}
       centerHeader
       showBrand
       footer={

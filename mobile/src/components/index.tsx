@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import React from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -153,6 +154,9 @@ export function BackButton({ onPress, label }: { onPress: () => void; label?: st
     </Pressable>
   );
 }
+import { colors, radii, shadow, spacing, statusPalette, text } from '../theme';
+
+// ---------------------------------------------------------------------------
 
 export function Card({
   children,
@@ -239,6 +243,14 @@ export function StatusPill({ value, label }: { value: string; label?: string }) 
   return (
     <View style={[s.pill, { backgroundColor: palette.bg }]}>
       <Text style={[s.pillText, { color: palette.fg }]}>{label ?? (key ? t(key) : fallback)}</Text>
+/** Coloured pill used for every status in the design. */
+export function StatusPill({ value, label }: { value: string; label?: string }) {
+  const palette = statusPalette[value] ?? { bg: colors.border, fg: colors.textGray };
+  return (
+    <View style={[s.pill, { backgroundColor: palette.bg }]}>
+      <Text style={[s.pillText, { color: palette.fg }]}>
+        {label ?? value.charAt(0) + value.slice(1).toLowerCase().replace(/_/g, ' ')}
+      </Text>
     </View>
   );
 }
@@ -296,6 +308,7 @@ export function Button({
   // the plain body-text colour, so the label reads as part of the button
   // rather than as loose text sitting on the screen.
   const fg = variant === 'outline' ? colors.primary : colors.onPrimary;
+  const fg = variant === 'outline' ? colors.textBody : colors.onPrimary;
 
   return (
     <Pressable
@@ -377,6 +390,11 @@ export function Meter({ percent, color }: { percent: number; color?: string }) {
           s.meterFill,
           { width: `${Math.max(0, Math.min(100, percent))}%`, backgroundColor: color ?? colors.primary },
         ]}
+export function Meter({ percent, color = colors.primary }: { percent: number; color?: string }) {
+  return (
+    <View style={s.meterTrack}>
+      <View
+        style={[s.meterFill, { width: `${Math.max(0, Math.min(100, percent))}%`, backgroundColor: color }]}
       />
     </View>
   );
@@ -392,6 +410,7 @@ export function Meter({ percent, color }: { percent: number; color?: string }) {
  * and the chart doesn't need a legend since the colour and the label under
  * each bar are the same thing.
  */
+/** Simple bar chart. The design's charts are bar series, so no chart library. */
 export function BarChart({
   data,
   height = 120,
@@ -412,6 +431,7 @@ export function BarChart({
                 {
                   height: Math.max(4, (d.value / max) * (height - 8)),
                   backgroundColor: categoryTint(categoryPalette, d.label).fg,
+                  backgroundColor: i === data.length - 1 ? colors.primary : colors.primarySoft,
                 },
               ]}
             />
@@ -451,6 +471,10 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
     <View style={s.centered}>
       <Text style={s.errorText}>{message}</Text>
       {onRetry ? <Button label={t('common.tryAgain')} variant="outline" onPress={onRetry} /> : null}
+  return (
+    <View style={s.centered}>
+      <Text style={s.errorText}>{message}</Text>
+      {onRetry ? <Button label="Try again" variant="outline" onPress={onRetry} /> : null}
     </View>
   );
 }
@@ -464,3 +488,92 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
     </View>
   );
 }
+  return (
+    <View style={s.centered}>
+      <Text style={text.cardTitle}>{title}</Text>
+      {hint ? <Text style={[text.caption, { marginTop: spacing.xs }]}>{hint}</Text> : null}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+const s = StyleSheet.create({
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  sectionAction: { ...text.caption, color: colors.primary, fontWeight: '600' },
+
+  pill: { paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radii.pill },
+  pillText: { fontSize: 11, fontWeight: '700' },
+
+  chip: {
+    backgroundColor: colors.background,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+  },
+  chipText: { fontSize: 11, fontWeight: '500', color: colors.textGray },
+
+  avatar: { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: colors.onPrimary, fontWeight: '700' },
+
+  button: {
+    height: 44,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    flexGrow: 1,
+  },
+  buttonOutline: { borderWidth: 1, borderColor: colors.border },
+  buttonText: { fontSize: 14, fontWeight: '600' },
+
+  tabs: { gap: spacing.sm, paddingVertical: spacing.sm },
+  tab: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    backgroundColor: colors.card,
+  },
+  tabActive: { backgroundColor: colors.primary },
+  tabText: { fontSize: 13, fontWeight: '600', color: colors.textGray },
+  tabTextActive: { color: colors.onPrimary },
+
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: spacing.lg,
+  },
+  detailLabel: { ...text.caption, flexShrink: 0 },
+  detailValue: { ...text.body, fontWeight: '500', flex: 1, textAlign: 'right' },
+
+  meterTrack: {
+    height: 8,
+    borderRadius: radii.pill,
+    backgroundColor: colors.background,
+    overflow: 'hidden',
+  },
+  meterFill: { height: '100%', borderRadius: radii.pill },
+
+  chart: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
+  chartColumn: { flex: 1, justifyContent: 'flex-end' },
+  chartBar: { borderRadius: radii.sm },
+  chartLabels: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  chartLabel: { ...text.micro, flex: 1, textAlign: 'center' },
+
+  centered: { padding: spacing.xxl, alignItems: 'center', gap: spacing.md },
+  errorText: { ...text.body, color: colors.redText, textAlign: 'center' },
+});

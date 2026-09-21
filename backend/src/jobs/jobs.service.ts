@@ -5,6 +5,11 @@ import { UserNotificationsService } from '../common/user-notifications.service';
 import { paginate } from '../common/pagination.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateJobCategoryDto, CreateJobDto, ListJobsDto, UpdateJobDto } from './dto/job.dto';
+import { JobStatus, Prisma } from '@prisma/client';
+import { AuditService } from '../common/audit.service';
+import { paginate } from '../common/pagination.dto';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateJobDto, ListJobsDto, UpdateJobDto } from './dto/job.dto';
 
 const JOB_INCLUDE = {
   company: { select: { id: true, name: true, initials: true } },
@@ -86,6 +91,10 @@ export class JobsService {
     const job = await this.prisma.job.create({
       data: {
         code,
+    const count = await this.prisma.job.count();
+    const job = await this.prisma.job.create({
+      data: {
+        code: `JOB-${String(count + 1).padStart(4, '0')}`,
         title: dto.title,
         description: dto.description,
         companyId: dto.companyId,
@@ -177,6 +186,8 @@ export class JobsService {
     }
 
     const existing = await this.findOne(id);
+  async reject(id: string, reason: string, adminId: string) {
+    await this.findOne(id);
     const job = await this.prisma.job.update({
       where: { id },
       data: {
@@ -200,12 +211,17 @@ export class JobsService {
       email: true,
     });
 
+        rejectionReason: reason,
+      },
+      include: JOB_INCLUDE,
+    });
     await this.audit.record({
       adminId,
       action: 'job.reject',
       entityType: 'Job',
       entityId: id,
       reason: trimmed,
+      reason,
     });
     return job;
   }

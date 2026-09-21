@@ -53,6 +53,23 @@ export const ApiErrorCode = {
   JOB_CLOSED: 'JOB_CLOSED',
   /** You cannot apply to a posting you created. */
   CANNOT_APPLY_OWN_JOB: 'CANNOT_APPLY_OWN_JOB',
+  /** The applicant withdrew, so there is nothing left to decide. */
+  APPLICATION_WITHDRAWN: 'APPLICATION_WITHDRAWN',
+
+  /** Not enough money in the wallet for this payment or withdrawal. */
+  INSUFFICIENT_BALANCE: 'INSUFFICIENT_BALANCE',
+  /**
+   * The wallet holds enough, but not enough of it was earned. Only money paid
+   * in by someone who hired you can be withdrawn; `details.withdrawable` says
+   * how much that is.
+   */
+  NOT_WITHDRAWABLE: 'NOT_WITHDRAWABLE',
+  /** Payments go only to someone hired (accepted) on one of your postings. */
+  NOT_HIRED: 'NOT_HIRED',
+  /** The payment gateway refused the request or could not be reached. */
+  PAYMENT_GATEWAY_UNAVAILABLE: 'PAYMENT_GATEWAY_UNAVAILABLE',
+  /** Someone got there first — the withdrawal or top-up was already dealt with. */
+  ALREADY_PROCESSED: 'ALREADY_PROCESSED',
 
   ACCOUNT_SUSPENDED: 'ACCOUNT_SUSPENDED',
   /** Action needs a higher verification level; `details.required` says which. */

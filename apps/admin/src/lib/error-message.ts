@@ -15,6 +15,8 @@ const MESSAGES: Record<string, string> = {
   [ApiErrorCode.RATE_LIMITED]: 'Too many attempts. Please wait a moment.',
   [ApiErrorCode.INVALID_CREDENTIALS]: 'Incorrect email or password.',
   [ApiErrorCode.ACCOUNT_SUSPENDED]: 'This account is not active.',
+  [ApiErrorCode.ALREADY_PROCESSED]:
+    'Someone has already dealt with this one. Refresh to see where it stands.',
   [ApiErrorCode.INTERNAL]: 'Something went wrong. Please try again.',
 };
 

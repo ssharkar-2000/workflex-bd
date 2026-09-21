@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import {
   DefaultTheme,
   Stack,
@@ -11,11 +11,15 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '../src/store/auth-store';
-import { useLaunchStore } from '../src/store/launch-store';
+import {
+  openGateForPaymentReturn,
+  useLaunchStore,
+} from '../src/store/launch-store';
 import { useI18nStore } from '../src/i18n';
 import { useTheme, useThemeStore } from '../src/lib/use-theme';
 import { MeshBackground } from '../src/components/MeshBackground';
 import { BrandMark } from '../src/components/BrandMark';
+import { BrandName } from '../src/components/BrandName';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -80,7 +84,6 @@ const navBackdrop = {
  */
 function RootNavigator() {
   const status = useAuthStore((s) => s.status);
-  const { c } = useTheme();
   useAuthRouting();
 
   return (
@@ -92,9 +95,7 @@ function RootNavigator() {
         // native splash, and a blank screen there reads as a broken app.
         <View style={styles.splash}>
           <BrandMark size={132} interactive={false} />
-          <Text style={[styles.splashMark, { color: c.primary }]}>
-            WorkFlex BD
-          </Text>
+          <BrandName height={44} />
         </View>
       ) : (
         // The navigator paints its own container with the navigation theme's
@@ -124,11 +125,6 @@ const styles = StyleSheet.create({
     gap: 18,
     backgroundColor: 'transparent',
   },
-  splashMark: {
-    fontSize: 28,
-    fontWeight: '900',
-    letterSpacing: -0.8,
-  },
 });
 
 function ThemedStatusBar() {
@@ -144,10 +140,13 @@ export default function RootLayout() {
   useEffect(() => {
     // Language and theme before session: the landing screen renders before
     // anyone is signed in, and it must already be in the user's language and
-    // their chosen mode rather than flashing the wrong one.
+    // their chosen mode rather than flashing the wrong one. A return from the
+    // payment gateway is recognised in the same step, before the session
+    // routing first runs.
     void Promise.all([
       hydrateLocale(),
       hydrateTheme(),
+      openGateForPaymentReturn(),
     ]).then(() => hydrate());
   }, [hydrate, hydrateLocale, hydrateTheme]);
 

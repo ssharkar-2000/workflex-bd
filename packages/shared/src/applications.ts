@@ -93,3 +93,44 @@ export const applicationStateSchema = z.object({
   status: applicationStatusSchema.nullable(),
 });
 export type ApplicationState = z.infer<typeof applicationStateSchema>;
+
+// --- the poster's side ---
+
+/** One person who applied, as the poster sees them. */
+export const applicantSchema = z.object({
+  userId: z.string().uuid(),
+  name: z.string(),
+  /** Identity verified. Applying requires it, so this is false only on old rows. */
+  verified: z.boolean(),
+  status: applicationStatusSchema,
+  message: z.string().nullable(),
+  appliedAt: z.string(),
+  /**
+   * Only once hired. Before that the poster is choosing between strangers
+   * and has no need of their numbers; after it, the two of them have work to
+   * arrange.
+   */
+  phone: z.string().nullable(),
+  /** Paid through the wallet for this job so far. */
+  paidSoFar: z.number().int(),
+});
+export type Applicant = z.infer<typeof applicantSchema>;
+
+export const applicantListSchema = z.object({
+  jobId: z.string().uuid(),
+  jobTitle: z.string(),
+  isOpen: z.boolean(),
+  applicants: z.array(applicantSchema),
+});
+export type ApplicantList = z.infer<typeof applicantListSchema>;
+
+/**
+ * The poster's decision on one application.
+ *
+ * ACCEPTED is hiring — it is what puts the work on the person's schedule and
+ * what lets the poster pay them through the wallet.
+ */
+export const decideApplicationSchema = z.object({
+  status: z.enum(['SHORTLISTED', 'ACCEPTED', 'REJECTED']),
+});
+export type DecideApplicationDto = z.output<typeof decideApplicationSchema>;

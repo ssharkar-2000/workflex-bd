@@ -10,6 +10,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { PaginationDto } from '../../common/pagination.dto';
 
 export class ListJobsDto extends PaginationDto {
@@ -60,4 +61,5 @@ export class CreateJobCategoryDto {
   /// A single emoji shown as the chip icon. Defaults to a generic briefcase
   /// when the caller doesn't send one, so the category still renders fine.
   @IsOptional() @IsString() @MaxLength(8) icon?: string;
+  @IsString() @MaxLength(500) reason!: string;
 }
