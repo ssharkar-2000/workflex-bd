@@ -1,4 +1,8 @@
 node_modules/
 dist/
 .env
+.expo/build/
+.env.local
+*.log
+.DS_Store
 .expo/
