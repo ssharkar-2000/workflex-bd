@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -14,20 +14,11 @@ import { useRouter } from 'expo-router';
 import { BrandMark } from '../../src/components/BrandMark';
 import { BrandName } from '../../src/components/BrandName';
 import { ShimmerButton } from '../../src/components/ShimmerButton';
-import { GlassCard } from '../../src/components/GlassCard';
 import { LanguageToggle } from '../../src/components/LanguageToggle';
 import { ThemeToggle } from '../../src/components/ThemeToggle';
 import { TwoRolesIntro } from '../../src/components/TwoRolesIntro';
 import { useT } from '../../src/i18n';
 import { useTheme } from '../../src/lib/use-theme';
-
-// ✓ and ৳ are plain characters, not emoji, so they are drawn in the text
-// colour — with none set they would be black on the dark theme's chips.
-const CHIPS = [
-  { icon: '✓', key: 'auth.chip.nid' },
-  { icon: '📍', key: 'auth.chip.nearby' },
-  { icon: '৳', key: 'auth.chip.bkash' },
-] as const;
 
 /**
  * Whether the intro has played since the app was opened.
@@ -57,8 +48,11 @@ const SCROLL_PAD = 12;
  * The tagline is one fixed line covering both sides of the market. It used to
  * rotate through three, one per audience, so the product only came across
  * whole to someone who watched all three — and the bKash line on its own made
- * it look like a payments app. bKash is still named, in the chips, as one
- * feature among three rather than as the headline.
+ * it look like a payments app.
+ *
+ * A row of three feature chips — NID verified, nearby jobs, bKash payout —
+ * used to sit under the supporting line. It was taken out by request, so the
+ * hero now ends on that line and the way in follows it.
  *
  * On a cold start the two-roles intro plays over the top first. The page
  * holds its entrance until the intro hands over, then rises into place under
@@ -73,7 +67,6 @@ export default function WelcomeScreen() {
   const hero = useRef(new Animated.Value(0)).current;
   const cta = useRef(new Animated.Value(0)).current;
   const float = useRef(new Animated.Value(0)).current;
-  const chips = useMemo(() => CHIPS.map(() => new Animated.Value(0)), []);
 
   const [intro, setIntro] = useState<'playing' | 'leaving' | 'done'>(
     introPlayed ? 'done' : 'playing',
@@ -99,17 +92,6 @@ export default function WelcomeScreen() {
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
-      Animated.stagger(
-        80,
-        chips.map((v) =>
-          Animated.spring(v, {
-            toValue: 1,
-            friction: 6,
-            tension: 70,
-            useNativeDriver: true,
-          }),
-        ),
-      ),
       Animated.spring(cta, {
         toValue: 1,
         friction: 9,
@@ -117,7 +99,7 @@ export default function WelcomeScreen() {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [hero, cta, chips]);
+  }, [hero, cta]);
 
   // With no intro to wait for, the page comes in as soon as it mounts. When
   // the intro does play, `endIntro` starts the entrance instead.
@@ -229,35 +211,6 @@ export default function WelcomeScreen() {
             >
               {t('auth.taglineSupport')}
             </Text>
-
-            <View style={styles.chips}>
-              {CHIPS.map((chip, i) => (
-                <Animated.View
-                  key={chip.key}
-                  style={{
-                    opacity: chips[i],
-                    transform: [
-                      {
-                        scale:
-                          chips[i]?.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [0.7, 1],
-                          }) ?? 1,
-                      },
-                    ],
-                  }}
-                >
-                  <GlassCard style={styles.chip} intensity={28}>
-                    <Text style={[styles.chipIcon, { color: c.textOnBrand }]}>
-                      {chip.icon}
-                    </Text>
-                    <Text style={[styles.chipText, { color: c.textOnBrand }]}>
-                      {t(chip.key)}
-                    </Text>
-                  </GlassCard>
-                </Animated.View>
-              ))}
-            </View>
           </Animated.View>
         </ScrollView>
 
@@ -349,23 +302,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingHorizontal: 8,
   },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 16,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-  chipIcon: { fontSize: 13, fontWeight: '800' },
-  chipText: { fontSize: 12, fontWeight: '700' },
 
   footer: { paddingHorizontal: 20, paddingBottom: 10 },
   secureRow: {
@@ -381,4 +317,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-
