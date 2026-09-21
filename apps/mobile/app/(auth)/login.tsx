@@ -44,10 +44,10 @@ import { font, radius } from '../../src/lib/theme';
 const MARK = { min: 56, max: 128 };
 /**
  * The back-and-toggles bar, and everything on this screen but the mark —
- * measured on the rendered page, 557 in both languages.
+ * measured on the rendered page, 495 in both languages.
  */
 const TOP_BAR = 46;
-const FORM_REST = 557;
+const FORM_REST = 495;
 /** Kept free, so a full screen still has a little air at top and bottom. */
 const BREATHING = 24;
 
@@ -136,7 +136,7 @@ export default function LoginScreen() {
 
   // Straight to the registration form. There is one kind of account, so
   // there is nothing to decide before filling it in.
-  const onCreateAccount = () => router.push('/(onboarding)/details');
+  const onRegister = () => router.push('/(onboarding)/details');
 
   const fieldStyle = (field: 'phone' | 'password') => [
     styles.inputRow,
@@ -315,29 +315,25 @@ export default function LoginScreen() {
 
                 {/* The way in for someone new, under the form rather than
                     beside it: a returning user never has to read past it, and
-                    a new one finds it where the sign-in form runs out. */}
+                    a new one finds it where the sign-in form runs out. One
+                    line, with Register as the bold word to tap. */}
                 <View style={styles.newRow}>
                   <View style={[styles.rule, { backgroundColor: c.glassBorder }]} />
                   <Text style={[styles.newText, { color: c.textMutedOnBrand }]}>
                     {t('login.newHere')}
                   </Text>
+                  <Pressable
+                    onPress={onRegister}
+                    accessibilityRole="button"
+                    hitSlop={12}
+                    style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+                  >
+                    <Text style={[styles.registerLink, { color: c.primary }]}>
+                      {t('login.register')}
+                    </Text>
+                  </Pressable>
                   <View style={[styles.rule, { backgroundColor: c.glassBorder }]} />
                 </View>
-                <Pressable
-                  onPress={onCreateAccount}
-                  accessibilityRole="button"
-                  style={({ pressed }) => [
-                    styles.createButton,
-                    {
-                      borderColor: c.primary,
-                      backgroundColor: pressed ? c.primarySoft : 'transparent',
-                    },
-                  ]}
-                >
-                  <Text style={[styles.createText, { color: c.primary }]}>
-                    {t('login.createAccount')}
-                  </Text>
-                </Pressable>
               </GlassCard>
             </Animated.View>
           </ScrollView>
@@ -407,17 +403,10 @@ const styles = StyleSheet.create({
   newRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     marginTop: 20,
-    marginBottom: 12,
   },
   rule: { flex: 1, height: 1 },
-  newText: { fontSize: font.sm, fontWeight: '700' },
-  createButton: {
-    borderWidth: 1.5,
-    borderRadius: radius.lg,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  createText: { fontSize: font.md, fontWeight: '800' },
+  newText: { fontSize: font.sm, fontWeight: '600' },
+  registerLink: { fontSize: font.sm, fontWeight: '800' },
 });
