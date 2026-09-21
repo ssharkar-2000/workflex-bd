@@ -91,6 +91,16 @@ export interface Palette {
   bandBorder: string;
 
   /**
+   * The panel every form sits on — sign-in, the code check, password reset
+   * and each registration step. In light mode it is the reference's pale ice
+   * blue, the same blue as the registration band. Unlike the band it is not
+   * fixed across modes: the forms' text turns light in dark mode, so there
+   * the panel keeps the hue at a depth light text can sit on.
+   */
+  formBg: string;
+  formBorder: string;
+
+  /**
    * Card fills, cycled so a grid reads as the reference's pastel mix rather
    * than a wall of identical white boxes. Deliberately pale: `text` has to
    * clear AA on every one of them, which rules out the saturated versions.
@@ -172,6 +182,12 @@ const light: Palette = {
   bandText: '#101010',
   bandBorder: '#AAC4DC',
 
+  // The reference's pale ice blue. On it body text measures 14.0:1, muted
+  // text 5.4:1, links 5.1:1 and the Register link 7.9:1. It is only 1.15:1
+  // from the page, so the border — the band's own edge — outlines the form.
+  formBg: '#DFEAF4',
+  formBorder: '#AAC4DC',
+
   // peach · mint · lavender · butter — the reference's four pastels
   tints: ['#FFEADF', '#DFF1E7', '#E6E8FA', '#FDF1DC'],
   tintBorders: ['#F8D3C0', '#C7E5D6', '#CFD3F0', '#F2DEBC'],
@@ -251,6 +267,12 @@ const dark: Palette = {
   bandBg: '#DFEAF4',
   bandText: '#101010',
   bandBorder: '#AAC4DC',
+
+  // The ice blue's hue taken down to where light text reads on it: body text
+  // 12.7:1, muted text 7.0:1, links 7.8:1, the Register link 5.6:1. Like the
+  // light panel it sits close to the page, so it keeps an edge of its own.
+  formBg: '#1E2A3B',
+  formBorder: '#34465E',
 
   // The same four hues pushed to near-black. They read as a tint against the
   // page rather than as colour — at this luminance anything stronger would
