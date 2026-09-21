@@ -37,9 +37,10 @@ const SCROLL_PAD = 12;
 
 /**
  * Pure welcome screen — it says what the product is and offers one way in:
- * Get started, which always opens the Login / New account screen. A returning
- * user signs in there; a new one continues into registration, which runs its
- * own steps from there (details, SMS check, documents, review).
+ * Get started, which always opens the sign-in page. A returning user signs in
+ * there; a new one taps Create an account under the form and continues into
+ * registration, which runs its own steps (details, SMS check, documents,
+ * review).
  *
  * The phone field used to live here, which meant asking for a number before
  * the user knew what they were signing up for. Intent now comes first, and
@@ -230,13 +231,12 @@ export default function WelcomeScreen() {
             },
           ]}
         >
-          {/* Always the Login / New account screen next, whoever taps it —
-              someone new, someone returning, someone still signed in. */}
+          {/* Always the sign-in page next, whoever taps it — someone
+              returning signs in there, someone new finds Create an account
+              under the form. */}
           <ShimmerButton
             label={t('auth.getStartedCta')}
-            onPress={() =>
-              router.push({ pathname: '/(auth)/login', params: { tab: 'register' } })
-            }
+            onPress={() => router.push('/(auth)/login')}
           />
 
           <View style={styles.secureRow}>
