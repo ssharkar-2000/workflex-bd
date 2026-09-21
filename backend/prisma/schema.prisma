@@ -1,0 +1,592 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Admin access
+// ---------------------------------------------------------------------------
+
+enum AdminRole {
+  SUPER_ADMIN
+  MODERATOR
+  SUPPORT
+}
+
+model AdminUser {
+  id           String         @id @default(uuid())
+  email        String         @unique
+  passwordHash String
+  displayName  String
+  role         AdminRole      @default(MODERATOR)
+  language     String         @default("en") // "en" | "bn"
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  sessions     RefreshToken[]
+  auditLogs    AuditLog[]
+
+  @@map("admin_users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  adminId   String
+  tokenHash String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  admin     AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@map("refresh_tokens")
+}
+
+/// Every state-changing admin action is recorded — approve, reject, suspend,
+/// refund, escalate. The alert detail frame shows an "Action Taken" field, and
+/// suspend/reject flows all confirm before writing.
+model AuditLog {
+  id         String    @id @default(uuid())
+  adminId    String
+  action     String // "job.approve", "worker.suspend", ...
+  entityType String
+  entityId   String
+  reason     String?
+  metadata   Json?
+  createdAt  DateTime  @default(now())
+  admin      AdminUser @relation(fields: [adminId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Workers
+// ---------------------------------------------------------------------------
+
+enum WorkerStatus {
+  ACTIVE
+  PENDING
+  REJECTED
+  SUSPENDED
+}
+
+enum Availability {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+}
+
+model Worker {
+  id         String @id @default(uuid())
+  /// Human-facing code shown in the UI, e.g. "WK-002".
+  code       String @unique
+  fullName   String
+  /// Initials shown in the avatar circle when no photo exists ("SB").
+  initials   String
+  profession String
+
+  status       WorkerStatus @default(PENDING)
+  availability Availability @default(FULL_TIME)
+
+  phone   String
+  email   String?
+  address String
+
+  bio         String?
+  education   String?
+  lastCompany String?
+  /// Stored in months so "3 years 1 month" renders in either language.
+  experienceMonths Int @default(0)
+
+  /// Aggregates maintained from review rows.
+  rating      Decimal @default(0) @db.Decimal(2, 1)
+  reviewCount Int     @default(0)
+  /// 0-100, drives the "Trust Score" meter.
+  trustScore  Int     @default(0)
+
+  totalJobs      Int    @default(0)
+  completionRate Int    @default(0)
+  /// Money is stored in paisa (integer) to avoid float drift. ৳25,000 = 2500000.
+  totalEarnings  BigInt @default(0)
+  salaryMin      BigInt?
+  salaryMax      BigInt?
+
+  joinedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  skills         WorkerSkill[]
+  certifications Certification[]
+  jobHistory     JobHistoryEntry[]
+  applications   JobApplication[]
+  verifications  VerificationRequest[]
+  alerts         Alert[]
+  transactions   Transaction[]        @relation("TransactionToWorker")
+  attendance     AttendanceRecord[]
+
+  @@index([status])
+  @@index([profession])
+  @@map("workers")
+}
+
+model WorkerSkill {
+  id       String @id @default(uuid())
+  workerId String
+  name     String
+  worker   Worker @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@unique([workerId, name])
+  @@map("worker_skills")
+}
+
+model Certification {
+  id       String  @id @default(uuid())
+  workerId String
+  name     String
+  issuer   String?
+  year     Int?
+  worker   Worker  @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@map("certifications")
+}
+
+model JobHistoryEntry {
+  id        String    @id @default(uuid())
+  workerId  String
+  company   String
+  role      String
+  startedAt DateTime
+  endedAt   DateTime?
+  worker    Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@index([workerId])
+  @@map("job_history_entries")
+}
+
+// ---------------------------------------------------------------------------
+// Employers and companies
+// ---------------------------------------------------------------------------
+
+model Company {
+  id        String     @id @default(uuid())
+  name      String
+  /// Single letter shown in the job card avatar ("R" for Radisson).
+  initials  String
+  industry  String?
+  address   String?
+  verified  Boolean    @default(false)
+  createdAt DateTime   @default(now())
+  employers Employer[]
+  jobs      Job[]
+
+  @@map("companies")
+}
+
+model Employer {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  fullName  String
+  email     String   @unique
+  phone     String?
+  companyId String?
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  verifications VerificationRequest[]
+
+  @@map("employers")
+}
+
+// ---------------------------------------------------------------------------
+// Jobs
+// ---------------------------------------------------------------------------
+
+enum JobStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum JobUrgency {
+  NORMAL
+  URGENT
+}
+
+model JobCategory {
+  id   String @id @default(uuid())
+  slug String @unique // "administration", "security", "healthcare", ...
+  name String
+  /// Emoji used as the chip icon in the category filter row.
+  icon String
+  jobs Job[]
+
+  @@map("job_categories")
+}
+
+model Job {
+  id          String @id @default(uuid())
+  code        String @unique
+  title       String
+  description String
+  companyId   String
+  categoryId  String
+  location    String
+
+  salaryMin BigInt
+  salaryMax BigInt
+
+  availability Availability @default(FULL_TIME)
+  /// Minimum experience required, in months ("1+ year" = 12).
+  experienceMonths Int @default(0)
+
+  status   JobStatus  @default(PENDING)
+  urgency  JobUrgency @default(NORMAL)
+  /// "Featured" is a flag on an approved job, not a fifth status — the tab row
+  /// counts All / Pending / Approved / Featured / Rejected independently.
+  featured Boolean    @default(false)
+
+  /// Set when an admin rejects; shown on the Rejected Jobs screen.
+  rejectionReason String?
+  reviewedAt      DateTime?
+
+  views     Int      @default(0)
+  postedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company      Company            @relation(fields: [companyId], references: [id])
+  category     JobCategory        @relation(fields: [categoryId], references: [id])
+  applications JobApplication[]
+  attendance   AttendanceRecord[]
+
+  @@index([status])
+  @@index([categoryId])
+  @@map("jobs")
+}
+
+enum ApplicationStatus {
+  APPLIED
+  SHORTLISTED
+  HIRED
+  REJECTED
+}
+
+model JobApplication {
+  id        String            @id @default(uuid())
+  jobId     String
+  workerId  String
+  status    ApplicationStatus @default(APPLIED)
+  appliedAt DateTime          @default(now())
+  hiredAt   DateTime?
+  job       Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  worker    Worker            @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, workerId])
+  @@map("job_applications")
+}
+
+// ---------------------------------------------------------------------------
+// Payments
+// ---------------------------------------------------------------------------
+
+enum TransactionType {
+  SALARY_PAYMENT
+  WITHDRAWAL
+  PLATFORM_FEE
+  REFUND
+}
+
+enum TransactionStatus {
+  COMPLETED
+  PENDING
+  FAILED
+}
+
+model Transaction {
+  id   String @id @default(uuid())
+  /// Shown in the UI as "TXN-8825".
+  code String @unique
+
+  type   TransactionType
+  status TransactionStatus @default(PENDING)
+  /// Paisa. ৳25,000 = 2500000.
+  amount BigInt
+
+  /// The design renders "Bashundhara Group → Md. Rafiqul Islam", so both sides
+  /// are stored as labels and optionally linked to a worker when known.
+  fromLabel String
+  toLabel   String
+  workerId  String?
+
+  /// Only set on FAILED rows; drives the Failed Transaction modal.
+  failureReason String?
+  /// Only set on REFUND rows.
+  refundReason  String?
+
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  worker Worker? @relation("TransactionToWorker", fields: [workerId], references: [id])
+
+  @@index([status])
+  @@index([occurredAt])
+  @@map("transactions")
+}
+
+// ---------------------------------------------------------------------------
+// Verification centre
+// ---------------------------------------------------------------------------
+
+enum VerificationType {
+  NID
+  FACE
+  BUSINESS
+  WORKER
+  EMPLOYER
+  COMPANY
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model VerificationRequest {
+  id     String             @id @default(uuid())
+  type   VerificationType
+  status VerificationStatus @default(PENDING)
+  /// Name as displayed in the queue ("Karim Uddin", "City Tech Solutions").
+  subjectName String
+  workerId    String?
+  employerId  String?
+  documentUrl String?
+  reviewNote  String?
+  submittedAt DateTime @default(now())
+  reviewedAt  DateTime?
+
+  worker   Worker?   @relation(fields: [workerId], references: [id])
+  employer Employer? @relation(fields: [employerId], references: [id])
+
+  @@index([status, type])
+  @@map("verification_requests")
+}
+
+// ---------------------------------------------------------------------------
+// AI monitoring
+// ---------------------------------------------------------------------------
+
+enum AlertSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum AlertStatus {
+  OPEN
+  ESCALATED
+  RESOLVED
+}
+
+enum AlertKind {
+  SOS
+  SUSPICIOUS_LOGIN
+  FAKE_GPS
+  FAILED_VERIFICATION
+  FRAUD
+}
+
+model Alert {
+  id       String        @id @default(uuid())
+  kind     AlertKind
+  severity AlertSeverity
+  status   AlertStatus   @default(OPEN)
+  message  String
+
+  /// Free-text subject, since some alerts have no linked account
+  /// ("Unknown User" appears in the design).
+  subjectName String
+  workerId    String?
+
+  latitude    Decimal? @db.Decimal(9, 6)
+  longitude   Decimal? @db.Decimal(9, 6)
+  device      String?
+  actionTaken String?
+
+  detectedAt DateTime  @default(now())
+  resolvedAt DateTime?
+
+  worker Worker? @relation(fields: [workerId], references: [id])
+
+  @@index([status, severity])
+  @@map("alerts")
+}
+
+// ---------------------------------------------------------------------------
+// Support and notifications
+// ---------------------------------------------------------------------------
+
+enum ComplaintStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model Complaint {
+  id           String          @id @default(uuid())
+  code         String          @unique
+  subject      String
+  body         String
+  status       ComplaintStatus @default(OPEN)
+  reporterName String
+  resolution   String?
+  createdAt    DateTime        @default(now())
+  resolvedAt   DateTime?
+
+  @@index([status])
+  @@map("complaints")
+}
+
+enum NotificationKind {
+  SOS
+  VERIFICATION
+  PAYMENT
+  FRAUD
+  JOB
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  kind      NotificationKind
+  title     String
+  body      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([read, createdAt])
+  @@map("notifications")
+}
+
+/// Pre-aggregated daily rollups. The dashboard and analytics screens plot
+/// monthly revenue and worker growth; recomputing those from raw rows on every
+/// request would not hold up, so a nightly job writes them here.
+model DailyMetric {
+  date          DateTime @id @db.Date
+  revenue       BigInt   @default(0)
+  newWorkers    Int      @default(0)
+  activeWorkers Int      @default(0)
+  jobsPosted    Int      @default(0)
+  jobsApproved  Int      @default(0)
+
+  @@map("daily_metrics")
+}
+
+// ---------------------------------------------------------------------------
+// Attendance
+//
+// No design frames exist for this section, so the shape follows what the rest
+// of the product implies: a worker checks in and out of a job, GPS is captured
+// (the AI monitoring screens flag "fake GPS during check-in"), and an admin can
+// see who is late or absent.
+// ---------------------------------------------------------------------------
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  ON_LEAVE
+}
+
+model AttendanceRecord {
+  id       String           @id @default(uuid())
+  workerId String
+  jobId    String?
+  date     DateTime         @db.Date
+  status   AttendanceStatus @default(PRESENT)
+
+  checkInAt  DateTime?
+  checkOutAt DateTime?
+
+  /// Captured at check-in. The fake-GPS alerts compare this against the job site.
+  latitude  Decimal? @db.Decimal(9, 6)
+  longitude Decimal? @db.Decimal(9, 6)
+  /// Set when the AI monitor flags the coordinates as implausible.
+  gpsFlagged Boolean @default(false)
+
+  note      String?
+  createdAt DateTime @default(now())
+
+  worker Worker @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  job    Job?   @relation(fields: [jobId], references: [id])
+
+  @@unique([workerId, date])
+  @@index([date])
+  @@index([status])
+  @@map("attendance_records")
+}
+
+// ---------------------------------------------------------------------------
+// CMS
+// ---------------------------------------------------------------------------
+
+enum CmsBlockKind {
+  BANNER
+  PAGE
+  FAQ
+}
+
+model CmsBlock {
+  id        String       @id @default(uuid())
+  kind      CmsBlockKind
+  /// URL-safe key the client app fetches by, e.g. "home-hero", "terms".
+  slug      String       @unique
+  title     String
+  titleBn   String?
+  body      String?
+  bodyBn    String?
+  imageUrl  String?
+  /// Ordering within a kind; lower shows first.
+  position  Int          @default(0)
+  published Boolean      @default(false)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([kind, published])
+  @@map("cms_blocks")
+}
+
+// ---------------------------------------------------------------------------
+// System settings
+//
+// Key/value rather than a wide table, so a new toggle is a row instead of a
+// migration. Values are stored as strings and coerced by `valueType`.
+// ---------------------------------------------------------------------------
+
+enum SettingType {
+  STRING
+  NUMBER
+  BOOLEAN
+}
+
+model SystemSetting {
+  key         String      @id
+  value       String
+  valueType   SettingType @default(STRING)
+  label       String
+  description String?
+  /// Grouping for the settings screen: "platform", "payments", "security".
+  group       String      @default("platform")
+  updatedAt   DateTime    @updatedAt
+
+  @@index([group])
+  @@map("system_settings")
+}
