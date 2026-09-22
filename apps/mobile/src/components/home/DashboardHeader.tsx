@@ -2,11 +2,10 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { AuthUser } from '@workflex/shared';
-import { Avatar } from '../Avatar';
 import { BrandName } from '../BrandName';
 import { NotificationBell } from '../NotificationBell';
 import { DashboardMenu } from '../DashboardMenu';
-import { Greeting, ProfileStrengthBadge } from './DashboardSections';
+import { Greeting, ProfileAvatar } from './DashboardSections';
 import { useT } from '../../i18n';
 import { useTheme } from '../../lib/use-theme';
 import { font, radius, space } from '../../lib/theme';
@@ -71,23 +70,18 @@ export function DashboardHeader({
 
         <View style={styles.spacer} />
 
-        <ProfileStrengthBadge />
         <NotificationBell />
 
-        <Pressable
-          onPress={() => router.push('/(app)/profile')}
-          accessibilityRole="button"
-          accessibilityLabel={t('profile.title')}
-        >
-          <Avatar
-            hasPhoto={user.hasPhoto}
-            initials={initials}
-            size={36}
-            // Re-fetches when the account's photo state flips, so a selfie
-            // taken during verification shows up without a restart.
-            version={String(user.hasPhoto)}
-          />
-        </Pressable>
+        {/* The avatar and the profile-strength ring, merged into one control:
+            the ring frames the picture and its figure sits on the ring. */}
+        <ProfileAvatar
+          hasPhoto={user.hasPhoto}
+          initials={initials}
+          // Re-fetches when the account's photo state flips, so a selfie
+          // taken during verification shows up without a restart.
+          version={String(user.hasPhoto)}
+          label={t('profile.title')}
+        />
       </View>
 
       <View
