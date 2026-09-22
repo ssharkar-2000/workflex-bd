@@ -141,7 +141,7 @@ export function EmailVerifyField({
       <View
         style={[
           styles.inputRow,
-          { borderColor: borderFor('email') },
+          { borderColor: borderFor('email'), backgroundColor: c.fieldBg },
           !enabled && styles.disabled,
         ]}
       >
@@ -208,7 +208,7 @@ export function EmailVerifyField({
             style={[
               styles.inputRow,
               styles.codeRow,
-              { borderColor: borderFor('code') },
+              { borderColor: borderFor('code'), backgroundColor: c.fieldBg },
             ]}
           >
             <TextInput
@@ -280,7 +280,6 @@ const styles = StyleSheet.create({
     gap: 8,
     borderWidth: 1.5,
     borderRadius: radius.md,
-    backgroundColor: 'rgba(128,128,128,0.10)',
     paddingHorizontal: 14,
   },
   disabled: { opacity: 0.55 },
