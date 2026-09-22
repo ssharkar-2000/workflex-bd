@@ -133,7 +133,7 @@ export default function SupportScreen() {
               style={[
                 styles.input,
                 {
-                  backgroundColor: c.surfaceAlt,
+                  backgroundColor: c.fieldBg,
                   borderColor: c.border,
                   color: c.text,
                 },
@@ -160,7 +160,7 @@ export default function SupportScreen() {
                 styles.input,
                 styles.textarea,
                 {
-                  backgroundColor: c.surfaceAlt,
+                  backgroundColor: c.fieldBg,
                   borderColor: c.border,
                   color: c.text,
                 },
