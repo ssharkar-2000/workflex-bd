@@ -104,13 +104,16 @@ export class OnboardingService {
    * Registration is complete when the person has told us who they are. The
    * company-name check that used to live here is gone: a business is proved
    * by an approved trade licence, not by typing a name into a signup form.
+   *
+   * Only `firstName` is looked at for the name. Registration asks for a full
+   * name in one field and stores it there whole, leaving `lastName` empty;
+   * accounts from before that have both parts, and a first part either way.
    */
   private isProfileComplete(user: {
     firstName: string | null;
-    lastName: string | null;
     address: string | null;
   }): boolean {
-    return Boolean(user.firstName && user.lastName && user.address);
+    return Boolean(user.firstName && user.address);
   }
 
   async saveProfile(
@@ -128,8 +131,11 @@ export class OnboardingService {
         // what anyone may do — a business is proved by an approved trade
         // licence, which is what level 2 records.
         accountType: 'INDIVIDUAL',
-        firstName: dto.firstName,
-        lastName: dto.lastName,
+        // The form asks for one full name, kept whole in `firstName` with
+        // `lastName` left empty — no split is guessed at. Everything that
+        // shows a name joins the two parts, so both shapes read the same.
+        firstName: dto.fullName,
+        lastName: null,
         address: dto.address,
         experienceType: dto.experienceType ?? null,
         // Only the hash is ever persisted; the plaintext leaves scope here.
