@@ -90,7 +90,7 @@ export default function AdminLoginScreen() {
           : focusedField === field
             ? c.accentOnBrand
             : c.glassBorder,
-      backgroundColor: focusedField === field ? c.glassHighlight : c.glassFill,
+      backgroundColor: c.fieldBg,
     },
   ];
 

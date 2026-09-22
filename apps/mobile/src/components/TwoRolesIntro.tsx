@@ -183,7 +183,10 @@ const PLUMBER: Look = {
 };
 
 /** The app icon on the notification: the same on every phone. */
-const ICON = ['#3A34A0', '#6D28D9'] as const;
+// The logo's navy — the W of the logotype — lighter to darker, with the
+// location pin in the orange of its F, as on the brand mark.
+const ICON = ['#274F7C', '#162C46'] as const;
+const ICON_PIN = '#F97316';
 const CONFETTI = ['#3A34A0', '#6D28D9', '#136B3A', '#F0884C', '#F2B233'];
 const WATER = '#4AA3E0';
 
@@ -1895,12 +1898,12 @@ function AppIcon({ size }: { size: number }) {
       <Svg width={size * 0.64} height={size * 0.64} viewBox="0 0 24 24">
         <Path
           d="M12 2.5c-4 0-7 3.1-7 7 0 5.2 7 12 7 12s7-6.8 7-12c0-3.9-3-7-7-7z"
-          stroke="#FFFFFF"
+          stroke={ICON_PIN}
           strokeWidth={2}
           strokeLinejoin="round"
           fill="none"
         />
-        <Path d="M12.8 6.2 9.8 11h2.4l-1 4.2 3.4-5.2h-2.5z" fill="#FFFFFF" />
+        <Path d="M12.8 6.2 9.8 11h2.4l-1 4.2 3.4-5.2h-2.5z" fill={ICON_PIN} />
       </Svg>
     </LinearGradient>
   );

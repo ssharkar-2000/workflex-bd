@@ -232,7 +232,7 @@ export default function ReportScreen() {
                   maxLength={20}
                   style={[
                     styles.input,
-                    { backgroundColor: c.surfaceAlt, borderColor: c.border, color: c.text },
+                    { backgroundColor: c.fieldBg, borderColor: c.border, color: c.text },
                   ]}
                 />
               </>
@@ -252,7 +252,7 @@ export default function ReportScreen() {
               maxLength={140}
               style={[
                 styles.input,
-                { backgroundColor: c.surfaceAlt, borderColor: c.border, color: c.text },
+                { backgroundColor: c.fieldBg, borderColor: c.border, color: c.text },
               ]}
             />
 
@@ -274,7 +274,7 @@ export default function ReportScreen() {
               style={[
                 styles.input,
                 styles.textarea,
-                { backgroundColor: c.surfaceAlt, borderColor: c.border, color: c.text },
+                { backgroundColor: c.fieldBg, borderColor: c.border, color: c.text },
               ]}
             />
 

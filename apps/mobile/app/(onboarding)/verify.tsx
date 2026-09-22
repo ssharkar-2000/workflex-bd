@@ -180,7 +180,7 @@ export default function VerifyScreen() {
                   : d
                     ? c.accentOnBrand
                     : c.glassBorder,
-                backgroundColor: d ? c.glassHighlight : c.glassFill,
+                backgroundColor: c.fieldBg,
               },
             ]}
           >

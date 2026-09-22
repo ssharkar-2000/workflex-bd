@@ -98,9 +98,7 @@ export default function ForgotPasswordScreen() {
                       : focused
                         ? c.accentOnBrand
                         : c.glassBorder,
-                    backgroundColor: focused
-                      ? c.glassHighlight
-                      : c.glassFill,
+                    backgroundColor: c.fieldBg,
                   },
                 ]}
               >

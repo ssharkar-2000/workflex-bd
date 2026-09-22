@@ -249,7 +249,7 @@ function SubmissionCard({ item }: { item: KycQueueItem }) {
           <TextInput
             style={[
               styles.input,
-              { borderColor: c.border, backgroundColor: c.bg, color: c.text },
+              { borderColor: c.border, backgroundColor: c.fieldBg, color: c.text },
             ]}
             value={reason}
             onChangeText={setReason}
