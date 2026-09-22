@@ -55,10 +55,7 @@ export function PhoneField({
                   inputRange: [0, 1],
                   outputRange: [c.glassBorder, c.accentOnBrand],
                 }),
-            backgroundColor: anim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [c.glassFill, c.glassHighlight],
-            }),
+            backgroundColor: c.fieldBg,
           },
         ]}
       >
