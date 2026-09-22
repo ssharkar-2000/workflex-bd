@@ -121,6 +121,7 @@ export default function ResetPasswordScreen() {
                     borderColor: fieldErrors.code
                       ? 'rgba(255,150,145,0.85)'
                       : c.accentOnBrand,
+                    backgroundColor: c.fieldBg,
                   },
                 ]}
                 value={code}
@@ -203,7 +204,6 @@ const styles = StyleSheet.create({
   codeInput: {
     borderWidth: 1.5,
     borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.09)',
     paddingVertical: 14,
     fontSize: 28,
     fontWeight: '700',
