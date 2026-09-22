@@ -148,7 +148,12 @@ export function PhoneVerifyField({
         </Text>
       </View>
 
-      <View style={[styles.inputRow, { borderColor: borderFor('phone') }]}>
+      <View
+        style={[
+          styles.inputRow,
+          { borderColor: borderFor('phone'), backgroundColor: c.fieldBg },
+        ]}
+      >
         <Text style={styles.flag}>🇧🇩</Text>
         <Text style={[styles.prefix, { color: c.textOnBrand }]}>+880</Text>
         <View style={styles.divider} />
@@ -218,7 +223,7 @@ export function PhoneVerifyField({
             style={[
               styles.inputRow,
               styles.codeRow,
-              { borderColor: borderFor('code') },
+              { borderColor: borderFor('code'), backgroundColor: c.fieldBg },
             ]}
           >
             <TextInput
@@ -286,7 +291,6 @@ const styles = StyleSheet.create({
     gap: 8,
     borderWidth: 1.5,
     borderRadius: radius.md,
-    backgroundColor: 'rgba(128,128,128,0.10)',
     paddingHorizontal: 14,
   },
   codeRow: { marginTop: 8 },
