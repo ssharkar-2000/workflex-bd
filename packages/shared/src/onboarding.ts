@@ -59,11 +59,18 @@ export const kycStatusSchema = z.enum([
 ]);
 export type KycStatus = z.infer<typeof kycStatusSchema>;
 
-const nameSchema = z
+/**
+ * A person's whole name in one field — "Md. Abdul Karim", "রহিম উদ্দিন", or a
+ * single name. It is never split into parts: names here do not divide into a
+ * given and a family name reliably, and guessing where to cut would misfile
+ * someone's own name. Longer than one part of a name used to be allowed,
+ * since it now carries all of them.
+ */
+const fullNameSchema = z
   .string()
   .trim()
-  .min(1, 'Required')
-  .max(60)
+  .min(2, 'Enter your full name')
+  .max(100)
   // Bangla and Latin letters, spaces, dots and hyphens. No digits.
   .regex(/^[\p{L}\p{M}][\p{L}\p{M}\s.'-]*$/u, 'Enter a valid name');
 
@@ -173,8 +180,8 @@ const tinSchema = z
  */
 export const onboardingProfileSchema = z
   .object({
-    firstName: nameSchema,
-    lastName: nameSchema,
+    /** One field for the whole name; stored in `firstName`, see the API. */
+    fullName: fullNameSchema,
     address: addressSchema,
     password: passwordSchema,
     confirmPassword: z.string(),
@@ -208,8 +215,8 @@ export type OnboardingProfileDto = z.output<typeof onboardingProfileSchema>;
  * against the old type.
  */
 export const profileUpdateSchema = z.object({
-  firstName: nameSchema,
-  lastName: nameSchema,
+  /** The whole name in one field, as at registration. */
+  fullName: fullNameSchema,
   address: addressSchema,
   /** Company accounts only; ignored by the API for an individual. */
   designation: designationSchema.optional().or(z.literal('')),
