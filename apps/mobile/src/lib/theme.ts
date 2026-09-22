@@ -80,11 +80,12 @@ export interface Palette {
   locked: string;
 
   /**
-   * The registration brand band: pale ice blue with black on it, taken from
-   * the supplied reference. Identical in both modes, which is why it cannot
-   * borrow `primary`/`primaryText` — those invert between light and dark.
-   * `bandBorder` draws the bottom edge, which would otherwise be invisible
-   * against the cream page in light mode.
+   * The registration brand band: a warm peach with black on it, by request
+   * the tone of the page's own wash behind the landing screen (it was a pale
+   * ice blue, which is now the forms' colour). Identical in both modes, which
+   * is why it cannot borrow `primary`/`primaryText` — those invert between
+   * light and dark. `bandBorder` draws the edge below it, which would
+   * otherwise be lost against the cream page in light mode.
    */
   bandBg: string;
   bandText: string;
@@ -93,12 +94,19 @@ export interface Palette {
   /**
    * The panel every form sits on — sign-in, the code check, password reset
    * and each registration step. In light mode it is the reference's pale ice
-   * blue, the same blue as the registration band. Unlike the band it is not
-   * fixed across modes: the forms' text turns light in dark mode, so there
-   * the panel keeps the hue at a depth light text can sit on.
+   * blue. It is not fixed across modes: the forms' text turns light in dark
+   * mode, so there the panel keeps the hue at a depth light text can sit on.
    */
   formBg: string;
   formBorder: string;
+
+  /**
+   * Inside every box a person types into, on a form panel or a card alike.
+   * Solid, never the colour behind showing through: white in light mode, by
+   * request, and in dark mode the raised dark fill the app's fields already
+   * had, since a white box there would hide the light text typed into it.
+   */
+  fieldBg: string;
 
   /**
    * Card fills, cycled so a grid reads as the reference's pastel mix rather
@@ -178,15 +186,22 @@ const light: Palette = {
   // has to survive being the least important text on the screen.
   locked: '#6A6A82',
 
-  bandBg: '#DFEAF4',
+  // The peach of the page's own wash, sampled from it (#FBDFCF on average).
+  // The black on it measures 15.0:1; the edge is a step deeper so the band
+  // still ends visibly against the cream page (1.7:1).
+  bandBg: '#FBDFCF',
   bandText: '#101010',
-  bandBorder: '#AAC4DC',
+  bandBorder: '#E8B696',
 
   // The reference's pale ice blue. On it body text measures 14.0:1, muted
   // text 5.4:1, links 5.1:1 and the Register link 7.9:1. It is only 1.15:1
-  // from the page, so the border — the band's own edge — outlines the form.
+  // from the page, so a deeper ice-blue border outlines the form.
   formBg: '#DFEAF4',
   formBorder: '#AAC4DC',
+
+  // White, by request, so a field reads as a blank to fill in (text 17.1:1).
+  // On a white card its border is what marks it out.
+  fieldBg: '#FFFFFF',
 
   // peach · mint · lavender · butter — the reference's four pastels
   tints: ['#FFEADF', '#DFF1E7', '#E6E8FA', '#FDF1DC'],
@@ -264,15 +279,20 @@ const dark: Palette = {
 
   // Deliberately the same values as light mode: the band is the brand lockup
   // and is meant to look identical whichever theme the phone is in.
-  bandBg: '#DFEAF4',
+  bandBg: '#FBDFCF',
   bandText: '#101010',
-  bandBorder: '#AAC4DC',
+  bandBorder: '#E8B696',
 
   // The ice blue's hue taken down to where light text reads on it: body text
   // 12.7:1, muted text 7.0:1, links 7.8:1, the Register link 5.6:1. Like the
   // light panel it sits close to the page, so it keeps an edge of its own.
   formBg: '#1E2A3B',
   formBorder: '#34465E',
+
+  // The raised dark fill the app's fields already had in dark mode, where
+  // white would hide the light text typed in (13.5:1 on it). It sits close
+  // to the form and the cards, so each field's border marks it out.
+  fieldBg: '#232338',
 
   // The same four hues pushed to near-black. They read as a tint against the
   // page rather than as colour — at this luminance anything stronger would
