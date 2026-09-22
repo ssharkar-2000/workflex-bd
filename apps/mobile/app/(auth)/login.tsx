@@ -147,10 +147,7 @@ export default function LoginScreen() {
           : focusedField === field
             ? c.accentOnBrand
             : c.glassBorder,
-      backgroundColor:
-        focusedField === field
-          ? c.glassHighlight
-          : c.glassFill,
+      backgroundColor: c.fieldBg,
     },
   ];
 
