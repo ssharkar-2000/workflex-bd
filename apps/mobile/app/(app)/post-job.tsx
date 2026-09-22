@@ -884,7 +884,7 @@ function Field({
         style={[
           styles.input,
           multiline && styles.textarea,
-          { backgroundColor: c.surfaceAlt, borderColor: c.border, color: c.text },
+          { backgroundColor: c.fieldBg, borderColor: c.border, color: c.text },
         ]}
       />
     </View>
@@ -907,7 +907,7 @@ function Money({
       <View
         style={[
           styles.moneyBox,
-          { backgroundColor: c.surfaceAlt, borderColor: c.border },
+          { backgroundColor: c.fieldBg, borderColor: c.border },
         ]}
       >
         <Text style={[styles.taka, { color: c.textMuted }]}>৳</Text>
