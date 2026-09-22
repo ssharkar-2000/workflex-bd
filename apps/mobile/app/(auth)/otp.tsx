@@ -113,7 +113,7 @@ export default function OtpScreen() {
                   borderColor: error
                     ? 'rgba(255,150,145,0.85)'
                     : c.accentOnBrand,
-                  backgroundColor: c.glassFill,
+                  backgroundColor: c.fieldBg,
                 },
               ]}
               value={code}
