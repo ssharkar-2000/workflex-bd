@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import type { DashboardSummary, ProfileGap } from '@workflex/shared';
 import { fetchDashboardSummary } from '../../api/auth';
+import { Avatar } from '../Avatar';
 import { useT, type TranslationKey } from '../../i18n';
 import { useTheme } from '../../lib/use-theme';
 import { font, radius, space } from '../../lib/theme';
@@ -25,15 +26,6 @@ const GAP_LABELS: Record<ProfileGap, TranslationKey> = {
   PHOTO: 'dash.gap.PHOTO',
   CV: 'dash.gap.CV',
   EMAIL: 'dash.gap.EMAIL',
-};
-
-/** Where each gap is actually fixed, so the prompt is one tap from the cure. */
-const GAP_ROUTES: Record<ProfileGap, string> = {
-  NAME: '/(app)/profile',
-  NID_VERIFIED: '/(onboarding)/documents',
-  PHOTO: '/(onboarding)/documents',
-  CV: '/(app)/cv',
-  EMAIL: '/(app)/profile',
 };
 
 export function useDashboardSummary() {
@@ -81,14 +73,19 @@ export function Greeting({ name }: { name: string }) {
 }
 
 /**
- * The ring's geometry, sized to sit in the header beside the bell.
+ * The profile control's geometry: the avatar inside the strength ring, with a
+ * small gap so the ring reads as a frame round the picture rather than as its
+ * border.
  *
- * It was a full-width card, which spent a whole band of the dashboard on one
- * number. As a header badge it is glanceable in the place people already look
- * for status, and the body is left for things that need the room.
+ * The ring was a full-width card once, which spent a whole band of the
+ * dashboard on one number; then a badge of its own beside the bell. Around
+ * the avatar it is glanceable in the place people already look for their own
+ * status, and it no longer takes a slot of its own.
  */
-const RING_SIZE = 34;
-const RING_STROKE = 3.5;
+const AVATAR_SIZE = 34;
+const RING_STROKE = 3;
+const RING_GAP = 2;
+const RING_SIZE = AVATAR_SIZE + 2 * (RING_GAP + RING_STROKE);
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
@@ -102,29 +99,46 @@ const STRENGTH_BANDS: { min: number; label: TranslationKey }[] = [
 ];
 
 /**
- * Profile completeness as a header badge, beside the notification bell.
+ * The account's avatar framed by its profile-strength ring — one control
+ * where the header used to have two.
+ *
+ * The ring sat beside the bell and the avatar beside that, saying two halves
+ * of one thing: who you are here, and how much of it the app can vouch for.
+ * Merged by request, the ring now wraps the picture and its figure rides on
+ * the ring's foot as a small badge, so the number is still there to read.
+ *
+ * Tapping opens My Profile, as tapping your own picture does everywhere; the
+ * verification card there leads on to what is still missing. Ring and badge
+ * drop away once nothing is missing — a ring permanently at 100% is
+ * decoration — leaving the plain avatar in the same footprint, so the header
+ * does not shift when the profile is finished.
  *
  * Fetches its own summary rather than taking a prop: it lives in the header,
  * which renders before the dashboard body has any data, and threading the
  * value down through Header would couple the two for no gain. The query is
  * shared by key, so this costs no extra request.
- *
- * Renders nothing at all once the profile is complete. A ring permanently at
- * 100% is decoration — the badge exists to prompt the work that is left, and
- * when there is none it should stop taking up space.
  */
-export function ProfileStrengthBadge() {
+export function ProfileAvatar({
+  hasPhoto,
+  initials,
+  version,
+  label,
+}: {
+  hasPhoto: boolean;
+  initials: string;
+  /** Changes when the photo does; see Avatar. */
+  version?: string;
+  /** What a screen reader calls the control, before the strength details. */
+  label: string;
+}) {
   const t = useT();
   const { c } = useTheme();
   const router = useRouter();
   const { data } = useDashboardSummary();
 
-  if (!data) return null;
-
-  const { percent, missing } = data.profileStrength;
-  const next = missing[0];
-  if (!next) return null;
-
+  const strength = data?.profileStrength;
+  const next = strength?.missing[0];
+  const percent = strength?.percent ?? 0;
   const band =
     STRENGTH_BANDS.find((b) => percent >= b.min) ?? STRENGTH_BANDS.at(-1)!;
 
@@ -134,46 +148,64 @@ export function ProfileStrengthBadge() {
 
   return (
     <Pressable
-      onPress={() => router.push(GAP_ROUTES[next] as never)}
-      hitSlop={8}
-      accessibilityRole="progressbar"
-      // The whole label goes to a screen reader, which cannot see the ring:
-      // "Profile strength, very good, 50 percent. Next: verify your NID."
-      accessibilityLabel={`${t('dash.strength')}, ${t(band.label)}, ${percent}%. ${t(
-        'dash.nextStep',
-      )} ${t(GAP_LABELS[next])}`}
-      accessibilityValue={{ min: 0, max: 100, now: percent }}
-      style={styles.badge}
+      onPress={() => router.push('/(app)/profile')}
+      hitSlop={6}
+      accessibilityRole="button"
+      // A screen reader cannot see the ring, so it hears what the ring says:
+      // "My profile. Profile strength, good, 50%. Next: verify your NID."
+      accessibilityLabel={
+        next
+          ? `${label}. ${t('dash.strength')}, ${t(band.label)}, ${percent}%. ${t(
+              'dash.nextStep',
+            )} ${t(GAP_LABELS[next])}`
+          : label
+      }
+      style={styles.profile}
     >
-      <Svg width={RING_SIZE} height={RING_SIZE}>
-        {/* The unfilled remainder, so the ring reads as a whole. */}
-        <Circle
-          cx={RING_SIZE / 2}
-          cy={RING_SIZE / 2}
-          r={RING_RADIUS}
-          stroke={c.surfaceAlt}
-          strokeWidth={RING_STROKE}
-          fill="none"
-        />
-        <Circle
-          cx={RING_SIZE / 2}
-          cy={RING_SIZE / 2}
-          r={RING_RADIUS}
-          stroke={c.primary}
-          strokeWidth={RING_STROKE}
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={`${filled} ${RING_CIRCUMFERENCE}`}
-          // SVG arcs begin at three o'clock; this brings the start to noon.
-          transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
-        />
-      </Svg>
+      {next ? (
+        <Svg width={RING_SIZE} height={RING_SIZE} style={StyleSheet.absoluteFill}>
+          {/* The unfilled remainder, so the ring reads as a whole. */}
+          <Circle
+            cx={RING_SIZE / 2}
+            cy={RING_SIZE / 2}
+            r={RING_RADIUS}
+            stroke={c.surfaceAlt}
+            strokeWidth={RING_STROKE}
+            fill="none"
+          />
+          <Circle
+            cx={RING_SIZE / 2}
+            cy={RING_SIZE / 2}
+            r={RING_RADIUS}
+            stroke={c.primary}
+            strokeWidth={RING_STROKE}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={`${filled} ${RING_CIRCUMFERENCE}`}
+            // SVG arcs begin at three o'clock; this brings the start to noon.
+            transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
+          />
+        </Svg>
+      ) : null}
 
-      {/* Absolutely positioned over the SVG rather than nested inside it:
-          react-native-svg's own <Text> does not inherit the app's font. */}
-      <View style={styles.ringLabel} pointerEvents="none">
-        <Text style={[styles.ringPercent, { color: c.text }]}>{percent}</Text>
-      </View>
+      <Avatar
+        hasPhoto={hasPhoto}
+        initials={initials}
+        size={AVATAR_SIZE}
+        version={version}
+      />
+
+      {/* The figure on the ring's foot, cut out of the ring by a rim in the
+          page colour. A plain View over the SVG rather than SVG text:
+          react-native-svg's <Text> does not inherit the app's font. */}
+      {next ? (
+        <View
+          style={[styles.percentBadge, { backgroundColor: c.primary, borderColor: c.bg }]}
+          pointerEvents="none"
+        >
+          <Text style={[styles.percentText, { color: c.primaryText }]}>{percent}%</Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -306,17 +338,24 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: radius.lg, padding: 14, marginTop: space.md },
   cardTitle: { fontSize: font.md, fontWeight: '800' },
 
-  badge: { marginRight: 4 },
-  ringLabel: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  profile: {
+    width: RING_SIZE,
+    height: RING_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ringPercent: { fontSize: font.xs - 1, fontWeight: '800', letterSpacing: -0.2 },
+  percentBadge: {
+    position: 'absolute',
+    bottom: -6,
+    alignSelf: 'center',
+    minWidth: 28,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    alignItems: 'center',
+  },
+  percentText: { fontSize: 9, fontWeight: '800', letterSpacing: -0.1 },
 
   statGrid: {
     flexDirection: 'row',
