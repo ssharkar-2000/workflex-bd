@@ -6,22 +6,15 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMe, logout } from '../../src/api/auth';
 import { updateLocale } from '../../src/api/email';
 import { useErrorMessage } from '../../src/lib/error-message';
 import { useAuthStore } from '../../src/store/auth-store';
-import {
-  useI18nStore,
-  useLocale,
-  useT,
-  type TranslationKey,
-} from '../../src/i18n';
+import { useI18nStore, useLocale, useT } from '../../src/i18n';
 import { RecommendedForYou } from '../../src/components/jobs/RecommendedForYou';
 import { NextSkillAI } from '../../src/components/home/NextSkillAI';
 import { TrustScore } from '../../src/components/home/TrustScore';
@@ -34,6 +27,7 @@ import {
 } from '../../src/components/home/DashboardSections';
 import { RecentActivity } from '../../src/components/home/RecentActivity';
 import { DashboardHeader } from '../../src/components/home/DashboardHeader';
+import { RolePicker } from '../../src/components/home/RolePicker';
 import { useScrollDirectionHandler } from '../../src/lib/scroll-direction';
 import { useTheme } from '../../src/lib/use-theme';
 import { font, radius, space } from '../../src/lib/theme';
@@ -121,6 +115,9 @@ export default function HomeScreen() {
         contentContainerStyle={styles.container}
         onScroll={onScroll}
         scrollEventThrottle={16}
+        // Buttons in the header's search take a tap while the keyboard is
+        // up; the default would spend that tap closing the keyboard.
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
@@ -148,143 +145,10 @@ export default function HomeScreen() {
   );
 }
 
-function RolePicker() {
-  const t = useT();
-  const { c } = useTheme();
-
-  return (
-    <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: c.text }]}>
-        {t('home.roles.title')}
-      </Text>
-      <View style={styles.roleRow}>
-        <RoleCard
-          emoji="🔎"
-          title="home.role.find"
-          body="home.role.findBody"
-          tint={0}
-          href="/(app)/jobs"
-          cta="home.role.browse"
-        />
-        <RoleCard
-          emoji="📋"
-          title="home.role.hire"
-          body="home.role.hireBody"
-          tint={2}
-          href="/(app)/post-job"
-          cta="home.role.post"
-        />
-      </View>
-      <Text style={[styles.sectionNote, { color: c.textMuted }]}>
-        {t('home.roles.note')}
-      </Text>
-    </View>
-  );
-}
-
-function RoleCard({
-  emoji,
-  title,
-  body,
-  tint,
-  href,
-  cta,
-}: {
-  emoji: string;
-  title: TranslationKey;
-  body: TranslationKey;
-  /** Index into the palette's tint set — peach, mint, lavender, butter. */
-  tint: number;
-  /** Omitted while the destination does not exist; the card then shows "soon". */
-  href?: string;
-  cta: TranslationKey;
-}) {
-  const t = useT();
-  const router = useRouter();
-  const { c } = useTheme();
-
-  // A card with somewhere to go is a button and dips on press; one without is
-  // not, so it never offers a tap that does nothing.
-  const Wrapper = href ? Pressable : View;
-
-  return (
-    <Wrapper
-      onPress={href ? () => router.push(href as never) : undefined}
-      accessibilityRole={href ? 'button' : undefined}
-      style={({ pressed }: { pressed?: boolean } = {}) => [
-        styles.roleCard,
-        {
-          backgroundColor: c.tints[tint % c.tints.length],
-          borderColor: c.tintBorders[tint % c.tintBorders.length],
-        },
-        pressed && styles.rolePressed,
-      ]}
-    >
-      <Text style={styles.roleEmoji}>{emoji}</Text>
-      <Text style={[styles.roleTitle, { color: c.text }]}>{t(title)}</Text>
-      <Text style={[styles.roleBody, { color: c.textMuted }]}>{t(body)}</Text>
-      {href ? (
-        <Text style={[styles.roleGo, { color: c.primary }]}>
-          {t(cta)} →
-        </Text>
-      ) : (
-        <View
-          style={[
-            styles.soonPill,
-            { backgroundColor: c.surfaceAlt, borderColor: c.border },
-          ]}
-        >
-          <Text style={[styles.soonPillText, { color: c.textMuted }]}>
-            {t('common.comingNext')}
-          </Text>
-        </View>
-      )}
-    </Wrapper>
-  );
-}
-
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   centered: { alignItems: 'center', justifyContent: 'center', padding: space.lg },
   container: { padding: space.lg, paddingBottom: space.fab },
-
-
-  section: { marginTop: space.lg },
-  sectionTitle: { fontSize: font.md, fontWeight: '700', marginBottom: space.md },
-  sectionNote: { marginTop: space.sm, fontSize: font.xs },
-
-  roleRow: { flexDirection: 'row', gap: space.md },
-  roleCard: {
-    flex: 1,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    padding: space.md,
-  },
-  roleEmoji: { fontSize: 26, marginBottom: space.sm },
-  roleTitle: { fontSize: font.md, fontWeight: '700' },
-  // Two lines on both cards, so neither is taller than the other and the row
-  // reads as an even split rather than two boxes that happen to be adjacent.
-  roleBody: {
-    fontSize: font.xs,
-    marginTop: space.xs,
-    lineHeight: 18,
-    minHeight: 36,
-  },
-
-  soonPill: {
-    alignSelf: 'flex-start',
-    marginTop: space.sm,
-    borderWidth: 1,
-    borderRadius: radius.pill,
-    paddingHorizontal: space.sm,
-    paddingVertical: 3,
-  },
-  soonPillText: { fontSize: font.xs, fontWeight: '600' },
-  rolePressed: { opacity: 0.72 },
-  roleGo: { fontSize: font.xs, fontWeight: '800', marginTop: 'auto', paddingTop: 8 },
-
-
-
 
   primaryButton: {
     marginTop: space.lg,
