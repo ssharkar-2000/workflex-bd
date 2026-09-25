@@ -722,31 +722,6 @@ export const en = {
   'error.TOO_MANY_OPEN_TICKETS':
     'You already have several requests waiting for a reply. Please wait for us to answer those first.',
 
-  'admin.title': 'Admin dashboard',
-  'admin.queue.title': 'Pending review',
-  'admin.queue.count': '{count} waiting',
-  'admin.queue.empty': 'Nothing waiting for review.',
-  'admin.waitingHours': '{hours}h waiting',
-  'admin.documents': 'Documents',
-  'admin.approve': 'Approve',
-  'admin.approving': 'Approving…',
-  'admin.reject': 'Reject',
-  'admin.reject.placeholder': 'Reason the applicant can act on',
-  'admin.reject.confirm': 'Send rejection',
-  'admin.reject.sending': 'Sending…',
-  'admin.outbox.title': 'Dev SMS outbox',
-  'admin.outbox.subtitle':
-    'These codes were never sent. Development aid only.',
-  'admin.outbox.empty': 'No messages yet.',
-
-  'adminLogin.title': 'Admin sign-in',
-  'adminLogin.subtitle': 'For reviewers only — not a regular account.',
-  'adminLogin.email': 'Email',
-  'adminLogin.emailPlaceholder': 'you@admin.workflex.internal',
-  'adminLogin.password': 'Password',
-  'adminLogin.submit': 'Sign in',
-  'adminLogin.invalidEmail': 'Enter a valid email address',
-
   'email.title': 'Email address',
   'email.optional': 'Optional',
   'email.description':
@@ -1736,30 +1711,6 @@ export const bn: Record<TranslationKey, string> = {
 
   'error.TOO_MANY_OPEN_TICKETS':
     'আপনার কয়েকটি অনুরোধ ইতিমধ্যে উত্তরের অপেক্ষায় আছে। আগে সেগুলোর উত্তর পাওয়া পর্যন্ত অপেক্ষা করুন।',
-
-  'admin.title': 'অ্যাডমিন ড্যাশবোর্ড',
-  'admin.queue.title': 'পর্যালোচনার অপেক্ষায়',
-  'admin.queue.count': '{count}টি অপেক্ষমাণ',
-  'admin.queue.empty': 'পর্যালোচনার জন্য কিছু নেই।',
-  'admin.waitingHours': '{hours} ঘণ্টা ধরে অপেক্ষমাণ',
-  'admin.documents': 'নথিপত্র',
-  'admin.approve': 'অনুমোদন',
-  'admin.approving': 'অনুমোদন হচ্ছে…',
-  'admin.reject': 'প্রত্যাখ্যান',
-  'admin.reject.placeholder': 'আবেদনকারী যা ঠিক করতে পারবে এমন কারণ লিখুন',
-  'admin.reject.confirm': 'প্রত্যাখ্যান পাঠান',
-  'admin.reject.sending': 'পাঠানো হচ্ছে…',
-  'admin.outbox.title': 'ডেভ এসএমএস আউটবক্স',
-  'admin.outbox.subtitle': 'এই কোডগুলো আসলে পাঠানো হয়নি। শুধু ডেভেলপমেন্ট সহায়ক।',
-  'admin.outbox.empty': 'এখনো কোনো বার্তা নেই।',
-
-  'adminLogin.title': 'অ্যাডমিন সাইন-ইন',
-  'adminLogin.subtitle': 'শুধু রিভিউয়ারদের জন্য — সাধারণ অ্যাকাউন্ট নয়।',
-  'adminLogin.email': 'ইমেইল',
-  'adminLogin.emailPlaceholder': 'you@admin.workflex.internal',
-  'adminLogin.password': 'পাসওয়ার্ড',
-  'adminLogin.submit': 'সাইন ইন',
-  'adminLogin.invalidEmail': 'সঠিক ইমেইল ঠিকানা দিন',
 
   'email.title': 'ইমেইল ঠিকানা',
   'email.optional': 'ঐচ্ছিক',

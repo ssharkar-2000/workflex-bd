@@ -72,15 +72,6 @@ api.interceptors.response.use(
         // Refresh itself failed: the session is genuinely gone.
         await useAuthStore.getState().signOut();
       }
-    } else if (
-      status === 401 &&
-      useAuthStore.getState().admin !== null
-    ) {
-      // Admin sessions carry no refresh token — an expired ADMIN_JWT_TTL
-      // surfaces as a plain 401 with nothing to retry, so this is the only
-      // place that notices and clears it. Without it the app would sit on a
-      // dead token, retrying the same 401 on every screen forever.
-      await useAuthStore.getState().signOut();
     }
 
     return Promise.reject(toApiError(error));
