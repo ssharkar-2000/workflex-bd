@@ -75,7 +75,7 @@ export function EmailCard() {
 
   const inputStyle = [
     styles.input,
-    { borderColor: c.border, backgroundColor: c.bg, color: c.text },
+    { borderColor: c.border, backgroundColor: c.fieldBg, color: c.text },
   ];
 
   return (

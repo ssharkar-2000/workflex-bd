@@ -28,37 +28,43 @@ import { LanguageToggle } from '../../src/components/LanguageToggle';
 import { ThemeToggle } from '../../src/components/ThemeToggle';
 import { useAuthStore } from '../../src/store/auth-store';
 import { useLaunchStore } from '../../src/store/launch-store';
-import { useT, type TranslationKey } from '../../src/i18n';
+import { useT } from '../../src/i18n';
 import { useTheme } from '../../src/lib/use-theme';
 import { font, radius } from '../../src/lib/theme';
 
-type Tab = 'login' | 'register';
-
 /**
  * The brand mark at the top of this screen. It was a fixed 56 — a badge
- * lost in the space above the tabs. Now it takes the room the Login tab
- * leaves, the taller of the two: as large as it can be without pushing Sign
- * in down the screen, up to `max`, and never smaller than it used to be.
+ * lost in the space above the form. Now it takes the room the form leaves:
+ * as large as it can be without pushing Sign in down the screen, up to `max`,
+ * and never smaller than it used to be.
  *
- * Worked out from the screen rather than measured from the layout, so it is
- * the same on both tabs and does not shrink when the keyboard opens.
+ * Worked out from the screen rather than measured from the layout, so it
+ * does not shrink when the keyboard opens.
  */
 const MARK = { min: 56, max: 128 };
-/** The back-and-toggles bar, and everything on the Login tab but the mark. */
+/**
+ * The back-and-toggles bar, and everything on this screen but the mark —
+ * measured on the rendered page, 495 in both languages.
+ */
 const TOP_BAR = 46;
-const LOGIN_TAB_REST = 517;
+const FORM_REST = 495;
 /** Kept free, so a full screen still has a little air at top and bottom. */
 const BREATHING = 24;
 
-
 /**
- * One screen, two tabs — sign in and registration entry share it rather than
- * living on separate screens. Existing fields are untouched; this only
- * restructures how they're reached. `?tab=register` opens straight to the
- * second tab (the welcome screen's "Get started" button does this); the
- * three redirects into this route after registration/reset/an existing
- * account (details.tsx, review.tsx, reset-password.tsx) all still land on
- * the Login tab with their `phone` + `notice` params intact.
+ * Sign in. The welcome screen's Get started lands here.
+ *
+ * It used to be one screen with two tabs, Login and New account, and Get
+ * started opened the second. Now the screen is the sign-in form alone, and
+ * someone new is asked under it whether they are new and sent to the first
+ * registration step from there — so a returning user meets only the form
+ * they came for.
+ *
+ * The redirects into this route after registration, a password reset or an
+ * existing account (verify.tsx, reset-password.tsx) arrive with their
+ * `phone` + `notice` params, which prefill the number and explain why they
+ * are here. An old link still carrying `?tab=register` simply opens this
+ * page.
  */
 export default function LoginScreen() {
   const t = useT();
@@ -67,7 +73,6 @@ export default function LoginScreen() {
   const params = useLocalSearchParams<{
     phone?: string;
     notice?: string;
-    tab?: string;
   }>();
   const setSession = useAuthStore((s) => s.setSession);
   const errorMessage = useErrorMessage();
@@ -79,12 +84,10 @@ export default function LoginScreen() {
       MARK.min,
       Math.min(
         MARK.max,
-        height - insets.top - insets.bottom - TOP_BAR - LOGIN_TAB_REST - BREATHING,
+        height - insets.top - insets.bottom - TOP_BAR - FORM_REST - BREATHING,
       ),
     ),
   );
-
-  const [tab, setTab] = useState<Tab>(params.tab === 'register' ? 'register' : 'login');
 
   const [phone, setPhone] = useState(
     params.phone ? sanitizeDigits(params.phone.replace(/^\+880/, '0'), 11) : '',
@@ -131,9 +134,9 @@ export default function LoginScreen() {
 
   const canSubmit = phone.length >= 10 && password.length > 0;
 
-  // Straight to the form. There is one kind of account, so there is nothing
-  // to decide before filling it in.
-  const onContinueRegister = () => router.push('/(onboarding)/details');
+  // Straight to the registration form. There is one kind of account, so
+  // there is nothing to decide before filling it in.
+  const onRegister = () => router.push('/(onboarding)/details');
 
   const fieldStyle = (field: 'phone' | 'password') => [
     styles.inputRow,
@@ -144,10 +147,7 @@ export default function LoginScreen() {
           : focusedField === field
             ? c.accentOnBrand
             : c.glassBorder,
-      backgroundColor:
-        focusedField === field
-          ? c.glassHighlight
-          : c.glassFill,
+      backgroundColor: c.fieldBg,
     },
   ];
 
@@ -193,188 +193,144 @@ export default function LoginScreen() {
                 <BrandName height={34} style={styles.brandName} />
               </View>
 
-              <View
-                style={[
-                  styles.tabBar,
-                  { backgroundColor: c.glassFill, borderColor: c.glassBorder },
-                ]}
-              >
-                <Pressable
-                  style={[
-                    styles.tabOption,
-                    tab === 'login' && { backgroundColor: c.primary },
-                  ]}
-                  onPress={() => setTab('login')}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: tab === 'login' }}
-                >
-                  <Text
-                    style={[
-                      styles.tabText,
-                      { color: tab === 'login' ? c.primaryText : c.textOnBrand },
-                    ]}
-                  >
-                    {t('login.tabLogin')}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.tabOption,
-                    tab === 'register' && { backgroundColor: c.primary },
-                  ]}
-                  onPress={() => setTab('register')}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: tab === 'register' }}
-                >
-                  <Text
-                    style={[
-                      styles.tabText,
-                      {
-                        color: tab === 'register' ? c.primaryText : c.textOnBrand,
-                      },
-                    ]}
-                  >
-                    {t('login.tabRegister')}
-                  </Text>
-                </Pressable>
-              </View>
-
               <GlassCard tone="dark" intensity={55} style={styles.sheet}>
-                {tab === 'login' ? (
-                  <>
-                    <Text style={[styles.title, { color: c.textOnBrand }]}>
-                      {t('login.title')}
+                <Text style={[styles.title, { color: c.textOnBrand }]}>
+                  {t('login.title')}
+                </Text>
+                <Text style={[styles.subtitle, { color: c.textMutedOnBrand }]}>
+                  {t('login.subtitle')}
+                </Text>
+
+                {/* Shown after registration, so the handover to sign-in does
+                    not look like the app forgot what was just submitted. */}
+                {params.notice === 'registered' ? (
+                  <View style={[styles.notice, { borderColor: c.accentOnBrand }]}>
+                    <Text style={[styles.noticeText, { color: c.textOnBrand }]}>
+                      ✓ {t('login.registered')}
                     </Text>
-                    <Text style={[styles.subtitle, { color: c.textMutedOnBrand }]}>
-                      {t('login.subtitle')}
+                  </View>
+                ) : params.notice === 'reset' ? (
+                  <View style={[styles.notice, { borderColor: c.accentOnBrand }]}>
+                    <Text style={[styles.noticeText, { color: c.textOnBrand }]}>
+                      ✓ {t('reset.done')}
                     </Text>
-
-                    {/* Shown after registration, so the handover to sign-in does
-                        not look like the app forgot what was just submitted. */}
-                    {params.notice === 'registered' ? (
-                      <View style={[styles.notice, { borderColor: c.accentOnBrand }]}>
-                        <Text style={[styles.noticeText, { color: c.textOnBrand }]}>
-                          ✓ {t('login.registered')}
-                        </Text>
-                      </View>
-                    ) : params.notice === 'reset' ? (
-                      <View style={[styles.notice, { borderColor: c.accentOnBrand }]}>
-                        <Text style={[styles.noticeText, { color: c.textOnBrand }]}>
-                          ✓ {t('reset.done')}
-                        </Text>
-                      </View>
-                    ) : params.notice === 'exists' ? (
-                      <View style={[styles.notice, { borderColor: c.accentOnBrand }]}>
-                        <Text style={[styles.noticeText, { color: c.textOnBrand }]}>
-                          {t('login.exists')}
-                        </Text>
-                      </View>
-                    ) : null}
-
-                    <Text style={[styles.label, { color: c.textOnBrand }]}>
-                      {t('login.phone')}
+                  </View>
+                ) : params.notice === 'exists' ? (
+                  <View style={[styles.notice, { borderColor: c.accentOnBrand }]}>
+                    <Text style={[styles.noticeText, { color: c.textOnBrand }]}>
+                      {t('login.exists')}
                     </Text>
-                    <View style={fieldStyle('phone')}>
-                      <Text style={styles.flag}>🇧🇩</Text>
-                      <Text style={[styles.prefix, { color: c.textOnBrand }]}>
-                        +880
-                      </Text>
-                      <View style={styles.divider} />
-                      <TextInput
-                        style={[styles.input, { color: c.textOnBrand }]}
-                        value={phone}
-                        onChangeText={(v) => {
-                          setPhone(sanitizeDigits(v, 11));
-                          if (error) setError(null);
-                        }}
-                        onFocus={() => setFocusedField('phone')}
-                        onBlur={() => setFocusedField(null)}
-                        placeholder={t('auth.phonePlaceholder')}
-                        placeholderTextColor={c.textMutedOnBrand}
-                        keyboardType="phone-pad"
-                        autoComplete="tel"
-                        maxLength={11}
-                        editable={!submit.isPending}
-                      />
-                    </View>
+                  </View>
+                ) : null}
 
-                    <Text
-                      style={[styles.label, styles.labelSpaced, { color: c.textOnBrand }]}
-                    >
-                      {t('login.password')}
+                <Text style={[styles.label, { color: c.textOnBrand }]}>
+                  {t('login.phone')}
+                </Text>
+                <View style={fieldStyle('phone')}>
+                  <Text style={styles.flag}>🇧🇩</Text>
+                  <Text style={[styles.prefix, { color: c.textOnBrand }]}>
+                    +880
+                  </Text>
+                  <View style={styles.divider} />
+                  <TextInput
+                    style={[styles.input, { color: c.textOnBrand }]}
+                    value={phone}
+                    onChangeText={(v) => {
+                      setPhone(sanitizeDigits(v, 11));
+                      if (error) setError(null);
+                    }}
+                    onFocus={() => setFocusedField('phone')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder={t('auth.phonePlaceholder')}
+                    placeholderTextColor={c.textMutedOnBrand}
+                    keyboardType="phone-pad"
+                    autoComplete="tel"
+                    maxLength={11}
+                    editable={!submit.isPending}
+                  />
+                </View>
+
+                <Text
+                  style={[styles.label, styles.labelSpaced, { color: c.textOnBrand }]}
+                >
+                  {t('login.password')}
+                </Text>
+                <View style={fieldStyle('password')}>
+                  <TextInput
+                    style={[styles.input, { color: c.textOnBrand }]}
+                    value={password}
+                    onChangeText={(v) => {
+                      setPassword(v);
+                      if (error) setError(null);
+                    }}
+                    onFocus={() => setFocusedField('password')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="••••••••"
+                    placeholderTextColor={c.textMutedOnBrand}
+                    secureTextEntry={!revealed}
+                    autoCapitalize="none"
+                    autoComplete="password"
+                    maxLength={72}
+                    editable={!submit.isPending}
+                    onSubmitEditing={() => canSubmit && submit.mutate()}
+                    returnKeyType="go"
+                  />
+                  <Pressable onPress={() => setRevealed((r) => !r)} hitSlop={10}>
+                    <Text style={[styles.reveal, { color: c.accentOnBrand }]}>
+                      {revealed ? t('ob.passwordHide') : t('ob.passwordShow')}
                     </Text>
-                    <View style={fieldStyle('password')}>
-                      <TextInput
-                        style={[styles.input, { color: c.textOnBrand }]}
-                        value={password}
-                        onChangeText={(v) => {
-                          setPassword(v);
-                          if (error) setError(null);
-                        }}
-                        onFocus={() => setFocusedField('password')}
-                        onBlur={() => setFocusedField(null)}
-                        placeholder="••••••••"
-                        placeholderTextColor={c.textMutedOnBrand}
-                        secureTextEntry={!revealed}
-                        autoCapitalize="none"
-                        autoComplete="password"
-                        maxLength={72}
-                        editable={!submit.isPending}
-                        onSubmitEditing={() => canSubmit && submit.mutate()}
-                        returnKeyType="go"
-                      />
-                      <Pressable onPress={() => setRevealed((r) => !r)} hitSlop={10}>
-                        <Text style={[styles.reveal, { color: c.accentOnBrand }]}>
-                          {revealed ? t('ob.passwordHide') : t('ob.passwordShow')}
-                        </Text>
-                      </Pressable>
-                    </View>
+                  </Pressable>
+                </View>
 
-                    <Pressable
-                      onPress={() =>
-                        router.push({
-                          pathname: '/(auth)/forgot-password',
-                          params: { phone },
-                        })
-                      }
-                      style={styles.forgotRow}
-                      hitSlop={8}
-                    >
-                      <Text style={[styles.forgot, { color: c.accentOnBrand }]}>
-                        {t('login.forgot')}
-                      </Text>
-                    </Pressable>
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(auth)/forgot-password',
+                      params: { phone },
+                    })
+                  }
+                  style={styles.forgotRow}
+                  hitSlop={8}
+                >
+                  <Text style={[styles.forgot, { color: c.accentOnBrand }]}>
+                    {t('login.forgot')}
+                  </Text>
+                </Pressable>
 
-                    <View style={styles.buttonWrap}>
-                      <ShimmerButton
-                        label={t('login.submit')}
-                        onPress={() => submit.mutate()}
-                        loading={submit.isPending}
-                        disabled={!canSubmit}
-                      />
-                    </View>
+                <View style={styles.buttonWrap}>
+                  <ShimmerButton
+                    label={t('login.submit')}
+                    onPress={() => submit.mutate()}
+                    loading={submit.isPending}
+                    disabled={!canSubmit}
+                  />
+                </View>
 
-                    {/* Below the button, as asked — the eye lands there after a
-                        failed tap rather than back up at the fields. */}
-                    <ErrorBanner message={error} />
-                  </>
-                ) : (
-                  <>
-                    <Text style={[styles.title, { color: c.textOnBrand }]}>
-                      {t('auth.role.title')}
+                {/* Below the button, as asked — the eye lands there after a
+                    failed tap rather than back up at the fields. */}
+                <ErrorBanner message={error} />
+
+                {/* The way in for someone new, under the form rather than
+                    beside it: a returning user never has to read past it, and
+                    a new one finds it where the sign-in form runs out. One
+                    line, with Register as the bold word to tap. */}
+                <View style={styles.newRow}>
+                  <View style={[styles.rule, { backgroundColor: c.glassBorder }]} />
+                  <Text style={[styles.newText, { color: c.textMutedOnBrand }]}>
+                    {t('login.newHere')}
+                  </Text>
+                  <Pressable
+                    onPress={onRegister}
+                    accessibilityRole="button"
+                    hitSlop={12}
+                    style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+                  >
+                    <Text style={[styles.registerLink, { color: c.primary }]}>
+                      {t('login.register')}
                     </Text>
-                    <Text style={[styles.subtitle, { color: c.textMutedOnBrand }]}>
-                      {t('auth.role.subtitle')}
-                    </Text>
-
-                    <View style={styles.buttonWrap}>
-                      <ShimmerButton
-                        label={t('ob.continue')}
-                        onPress={onContinueRegister}
-                      />
-                    </View>
-                  </>
-                )}
+                  </Pressable>
+                  <View style={[styles.rule, { backgroundColor: c.glassBorder }]} />
+                </View>
               </GlassCard>
             </Animated.View>
           </ScrollView>
@@ -401,22 +357,6 @@ const styles = StyleSheet.create({
 
   brandRow: { alignItems: 'center', marginBottom: 14 },
   brandName: { marginTop: 8 },
-
-  tabBar: {
-    flexDirection: 'row',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    padding: 4,
-    gap: 4,
-    marginBottom: 14,
-  },
-  tabOption: {
-    flex: 1,
-    borderRadius: radius.pill,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  tabText: { fontSize: font.sm, fontWeight: '800' },
 
   sheet: { borderRadius: radius.xl, padding: 22 },
   title: { fontSize: font.xl, fontWeight: '800', letterSpacing: -0.4 },
@@ -457,27 +397,13 @@ const styles = StyleSheet.create({
 
   buttonWrap: { marginTop: 18 },
 
-  intentCard: {
+  newRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    borderWidth: 1.5,
-    borderRadius: radius.lg,
-    padding: 14,
-    marginBottom: 12,
+    gap: 8,
+    marginTop: 20,
   },
-  intentEmoji: { fontSize: 26 },
-  intentText: { flex: 1 },
-  intentTitle: { fontSize: font.md, fontWeight: '800' },
-  intentBody: { fontSize: font.xs, marginTop: 3, lineHeight: 17 },
-  radio: {
-    width: 22,
-    height: 22,
-    borderRadius: radius.pill,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioDot: { width: 10, height: 10, borderRadius: 5 },
+  rule: { flex: 1, height: 1 },
+  newText: { fontSize: font.sm, fontWeight: '600' },
+  registerLink: { fontSize: font.sm, fontWeight: '800' },
 });
-

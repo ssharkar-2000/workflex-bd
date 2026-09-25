@@ -33,6 +33,33 @@ import { useTheme } from '../lib/use-theme';
 /** The trades that orbit the locator, in the order they sit on the ring. */
 const ORBIT = ['🛠️', '🍽️', '🚚', '🏥', '💻'] as const;
 
+/**
+ * The mark's own colours, by request: the core in the navy of the W in the
+ * logotype and the location pin in the orange of its F (see BrandName), so
+ * the mark and the name read as one logo. The core runs a step lighter to a
+ * step darker around the navy for depth, keeping its hue; the pin measures
+ * 3.0:1 against the lightest of it and 5.1:1 against the darkest.
+ *
+ * Dark mode keeps the same navy core. The W's dark-mode navy is too pale to
+ * carry an orange pin — it measured 1.3:1, the pin all but gone — so instead
+ * the core gets an edge in that lighter navy, which is what sets it apart
+ * from the near-black page (8.4:1; the core alone is 1.6:1).
+ */
+const MARK = {
+  light: {
+    core: ['#274F7C', '#1E3A5F', '#162C46'],
+    pin: '#F97316',
+    ring: '#1E3A5F',
+    edge: null,
+  },
+  dark: {
+    core: ['#274F7C', '#1E3A5F', '#162C46'],
+    pin: '#F97316',
+    ring: '#8FB0DD',
+    edge: '#8FB0DD',
+  },
+} as const;
+
 /** SVG gradient ids are global, so two marks on one screen must not collide. */
 let instanceCount = 0;
 
@@ -44,7 +71,8 @@ export function BrandMark({
   /** Splash and other passive placements skip the press affordance. */
   interactive?: boolean;
 }) {
-  const { c } = useTheme();
+  const { c, isDark } = useTheme();
+  const mark = isDark ? MARK.dark : MARK.light;
   const sweepId = useRef(`mark-sweep-${instanceCount++}`).current;
 
   const spin = useRef(new Animated.Value(0)).current;
@@ -185,7 +213,7 @@ export function BrandMark({
           size={ringSize}
           left={center - ringSize / 2}
           top={center - ringSize / 2}
-          color={c.primary}
+          color={mark.ring}
         />
       ))}
 
@@ -200,7 +228,7 @@ export function BrandMark({
             borderRadius: ringSize / 2,
             left: center - ringSize / 2,
             top: center - ringSize / 2,
-            borderColor: c.accent,
+            borderColor: mark.ring,
             opacity: burst.interpolate({
               inputRange: [0, 1],
               outputRange: [0.65, 0],
@@ -228,8 +256,8 @@ export function BrandMark({
         <Svg width={size} height={size}>
           <Defs>
             <RadialGradient id={sweepId} cx="50%" cy="50%" r="50%">
-              <Stop offset="0" stopColor={c.primary} stopOpacity="0.34" />
-              <Stop offset="1" stopColor={c.primary} stopOpacity="0" />
+              <Stop offset="0" stopColor={mark.ring} stopOpacity="0.34" />
+              <Stop offset="1" stopColor={mark.ring} stopOpacity="0" />
             </RadialGradient>
           </Defs>
           <Path d={wedgePath(center, size * 0.46)} fill={`url(#${sweepId})`} />
@@ -237,7 +265,7 @@ export function BrandMark({
             cx={center}
             cy={center}
             r={size * 0.46}
-            stroke={c.primary}
+            stroke={mark.ring}
             strokeOpacity={0.18}
             strokeWidth={1}
             fill="none"
@@ -286,7 +314,7 @@ export function BrandMark({
         }}
       >
         <LinearGradient
-          colors={[c.accent, c.primary, c.primaryPressed]}
+          colors={mark.core}
           start={{ x: 0.1, y: 0 }}
           end={{ x: 0.9, y: 1 }}
           style={[
@@ -296,25 +324,26 @@ export function BrandMark({
               height: coreSize,
               borderRadius: coreSize / 2,
             },
+            mark.edge ? { borderWidth: 1.5, borderColor: mark.edge } : null,
           ]}
         >
           <Svg width={coreSize * 0.56} height={coreSize * 0.56} viewBox="0 0 24 24">
             {/* A map pin with a bolt through it: work, located, right now. */}
             <Path
               d="M12 1.6c-4 0-7.2 3.1-7.2 7 0 5.1 7.2 14 7.2 14s7.2-8.9 7.2-14c0-3.9-3.2-7-7.2-7z"
-              fill={c.primaryText}
+              fill={mark.pin}
               fillOpacity={0.22}
             />
             <Path
               d="M12 1.6c-4 0-7.2 3.1-7.2 7 0 5.1 7.2 14 7.2 14s7.2-8.9 7.2-14c0-3.9-3.2-7-7.2-7z"
-              stroke={c.primaryText}
+              stroke={mark.pin}
               strokeWidth={1.6}
               fill="none"
               strokeLinejoin="round"
             />
             <Path
               d="M12.9 4.9 9.4 9.6h2.4l-1.1 4 3.6-4.9h-2.5l1.1-3.8z"
-              fill={c.primaryText}
+              fill={mark.pin}
             />
           </Svg>
         </LinearGradient>

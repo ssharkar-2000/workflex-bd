@@ -144,7 +144,7 @@ export function MoneyInput({
         style={[
           styles.moneyBox,
           {
-            backgroundColor: c.surfaceAlt,
+            backgroundColor: c.fieldBg,
             borderColor: invalid ? c.danger : c.border,
           },
         ]}
@@ -195,7 +195,7 @@ export function Field({
         accessibilityLabel={label}
         style={[
           styles.input,
-          { backgroundColor: c.surfaceAlt, borderColor: c.border, color: c.text },
+          { backgroundColor: c.fieldBg, borderColor: c.border, color: c.text },
         ]}
       />
     </View>

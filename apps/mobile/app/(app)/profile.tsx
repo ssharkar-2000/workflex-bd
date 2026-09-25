@@ -338,8 +338,11 @@ function DetailsForm({
 
   const isCompany = profile.accountType === 'COMPANY';
 
-  const [firstName, setFirstName] = useState(profile.firstName ?? '');
-  const [lastName, setLastName] = useState(profile.lastName ?? '');
+  // One field, as registration asks it. An account from before that has two
+  // stored parts, shown here joined — saving it unchanged rewrites nothing.
+  const [fullName, setFullName] = useState(
+    [profile.firstName, profile.lastName].filter(Boolean).join(' '),
+  );
   const [address, setAddress] = useState(profile.address ?? '');
   const [designation, setDesignation] = useState(profile.designation ?? '');
   const [companyName, setCompanyName] = useState(profile.company?.name ?? '');
@@ -369,8 +372,7 @@ function DetailsForm({
   const save = useMutation({
     mutationFn: async () => {
       const parsed = profileUpdateSchema.safeParse({
-        firstName,
-        lastName,
+        fullName,
         address,
         designation: isCompany ? designation : '',
         companyName: isCompany ? companyName : '',
@@ -413,28 +415,16 @@ function DetailsForm({
   return (
     <View style={styles.form}>
       {profile.nameEditable ? (
-        <>
-          <Field
-            label={t('ob.firstName')}
-            value={firstName}
-            onChangeText={(v) => {
-              setFirstName(sanitizePersonName(v));
-              clearErrors();
-            }}
-            error={fieldErrors.firstName}
-            disabled={save.isPending}
-          />
-          <Field
-            label={t('ob.lastName')}
-            value={lastName}
-            onChangeText={(v) => {
-              setLastName(sanitizePersonName(v));
-              clearErrors();
-            }}
-            error={fieldErrors.lastName}
-            disabled={save.isPending}
-          />
-        </>
+        <Field
+          label={t('ob.fullName')}
+          value={fullName}
+          onChangeText={(v) => {
+            setFullName(sanitizePersonName(v));
+            clearErrors();
+          }}
+          error={fieldErrors.fullName}
+          disabled={save.isPending}
+        />
       ) : (
         <View style={styles.lockedNote}>
           <Text style={[styles.hint, { color: c.textMuted }]}>
@@ -651,7 +641,7 @@ function Field({
           styles.input,
           {
             borderColor: error ? c.danger : c.border,
-            backgroundColor: c.bg,
+            backgroundColor: c.fieldBg,
             color: c.text,
           },
           multiline && styles.inputMultiline,

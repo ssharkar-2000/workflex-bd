@@ -622,7 +622,7 @@ function Money({
       <View
         style={[
           styles.moneyBox,
-          { backgroundColor: c.surfaceAlt, borderColor: c.border },
+          { backgroundColor: c.fieldBg, borderColor: c.border },
         ]}
       >
         <Text style={[styles.taka, { color: c.textMuted }]}>৳</Text>

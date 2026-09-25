@@ -75,9 +75,6 @@ export const en = {
   // screen the line breaks at the comma rather than leaving one word alone.
   'auth.taglineSupport':
     'Find work or hire someone, all\u00a0in\u00a0one\u00a0place.',
-  'auth.chip.nid': 'NID Verified',
-  'auth.chip.nearby': 'Nearby Jobs',
-  'auth.chip.bkash': 'bKash Payout',
   'auth.getStarted': 'Get started',
   'auth.enterNumber': 'Enter your mobile number to continue',
   'auth.phonePlaceholder': '1712 345678',
@@ -126,8 +123,8 @@ export const en = {
   'intro.findWork': 'Find work.',
   'intro.findWorkers': 'Find workers.',
   
-  'login.tabLogin': 'Login',
-  'login.tabRegister': 'New account',
+  'login.newHere': 'New to WorkFlex BD?',
+  'login.register': 'Register',
   'login.title': 'Welcome back',
   'login.subtitle': 'Sign in with the number you registered.',
   'login.phone': 'Mobile number',
@@ -156,9 +153,6 @@ export const en = {
     'At least 8 characters, with a capital letter, a small letter, a digit and a special character.',
   'ob.passwordShow': 'Show',
   'ob.passwordHide': 'Hide',
-  'auth.role.title': 'Create your account',
-  'auth.role.subtitle':
-    'One account for everything — find work, and hire people when you need them.',
   'auth.phone.title': 'Your mobile number',
   'auth.phone.subtitle': 'We will text you a 6-digit code to confirm it.',
 
@@ -1105,9 +1099,6 @@ export const bn: Record<TranslationKey, string> = {
   // Non-breaking spaces keep "সব এক জায়গায়" on one line, as in English.
   'auth.taglineSupport':
    'কাজ খুঁজুন বা কর্মী নিয়োগ দিন, সব\u00a0এক\u00a0জায়গায়।',
-  'auth.chip.nid': 'এনআইডি যাচাইকৃত',
-  'auth.chip.nearby': 'কাছাকাছি কাজ',
-  'auth.chip.bkash': 'বিকাশে পেমেন্ট',
   'auth.getStarted': 'শুরু করুন',
   'auth.enterNumber': 'চালিয়ে যেতে আপনার মোবাইল নম্বর দিন',
   'auth.phonePlaceholder': '১৭১২ ৩৪৫৬৭৮',
@@ -1155,8 +1146,8 @@ export const bn: Record<TranslationKey, string> = {
   'intro.findWork': 'কাজ খুঁজুন।',
   'intro.findWorkers': 'কর্মী খুঁজুন।',
   
-  'login.tabLogin': 'লগইন',
-  'login.tabRegister': 'নতুন অ্যাকাউন্ট',
+  'login.newHere': 'ওয়ার্কফ্লেক্স বিডিতে নতুন?',
+  'login.register': 'রেজিস্টার করুন',
   'login.title': 'আবার স্বাগতম',
   'login.subtitle': 'নিবন্ধনের সময় দেওয়া নম্বর দিয়ে সাইন ইন করুন।',
   'login.phone': 'মোবাইল নম্বর',
@@ -1186,9 +1177,6 @@ export const bn: Record<TranslationKey, string> = {
     'কমপক্ষে ৮ অক্ষর, একটি বড় হাতের ও একটি ছোট হাতের অক্ষর, একটি সংখ্যা এবং একটি বিশেষ চিহ্ন থাকতে হবে।',
   'ob.passwordShow': 'দেখান',
   'ob.passwordHide': 'লুকান',
-  'auth.role.title': 'অ্যাকাউন্ট তৈরি করুন',
-  'auth.role.subtitle':
-    'একটি অ্যাকাউন্টেই সব — কাজ খুঁজুন, আবার প্রয়োজনে লোক নিয়োগ দিন।',
   'auth.phone.title': 'আপনার মোবাইল নম্বর',
   'auth.phone.subtitle': 'নিশ্চিত করতে আমরা ৬ সংখ্যার একটি কোড পাঠাব।',
 
