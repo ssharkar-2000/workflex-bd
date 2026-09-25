@@ -1,7 +1,12 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
 import { api } from '../api/client';
-import { clearTokens, getTokens, saveTokens, Tokens } from './tokenStorage';
+import {
+  clearTokens,
+  getStoredAdmin,
+  getTokens,
+  saveStoredAdmin,
+  saveTokens,
+} from './tokenStorage';
 
 export type Admin = {
   id: string;
@@ -9,6 +14,13 @@ export type Admin = {
   displayName: string;
   role: 'SUPER_ADMIN' | 'MODERATOR' | 'SUPPORT';
   language: 'en' | 'bn';
+};
+
+/** What POST /auth/admin/login answers with. */
+type LoginResponse = {
+  accessToken: string;
+  expiresIn: number;
+  admin: { id: string; email: string; name?: string | null };
 };
 
 type AuthValue = {
@@ -21,63 +33,51 @@ type AuthValue = {
 
 const AuthContext = createContext<AuthValue | null>(null);
 
+/**
+ * Every account in the API's Admin table may do everything; there are no
+ * roles yet, so the screens that branch on one are told the account is a
+ * super admin rather than being hidden from a reviewer who needs them.
+ */
+function toAdmin(res: LoginResponse, language: 'en' | 'bn'): Admin {
+  return {
+    id: res.admin.id,
+    email: res.admin.email,
+    displayName: res.admin.name ?? res.admin.email,
+    role: 'SUPER_ADMIN',
+    language,
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [admin, setAdmin] = useState<Admin | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 🟢 ব্যাকগ্রাউন্ড থেকে আসার পর নেটওয়ার্ক ফেল করলে সাইলেন্টলি হ্যান্ডেল করবে
-  const loadAdmin = async (isInitialCheck = false) => {
-    try {
-      const data = await api<Admin>('/admin/me');
-      setAdmin(data);
-    } catch (e: any) {
-      console.log('Admin fetch failed gracefully:', e?.message || e);
-      // শুধুমাত্র অ্যাপ খোলার একদম প্রথমবার টোকেন ইনভ্যালিড হলে লগআউট করবে
-      // ব্যাকগ্রাউন্ড থেকে আসার সময় নেটওয়ার্ক ল্যাগে টোকেন ক্লিয়ার করবে না
-      if (isInitialCheck) {
-        await clearTokens();
-        setAdmin(null);
-      }
-    }
-  };
-
+  /**
+   * The session is restored from storage, not re-fetched: admin sign-in
+   * returns the account with the token and the API has no "who am I" route
+   * for admins. An expired token surfaces as a 401 on the first screen that
+   * loads, which clears the session (see api/client.ts).
+   */
   useEffect(() => {
-    let isMounted = true;
+    let alive = true;
 
-    const initAuth = async () => {
+    void (async () => {
       try {
         const tokens = await getTokens();
-        if (tokens?.accessToken) {
-          await loadAdmin(true);
-        } else {
-          if (isMounted) setAdmin(null);
-        }
+        const stored = tokens?.accessToken
+          ? await getStoredAdmin<Admin>()
+          : null;
+        if (alive) setAdmin(stored);
       } catch {
-        if (isMounted) {
-          await clearTokens();
-          setAdmin(null);
-        }
+        await clearTokens();
+        if (alive) setAdmin(null);
       } finally {
-        if (isMounted) setLoading(false);
+        if (alive) setLoading(false);
       }
-    };
-
-    initAuth();
-
-    // 🟢 অ্যাপ ব্যাকগ্রাউন্ড থেকে ফোরগ্রাউন্ডে এলে হ্যান্ডেল করার সেফ লিসেনার
-    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
-      if (nextAppState === 'active') {
-        getTokens().then((tokens) => {
-          if (tokens?.accessToken) {
-            loadAdmin(false); // সাইলেন্ট রি-ফেচ
-          }
-        });
-      }
-    });
+    })();
 
     return () => {
-      isMounted = false;
-      subscription.remove();
+      alive = false;
     };
   }, []);
 
@@ -86,31 +86,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       admin,
       loading,
       signIn: async (email, password) => {
-        const tokens = await api<Tokens>('/auth/sign-in', {
+        const res = await api<LoginResponse>('/auth/admin/login', {
           method: 'POST',
           body: { email, password },
           auth: false,
         });
-        await saveTokens(tokens);
-        await loadAdmin(true);
+        const next = toAdmin(res, admin?.language ?? 'en');
+        await saveTokens({ accessToken: res.accessToken });
+        await saveStoredAdmin(next);
+        setAdmin(next);
       },
+      // Nothing to tell the server: the token is stateless and expires on its
+      // own, so signing out is dropping it from this device.
       signOut: async () => {
-        try {
-          await api('/auth/sign-out', { method: 'POST' });
-        } catch (e) {
-          console.log('Sign-out API ignored error:', e);
-        } finally {
-          await clearTokens();
-          setAdmin(null);
-        }
+        await clearTokens();
+        setAdmin(null);
       },
       setLanguage: async (language) => {
-        try {
-          const updated = await api<Admin>('/admin/me', { method: 'PATCH', body: { language } });
-          setAdmin(updated);
-        } catch {
-          if (admin) setAdmin({ ...admin, language });
-        }
+        if (!admin) return;
+        const next = { ...admin, language };
+        await saveStoredAdmin(next);
+        setAdmin(next);
       },
     }),
     [admin, loading],
