@@ -17,6 +17,7 @@ import { MatchingModule } from './matching/matching.module';
 import { ReportsModule } from './reports/reports.module';
 import { SupportModule } from './support/support.module';
 import { AdminModule } from './admin/admin.module';
+import { ConsoleModule } from './console/console.module';
 import { MailModule } from './mail/mail.module';
 import { StorageModule } from './storage/storage.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
@@ -61,6 +62,7 @@ import { WalletModule } from './wallet/wallet.module';
     JobsModule,
     MatchingModule,
     AdminModule,
+    ConsoleModule,
     WalletModule,
   ],
   providers: [
