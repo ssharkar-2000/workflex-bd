@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import React from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -11,7 +10,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { useI18n } from '../i18n/I18nContext';
-import { buildText, categoryTint, spacing, ThemeColors } from '../theme';
+import { buildText, spacing, ThemeColors } from '../theme';
 import { useTheme } from '../theme/ThemeContext';
 
 // ---------------------------------------------------------------------------
@@ -43,17 +42,11 @@ function createStyles(colors: ThemeColors, text: ReturnType<typeof buildText>) {
     pill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
     pillText: { fontSize: 11, fontWeight: '700' },
 
-    // Was `colors.background` — identical to the screen's own background, so
-    // a chip sitting directly on a screen (not inside a Card) was completely
-    // invisible except for its text. `colors.card` plus a hairline border
-    // gives it a real edge against either the page or a Card behind it.
     chip: {
-      backgroundColor: colors.card,
+      backgroundColor: colors.background,
       borderRadius: 8,
       paddingHorizontal: 8,
       paddingVertical: 5,
-      borderWidth: 1,
-      borderColor: colors.border,
     },
     chipText: { fontSize: 11, fontWeight: '500', color: colors.textGray },
 
@@ -68,17 +61,7 @@ function createStyles(colors: ThemeColors, text: ReturnType<typeof buildText>) {
       paddingHorizontal: 16,
       flexGrow: 1,
     },
-    // Was a transparent fill with a `colors.border` outline — border and
-    // page background sit only a few percent apart in lightness, so the
-    // button had almost no visible edge and read as plain text floating on
-    // the screen. A tinted fill plus a brand-coloured border reads as a real
-    // button against any background (page or Card) and looks premium
-    // (a "ghost" button) instead of blending in.
-    buttonOutline: {
-      backgroundColor: colors.primarySoft,
-      borderWidth: 1.5,
-      borderColor: colors.primary,
-},
+    buttonOutline: { borderWidth: 1.5, borderColor: colors.primary },
     buttonText: { fontSize: 14, fontWeight: '600' },
 
     tabs: { gap: 8, paddingVertical: 8 },
@@ -128,9 +111,9 @@ function createStyles(colors: ThemeColors, text: ReturnType<typeof buildText>) {
 
 /** Shared hook: current theme colours/typography plus a memoized StyleSheet for this file. */
 function useThemed() {
-  const { colors, text, categoryPalette } = useTheme();
+  const { colors, text } = useTheme();
   const s = useMemo(() => createStyles(colors, text), [colors, text]);
-  return { colors, text, s, categoryPalette };
+  return { colors, text, s };
 }
 
 // ---------------------------------------------------------------------------
@@ -154,9 +137,6 @@ export function BackButton({ onPress, label }: { onPress: () => void; label?: st
     </Pressable>
   );
 }
-import { colors, radii, shadow, spacing, statusPalette, text } from '../theme';
-
-// ---------------------------------------------------------------------------
 
 export function Card({
   children,
@@ -243,14 +223,6 @@ export function StatusPill({ value, label }: { value: string; label?: string }) 
   return (
     <View style={[s.pill, { backgroundColor: palette.bg }]}>
       <Text style={[s.pillText, { color: palette.fg }]}>{label ?? (key ? t(key) : fallback)}</Text>
-/** Coloured pill used for every status in the design. */
-export function StatusPill({ value, label }: { value: string; label?: string }) {
-  const palette = statusPalette[value] ?? { bg: colors.border, fg: colors.textGray };
-  return (
-    <View style={[s.pill, { backgroundColor: palette.bg }]}>
-      <Text style={[s.pillText, { color: palette.fg }]}>
-        {label ?? value.charAt(0) + value.slice(1).toLowerCase().replace(/_/g, ' ')}
-      </Text>
     </View>
   );
 }
@@ -288,6 +260,7 @@ export function Button({
   loading,
   disabled,
   style,
+  tint,
 }: {
   label: string;
   onPress: () => void;
@@ -295,20 +268,26 @@ export function Button({
   loading?: boolean;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  /**
+   * Overrides the outline variant's colour with one of the category tints
+   * (see theme/categoryTint). Use this when two or more outline buttons sit
+   * next to each other on the same screen (e.g. "View History", "Documents",
+   * "Interviews") so each one reads as a distinct action instead of all of
+   * them rendering in the same single outline colour.
+   */
+  tint?: { bg: string; fg: string };
 }) {
   const { s, colors } = useThemed();
   const isDisabled = disabled || loading;
-  const fill = {
-    primary: colors.primary,
-    danger: colors.red,
-    success: colors.greenText,
-    outline: 'transparent',
-  }[variant];
-  // Outline text now matches the new coloured border/tint above instead of
-  // the plain body-text colour, so the label reads as part of the button
-  // rather than as loose text sitting on the screen.
-  const fg = variant === 'outline' ? colors.primary : colors.onPrimary;
-  const fg = variant === 'outline' ? colors.textBody : colors.onPrimary;
+  const fill = tint
+    ? tint.bg
+    : {
+        primary: colors.primary,
+        danger: colors.red,
+        success: colors.greenText,
+        outline: colors.primarySoft,
+      }[variant];
+  const fg = tint ? tint.fg : variant === 'outline' ? colors.primary : colors.onPrimary;
 
   return (
     <Pressable
@@ -318,7 +297,8 @@ export function Button({
       style={({ pressed }) => [
         s.button,
         { backgroundColor: fill },
-        variant === 'outline' && s.buttonOutline,
+        variant === 'outline' && !tint && s.buttonOutline,
+        tint && { borderWidth: 1.5, borderColor: tint.fg },
         pressed && !isDisabled && { opacity: 0.85 },
         isDisabled && { opacity: 0.5 },
         style,
@@ -390,26 +370,11 @@ export function Meter({ percent, color }: { percent: number; color?: string }) {
           s.meterFill,
           { width: `${Math.max(0, Math.min(100, percent))}%`, backgroundColor: color ?? colors.primary },
         ]}
-export function Meter({ percent, color = colors.primary }: { percent: number; color?: string }) {
-  return (
-    <View style={s.meterTrack}>
-      <View
-        style={[s.meterFill, { width: `${Math.max(0, Math.min(100, percent))}%`, backgroundColor: color }]}
       />
     </View>
   );
 }
 
-/**
- * Simple bar chart. The design's charts are bar series, so no chart library.
- *
- * Each bar gets its own colour from the app's category palette, keyed by
- * that bar's own label (`categoryTint`, the same deterministic hash used for
- * kind/type badges elsewhere) — so "Jan" is always the same colour on every
- * render and every screen, months are visually distinguishable at a glance,
- * and the chart doesn't need a legend since the colour and the label under
- * each bar are the same thing.
- */
 /** Simple bar chart. The design's charts are bar series, so no chart library. */
 export function BarChart({
   data,
@@ -418,7 +383,7 @@ export function BarChart({
   data: { label: string; value: number }[];
   height?: number;
 }) {
-  const { s, colors, categoryPalette } = useThemed();
+  const { s, colors } = useThemed();
   const max = Math.max(...data.map((d) => d.value), 1);
   return (
     <View>
@@ -430,7 +395,6 @@ export function BarChart({
                 s.chartBar,
                 {
                   height: Math.max(4, (d.value / max) * (height - 8)),
-                  backgroundColor: categoryTint(categoryPalette, d.label).fg,
                   backgroundColor: i === data.length - 1 ? colors.primary : colors.primarySoft,
                 },
               ]}
@@ -471,10 +435,6 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
     <View style={s.centered}>
       <Text style={s.errorText}>{message}</Text>
       {onRetry ? <Button label={t('common.tryAgain')} variant="outline" onPress={onRetry} /> : null}
-  return (
-    <View style={s.centered}>
-      <Text style={s.errorText}>{message}</Text>
-      {onRetry ? <Button label="Try again" variant="outline" onPress={onRetry} /> : null}
     </View>
   );
 }
@@ -488,92 +448,3 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
     </View>
   );
 }
-  return (
-    <View style={s.centered}>
-      <Text style={text.cardTitle}>{title}</Text>
-      {hint ? <Text style={[text.caption, { marginTop: spacing.xs }]}>{hint}</Text> : null}
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-
-const s = StyleSheet.create({
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-  sectionAction: { ...text.caption, color: colors.primary, fontWeight: '600' },
-
-  pill: { paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radii.pill },
-  pillText: { fontSize: 11, fontWeight: '700' },
-
-  chip: {
-    backgroundColor: colors.background,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
-  },
-  chipText: { fontSize: 11, fontWeight: '500', color: colors.textGray },
-
-  avatar: { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: colors.onPrimary, fontWeight: '700' },
-
-  button: {
-    height: 44,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-    flexGrow: 1,
-  },
-  buttonOutline: { borderWidth: 1, borderColor: colors.border },
-  buttonText: { fontSize: 14, fontWeight: '600' },
-
-  tabs: { gap: spacing.sm, paddingVertical: spacing.sm },
-  tab: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.pill,
-    backgroundColor: colors.card,
-  },
-  tabActive: { backgroundColor: colors.primary },
-  tabText: { fontSize: 13, fontWeight: '600', color: colors.textGray },
-  tabTextActive: { color: colors.onPrimary },
-
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    gap: spacing.lg,
-  },
-  detailLabel: { ...text.caption, flexShrink: 0 },
-  detailValue: { ...text.body, fontWeight: '500', flex: 1, textAlign: 'right' },
-
-  meterTrack: {
-    height: 8,
-    borderRadius: radii.pill,
-    backgroundColor: colors.background,
-    overflow: 'hidden',
-  },
-  meterFill: { height: '100%', borderRadius: radii.pill },
-
-  chart: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
-  chartColumn: { flex: 1, justifyContent: 'flex-end' },
-  chartBar: { borderRadius: radii.sm },
-  chartLabels: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  chartLabel: { ...text.micro, flex: 1, textAlign: 'center' },
-
-  centered: { padding: spacing.xxl, alignItems: 'center', gap: spacing.md },
-  errorText: { ...text.body, color: colors.redText, textAlign: 'center' },
-});

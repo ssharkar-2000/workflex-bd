@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { AttendanceStatus, Prisma } from '@prisma/client';
 import { AuditService } from '../common/audit.service';
 import { paginate } from '../common/pagination.dto';
@@ -11,6 +11,13 @@ function atMidnight(value?: string): Date {
   const date = value ? new Date(value) : new Date();
   date.setUTCHours(0, 0, 0, 0);
   return date;
+}
+
+/// Hours between check-in and check-out, rounded to 1 decimal. Null until
+/// both timestamps exist.
+function workingHoursOf(checkInAt: Date | null, checkOutAt: Date | null): number | null {
+  if (!checkInAt || !checkOutAt) return null;
+  return Math.round(((checkOutAt.getTime() - checkInAt.getTime()) / 36e5) * 10) / 10;
 }
 
 @Injectable()
@@ -30,7 +37,7 @@ export class AttendanceService {
         : {}),
     };
 
-    const [items, total] = await this.prisma.$transaction([
+    const [rows, total] = await this.prisma.$transaction([
       this.prisma.attendanceRecord.findMany({
         where,
         include: {
@@ -44,6 +51,7 @@ export class AttendanceService {
       this.prisma.attendanceRecord.count({ where }),
     ]);
 
+    const items = rows.map((r) => ({ ...r, workingHours: workingHoursOf(r.checkInAt, r.checkOutAt) }));
     return paginate(items, total, query.page, query.limit);
   }
 
@@ -101,5 +109,28 @@ export class AttendanceService {
       metadata: { status: dto.status, date: dto.date },
     });
     return record;
+  }
+
+  async checkOut(id: string, adminId: string) {
+    const record = await this.prisma.attendanceRecord.findUnique({ where: { id } });
+    if (!record) throw new NotFoundException('That attendance record no longer exists.');
+    if (!record.checkInAt) {
+      throw new BadRequestException('This worker was never checked in, so they cannot be checked out.');
+    }
+    if (record.checkOutAt) {
+      throw new BadRequestException('This worker has already been checked out.');
+    }
+
+    const updated = await this.prisma.attendanceRecord.update({
+      where: { id },
+      data: { checkOutAt: new Date() },
+    });
+    await this.audit.record({
+      adminId,
+      action: 'attendance.check-out',
+      entityType: 'AttendanceRecord',
+      entityId: id,
+    });
+    return { ...updated, workingHours: workingHoursOf(updated.checkInAt, updated.checkOutAt) };
   }
 }

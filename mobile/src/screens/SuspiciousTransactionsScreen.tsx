@@ -287,6 +287,7 @@ export function SuspiciousTransactionsScreen({ navigation }: any) {
                   <Button
                     label={t('bans.viewWorker')}
                     variant="outline"
+                    tint={categoryPalette[0]}
                     onPress={() => navigation.navigate('WorkerProfile', { id: ban.worker!.id })}
                   />
                 ) : null}
@@ -295,6 +296,7 @@ export function SuspiciousTransactionsScreen({ navigation }: any) {
                     <Button
                       label={t('bans.cancelNotice')}
                       variant="outline"
+                      tint={categoryPalette[3]}
                       loading={busy === ban.id}
                       onPress={() => act(ban, 'cancel')}
                     />

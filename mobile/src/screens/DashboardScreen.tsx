@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '../api/hooks';
 import { DashboardOverview } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
+import { BrandMark, BrandWordmark } from '../components/Brand';
 import {
   Avatar,
   BarChart,
@@ -14,21 +15,26 @@ import {
   SectionHeader,
   StatusPill,
 } from '../components';
-import { colors, radii, shadow, spacing, text } from '../theme';
+import { useI18n } from '../i18n/I18nContext';
+import { buildText, categoryTint, radii, spacing, ThemeColors } from '../theme';
 import { taka, timeAgo } from '../theme/format';
+import { useTheme } from '../theme/ThemeContext';
 
 const QUICK_ACCESS = [
-  { label: 'Workers', icon: '👷', route: 'Workers' },
-  { label: 'Jobs', icon: '💼', route: 'Jobs' },
-  { label: 'Payments', icon: '💳', route: 'Payments' },
-  { label: 'Verify', icon: '✅', route: 'Verifications' },
-  { label: 'Analytics', icon: '📊', route: 'Analytics' },
-  { label: 'AI Monitor', icon: '🛡️', route: 'AIMonitoring' },
+  { labelKey: 'nav.workers', icon: '👷', route: 'Workers' },
+  { labelKey: 'nav.jobs', icon: '💼', route: 'Jobs' },
+  { labelKey: 'nav.payments', icon: '💳', route: 'Payments' },
+  { labelKey: 'dashboard.quickVerify', icon: '✅', route: 'Verifications' },
+  { labelKey: 'analytics.title', icon: '📊', route: 'Analytics' },
+  { labelKey: 'dashboard.quickAiMonitor', icon: '🛡️', route: 'AIMonitoring' },
 ] as const;
 
 export function DashboardScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { admin } = useAuth();
+  const { colors, text, shadow, categoryPalette } = useTheme();
+  const { t } = useI18n();
+  const s = useMemo(() => createStyles(colors, text), [colors, text]);
   const { data, loading, error, refetch } = useApi<DashboardOverview>('/dashboard');
   const analytics = useApi<{ revenueSeries: { month: string; total: number }[] }>(
     '/dashboard/analytics',
@@ -64,10 +70,8 @@ export function DashboardScreen({ navigation }: any) {
       {/* Header */}
       <View style={s.topBar}>
         <View style={s.brand}>
-          <View style={s.logoIcon}>
-            <Text style={s.logoMark}>⚡</Text>
-          </View>
-          <Text style={s.brandName}>WorkFlex BD</Text>
+          <BrandMark size={32} />
+          <BrandWordmark size={17} />
         </View>
         <Pressable onPress={() => navigation.navigate('Notifications')} hitSlop={8}>
           <View>
@@ -83,7 +87,9 @@ export function DashboardScreen({ navigation }: any) {
 
       <View style={s.welcome}>
         <Text style={text.caption}>{today}</Text>
-        <Text style={s.greeting}>Hello, {admin?.displayName ?? 'Admin'}</Text>
+        <Text style={s.greeting}>
+          {t('dashboard.hello', { name: admin?.displayName ?? t('dashboard.defaultAdminName') })}
+        </Text>
       </View>
 
       {/* Critical alert banner */}
@@ -92,19 +98,19 @@ export function DashboardScreen({ navigation }: any) {
           <View style={s.sosBanner}>
             <Text style={s.sosTitle}>{liveAlerts[0].message}</Text>
             <Text style={s.sosMeta}>
-              {liveAlerts[0].subjectName} • {timeAgo(liveAlerts[0].detectedAt)}
+              {liveAlerts[0].subjectName} • {timeAgo(liveAlerts[0].detectedAt, t)}
             </Text>
           </View>
         </Pressable>
       ) : null}
 
       {/* Overview */}
-      <SectionHeader title="Overview" />
+      <SectionHeader title={t('dashboard.overview')} />
       <View style={s.statGrid}>
-        <StatCard label="Total Workers" value={overview.totalWorkers.toLocaleString('en-IN')} />
-        <StatCard label="Total Revenue" value={taka(overview.totalRevenue, true)} />
-        <StatCard label="Employers" value={overview.employers.toLocaleString('en-IN')} />
-        <StatCard label="Pending Verify" value={overview.pendingVerify.toLocaleString('en-IN')} />
+        <StatCard label={t('dashboard.totalWorkers')} value={overview.totalWorkers.toLocaleString('en-IN')} styles={s} text={text} shadow={shadow} tint={categoryTint(categoryPalette, 'totalWorkers').bg} />
+        <StatCard label={t('dashboard.totalRevenue')} value={taka(overview.totalRevenue, true)} styles={s} text={text} shadow={shadow} tint={categoryTint(categoryPalette, 'totalRevenue').bg} />
+        <StatCard label={t('dashboard.employers')} value={overview.employers.toLocaleString('en-IN')} styles={s} text={text} shadow={shadow} tint={categoryTint(categoryPalette, 'employers').bg} />
+        <StatCard label={t('dashboard.pendingVerify')} value={overview.pendingVerify.toLocaleString('en-IN')} styles={s} text={text} shadow={shadow} tint={categoryTint(categoryPalette, 'pendingVerify').bg} />
       </View>
 
       {/* Revenue */}
@@ -113,8 +119,8 @@ export function DashboardScreen({ navigation }: any) {
           <Card style={{ marginTop: spacing.lg }}>
             <View style={s.cardHead}>
               <View>
-                <Text style={text.sectionTitle}>Revenue</Text>
-                <Text style={text.caption}>Tap for full analytics</Text>
+                <Text style={text.sectionTitle}>{t('dashboard.revenue')}</Text>
+                <Text style={text.caption}>{t('dashboard.tapFullAnalytics')}</Text>
               </View>
             </View>
             <BarChart data={series} />
@@ -125,21 +131,21 @@ export function DashboardScreen({ navigation }: any) {
       {/* Worker status */}
       <Card style={{ marginTop: spacing.lg }}>
         <SectionHeader
-          title="Worker Status"
-          actionLabel="View all ›"
+          title={t('dashboard.workerStatus')}
+          actionLabel={t('dashboard.viewAllArrow')}
           onAction={() => navigation.navigate('Workers')}
         />
-        <StatusBar label="Verified" percent={workerStatus.verified} color={colors.greenText} />
-        <StatusBar label="Pending" percent={workerStatus.pending} color={colors.amber} />
-        <StatusBar label="Rejected" percent={workerStatus.rejected} color={colors.red} />
-        <StatusBar label="Suspended" percent={workerStatus.suspended} color={colors.slate} />
+        <StatusBar label={t('common.verified')} percent={workerStatus.verified} color={colors.greenText} styles={s} text={text} />
+        <StatusBar label={t('workers.pending')} percent={workerStatus.pending} color={colors.amber} styles={s} text={text} />
+        <StatusBar label={t('reports.rejected')} percent={workerStatus.rejected} color={colors.red} styles={s} text={text} />
+        <StatusBar label={t('workers.suspended')} percent={workerStatus.suspended} color={colors.slate} styles={s} text={text} />
       </Card>
 
       {/* Live alerts */}
       <View style={{ marginTop: spacing.xl }}>
         <SectionHeader
-          title="Live Alerts"
-          actionLabel="All ›"
+          title={t('dashboard.liveAlerts')}
+          actionLabel={t('dashboard.allArrow')}
           onAction={() => navigation.navigate('AIMonitoring')}
         />
         {liveAlerts.map((alert) => (
@@ -147,14 +153,14 @@ export function DashboardScreen({ navigation }: any) {
             key={alert.id}
             onPress={() => navigation.navigate('AlertDetail', { id: alert.id })}
           >
-            <Card style={{ marginBottom: spacing.sm }}>
+            <Card style={{ marginBottom: spacing.sm, backgroundColor: categoryTint(categoryPalette, alert.id).bg }}>
               <View style={s.alertRow}>
                 <View style={s.flexShrink}>
                   <Text style={text.cardTitle} numberOfLines={2}>
                     {alert.message}
                   </Text>
                   <Text style={[text.caption, { marginTop: spacing.xs }]}>
-                    {alert.subjectName} • {timeAgo(alert.detectedAt)}
+                    {alert.subjectName} • {timeAgo(alert.detectedAt, t)}
                   </Text>
                 </View>
                 <StatusPill value={alert.severity} />
@@ -165,16 +171,16 @@ export function DashboardScreen({ navigation }: any) {
       </View>
 
       {/* Quick access */}
-      <SectionHeader title="Quick Access" />
+      <SectionHeader title={t('dashboard.quickAccess')} />
       <View style={s.quickGrid}>
         {QUICK_ACCESS.map((item) => (
           <Pressable
-            key={item.label}
-            style={s.quickTile}
+            key={item.labelKey}
+            style={[s.quickTile, { backgroundColor: categoryTint(categoryPalette, item.labelKey).bg }]}
             onPress={() => navigation.navigate(item.route)}
           >
             <Text style={s.quickIcon}>{item.icon}</Text>
-            <Text style={s.quickLabel}>{item.label}</Text>
+            <Text style={s.quickLabel}>{t(item.labelKey)}</Text>
           </Pressable>
         ))}
       </View>
@@ -182,19 +188,48 @@ export function DashboardScreen({ navigation }: any) {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+type DashStyles = ReturnType<typeof createStyles>;
+type DashText = ReturnType<typeof buildText>;
+
+function StatCard({
+  label,
+  value,
+  styles,
+  text,
+  shadow,
+  tint,
+}: {
+  label: string;
+  value: string;
+  styles: DashStyles;
+  text: DashText;
+  shadow: { card: object };
+  tint?: string;
+}) {
   return (
-    <View style={[s.statCard, shadow.card]}>
+    <View style={[styles.statCard, shadow.card, tint ? { backgroundColor: tint } : null]}>
       <Text style={text.stat}>{value}</Text>
       <Text style={[text.caption, { marginTop: 2 }]}>{label}</Text>
     </View>
   );
 }
 
-function StatusBar({ label, percent, color }: { label: string; percent: number; color: string }) {
+function StatusBar({
+  label,
+  percent,
+  color,
+  styles,
+  text,
+}: {
+  label: string;
+  percent: number;
+  color: string;
+  styles: DashStyles;
+  text: DashText;
+}) {
   return (
     <View style={{ marginBottom: spacing.md }}>
-      <View style={s.statusHead}>
+      <View style={styles.statusHead}>
         <Text style={text.body}>{label}</Text>
         <Text style={[text.label, { color }]}>{percent}%</Text>
       </View>
@@ -203,22 +238,13 @@ function StatusBar({ label, percent, color }: { label: string; percent: number; 
   );
 }
 
-const s = StyleSheet.create({
+function createStyles(colors: ThemeColors, text: DashText) {
+  return StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl * 2 },
 
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   brand: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  logoIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoMark: { fontSize: 14 },
-  brandName: { fontSize: 17, fontWeight: '700', color: colors.textDark },
   bell: { fontSize: 18 },
   badge: {
     position: 'absolute',
@@ -274,3 +300,4 @@ const s = StyleSheet.create({
   quickIcon: { fontSize: 22 },
   quickLabel: { ...text.caption, fontWeight: '600', color: colors.textDark },
 });
+}

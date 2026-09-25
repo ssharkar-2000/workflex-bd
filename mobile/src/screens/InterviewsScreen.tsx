@@ -205,6 +205,7 @@ export function InterviewsScreen({ navigation }: any) {
                 <Button
                   label={t('interviews.viewWorker')}
                   variant="outline"
+                  tint={categoryPalette[0]}
                   onPress={() => navigation.navigate('WorkerProfile', { id: item.worker.id })}
                 />
                 {live ? (
@@ -212,6 +213,7 @@ export function InterviewsScreen({ navigation }: any) {
                     <Button
                       label={t('interviews.reschedule')}
                       variant="outline"
+                      tint={categoryPalette[3]}
                       disabled={busy}
                       onPress={() =>
                         setReschedule({ interview: item, value: toInputValue(item.scheduledAt) })
@@ -226,6 +228,7 @@ export function InterviewsScreen({ navigation }: any) {
                     <Button
                       label={t('interviews.noShow')}
                       variant="outline"
+                      tint={categoryPalette[1]}
                       disabled={busy}
                       onPress={() => run(item.id, 'noShow')}
                     />

@@ -65,9 +65,18 @@ export class EmployersService {
     const existing = await this.prisma.employer.findUnique({ where: { email: dto.email } });
     if (existing) throw new ConflictException('An employer with that email already exists.');
 
-    const count = await this.prisma.employer.count();
+    // Same class of bug as jobs.service.ts's old code generation: basing the
+    // next code on a plain count() collides with an existing code as soon as
+    // any employer row is ever removed. Deriving it from the highest code in
+    // use avoids that regardless of deletions.
+    const last = await this.prisma.employer.findFirst({
+      orderBy: { code: 'desc' },
+      select: { code: true },
+    });
+    const lastNumber = last ? Number(last.code.split('-')[1]) : 0;
+    const nextNumber = Number.isFinite(lastNumber) ? lastNumber + 1 : 1;
     const employer = await this.prisma.employer.create({
-      data: { ...dto, code: `EM-${String(count + 1).padStart(3, '0')}` },
+      data: { ...dto, code: `EM-${String(nextNumber).padStart(3, '0')}` },
     });
 
     await this.audit.record({

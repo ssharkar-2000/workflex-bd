@@ -107,12 +107,13 @@ export class ReportsService {
     });
 
     const escape = (value: string) => `"${value.replace(/"/g, '""')}"`;
-    const header = ['Reference', 'Type', 'Status', 'Amount (BDT)', 'From', 'To', 'Date'];
+    const header = ['Reference', 'Type', 'Status', 'Method', 'Amount (BDT)', 'From', 'To', 'Date'];
     const lines = rows.map((r) =>
       [
         r.code,
         r.type,
         r.status,
+        r.method,
         (Number(r.amount) / 100).toFixed(2),
         r.fromLabel,
         r.toLabel,

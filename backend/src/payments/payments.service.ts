@@ -16,6 +16,9 @@ export class PaymentsService {
     const where: Prisma.TransactionWhereInput = {
       ...(query.status ? { status: query.status } : {}),
       ...(query.type ? { type: query.type } : {}),
+      ...(query.workerId ? { workerId: query.workerId } : {}),
+      ...(query.employerId ? { employerId: query.employerId } : {}),
+      ...(query.jobId ? { jobId: query.jobId } : {}),
       ...(query.search
         ? {
             OR: [
@@ -30,43 +33,107 @@ export class PaymentsService {
     const [items, total] = await this.prisma.$transaction([
       this.prisma.transaction.findMany({
         where,
-        orderBy: { occurredAt: 'desc' },
+        orderBy: { occurredAt: query.sort ?? 'desc' },
         skip: (query.page - 1) * query.limit,
         take: query.limit,
+        include: { job: { select: { id: true, title: true, code: true } } },
       }),
       this.prisma.transaction.count({ where }),
     ]);
 
-    return paginate(items, total, query.page, query.limit);
+    // Cash-in vs cash-out only makes sense relative to a single wallet, so
+    // this is only computed when the caller asked for one worker's history
+    // (e.g. the Worker Profile "all transactions" screen).
+    const cashInTypes: TransactionType[] = [TransactionType.SALARY_PAYMENT, TransactionType.REFUND];
+    const withDirection = items.map((item) => ({
+      ...item,
+      direction: query.workerId ? (cashInTypes.includes(item.type) ? 'IN' : 'OUT') : undefined,
+    }));
+
+    const page = paginate(withDirection, total, query.page, query.limit);
+
+    if (!query.workerId) return page;
+
+    // Extra summary block for the per-worker view: how much moved in/out in
+    // the last 30 days, so the screen can show "cash-in/cash-out, last month"
+    // without the app having to walk every row on the client.
+    const since = new Date();
+    since.setDate(since.getDate() - 30);
+    const [cashIn, cashOut] = await this.prisma.$transaction([
+      this.prisma.transaction.aggregate({
+        _sum: { amount: true },
+        where: {
+          workerId: query.workerId,
+          status: TransactionStatus.COMPLETED,
+          type: { in: cashInTypes },
+          occurredAt: { gte: since },
+        },
+      }),
+      this.prisma.transaction.aggregate({
+        _sum: { amount: true },
+        where: {
+          workerId: query.workerId,
+          status: TransactionStatus.COMPLETED,
+          type: { in: [TransactionType.WITHDRAWAL, TransactionType.PLATFORM_FEE] },
+          occurredAt: { gte: since },
+        },
+      }),
+    ]);
+    const num = (v: bigint | null) => Number(v ?? 0n);
+    return {
+      ...page,
+      last30Days: { cashIn: num(cashIn._sum.amount), cashOut: num(cashOut._sum.amount) },
+    };
   }
 
   async findOne(id: string) {
     const txn = await this.prisma.transaction.findUnique({
       where: { id },
-      include: { worker: { select: { id: true, fullName: true, code: true } } },
+      include: {
+        worker: { select: { id: true, fullName: true, code: true } },
+        relatedTransaction: { select: { id: true, code: true, amount: true } },
+        refunds: { select: { id: true, code: true, amount: true, status: true } },
+      },
     });
     if (!txn) throw new NotFoundException('That transaction no longer exists.');
     return txn;
   }
 
   /// The four cards at the top of the Payments screen.
+  ///
+  /// Two correctness fixes here (found during the item-23 CRUD/DB audit):
+  /// 1. `totalRevenue`/`monthlyRevenue` previously summed *all* COMPLETED
+  ///    transactions, which double-counts money leaving the platform:
+  ///    a COMPLETED `REFUND` row was being added to revenue instead of
+  ///    being excluded. Revenue now only counts money actually earned
+  ///    (salary payments + platform fees), matching what "Total Revenue"
+  ///    means on the Payments screen.
+  /// 2. `pendingPayouts` previously summed *any* PENDING transaction
+  ///    (including e.g. a pending refund or pending fee) — narrowed to
+  ///    PENDING `WITHDRAWAL` rows, which is what "Pending Payouts" means.
   async summary() {
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
-    const [total, monthly, pending, fees] = await this.prisma.$transaction([
+    const revenueTypes = [TransactionType.SALARY_PAYMENT, TransactionType.PLATFORM_FEE];
+
+    const [total, monthly, pendingPayouts, fees] = await this.prisma.$transaction([
       this.prisma.transaction.aggregate({
         _sum: { amount: true },
-        where: { status: TransactionStatus.COMPLETED },
+        where: { status: TransactionStatus.COMPLETED, type: { in: revenueTypes } },
       }),
       this.prisma.transaction.aggregate({
         _sum: { amount: true },
-        where: { status: TransactionStatus.COMPLETED, occurredAt: { gte: startOfMonth } },
+        where: {
+          status: TransactionStatus.COMPLETED,
+          type: { in: revenueTypes },
+          occurredAt: { gte: startOfMonth },
+        },
       }),
       this.prisma.transaction.aggregate({
         _sum: { amount: true },
-        where: { status: TransactionStatus.PENDING },
+        where: { status: TransactionStatus.PENDING, type: TransactionType.WITHDRAWAL },
       }),
       this.prisma.transaction.aggregate({
         _sum: { amount: true },
@@ -80,11 +147,12 @@ export class PaymentsService {
       monthlyRevenue: num(monthly._sum.amount),
       // Fees collected but not yet swept out are what sits in the platform wallet.
       walletBalance: num(fees._sum.amount),
-      pendingPayouts: num(pending._sum.amount),
+      pendingPayouts: num(pendingPayouts._sum.amount),
     };
   }
 
   /// Monthly revenue series for the Revenue Analytics chart.
+  /// Same refund-exclusion fix as `summary()` above — see its docblock.
   async revenueSeries(months = 7) {
     const since = new Date();
     since.setMonth(since.getMonth() - (months - 1));
@@ -94,7 +162,9 @@ export class PaymentsService {
     const rows = await this.prisma.$queryRaw<{ month: Date; total: bigint }[]>`
       SELECT date_trunc('month', "occurredAt") AS month, SUM(amount)::bigint AS total
       FROM transactions
-      WHERE status = 'COMPLETED' AND "occurredAt" >= ${since}
+      WHERE status = 'COMPLETED'
+        AND type IN ('SALARY_PAYMENT', 'PLATFORM_FEE')
+        AND "occurredAt" >= ${since}
       GROUP BY 1
       ORDER BY 1 ASC
     `;
@@ -113,18 +183,28 @@ export class PaymentsService {
     if (BigInt(amount) > original.amount) {
       throw new BadRequestException('Refund cannot exceed the original amount.');
     }
+    const alreadyRefunded = original.refunds.some((r) => r.status !== 'FAILED');
+    if (alreadyRefunded) {
+      throw new BadRequestException('A refund has already been issued for this transaction.');
+    }
 
-    const count = await this.prisma.transaction.count();
+    // Same "count() + 1" collision bug fixed elsewhere (JobsService,
+    // EmployersService) — deriving from the highest code in use instead of a
+    // raw count survives gaps if a transaction row is ever removed.
+    const code = await this.nextTransactionCode();
     const refund = await this.prisma.transaction.create({
       data: {
-        code: `TXN-${8825 + count + 1}`,
+        code,
         type: TransactionType.REFUND,
         status: TransactionStatus.PENDING,
         amount: BigInt(amount),
+        method: original.method,
         fromLabel: 'WorkFlex BD',
         toLabel: original.fromLabel,
         refundReason: reason,
         workerId: original.workerId,
+        jobId: original.jobId,
+        relatedTransactionId: original.id,
       },
     });
 
@@ -137,6 +217,16 @@ export class PaymentsService {
       metadata: { refundId: refund.id, amount },
     });
     return refund;
+  }
+
+  private async nextTransactionCode(): Promise<string> {
+    const last = await this.prisma.transaction.findFirst({
+      orderBy: { code: 'desc' },
+      select: { code: true },
+    });
+    const lastNumber = last ? Number(last.code.split('-')[1]) : 8825;
+    const nextNumber = Number.isFinite(lastNumber) ? lastNumber + 1 : 8826;
+    return `TXN-${nextNumber}`;
   }
 
   async retry(id: string, adminId: string) {

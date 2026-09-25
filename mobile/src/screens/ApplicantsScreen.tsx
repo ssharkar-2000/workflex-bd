@@ -164,6 +164,7 @@ export function ApplicantsScreen({ route, navigation }: any) {
                     <Button
                       label={t('applicants.shortlist')}
                       variant="outline"
+                      tint={categoryPalette[0]}
                       loading={busy}
                       onPress={() => run(app.id, 'shortlist')}
                     />
@@ -183,6 +184,7 @@ export function ApplicantsScreen({ route, navigation }: any) {
                   <Button
                     label={t('applicants.scheduleInterview')}
                     variant="outline"
+                    tint={categoryPalette[3]}
                     disabled={busy}
                     onPress={() =>
                       setScheduling({ app, when: defaultSlot(), location: '' })
@@ -191,6 +193,7 @@ export function ApplicantsScreen({ route, navigation }: any) {
                   <Button
                     label={t('applicants.documents')}
                     variant="outline"
+                    tint={categoryPalette[1]}
                     onPress={() =>
                       navigation.navigate('Documents', { workerId: app.worker.id, jobId: id })
                     }

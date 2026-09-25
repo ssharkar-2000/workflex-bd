@@ -160,6 +160,7 @@ export function ComplaintDetailScreen({ route, navigation }: any) {
             <Button
               label={t('complaintDetail.assignToMe')}
               variant="outline"
+              tint={categoryPalette[0]}
               loading={busy === 'assign'}
               onPress={() => run('assign', 'assign')}
             />
@@ -168,6 +169,7 @@ export function ComplaintDetailScreen({ route, navigation }: any) {
             <Button
               label={t('complaintDetail.escalate')}
               variant="outline"
+              tint={categoryPalette[3]}
               loading={busy === 'escalate'}
               onPress={() => run('escalate', 'escalate')}
             />
@@ -184,6 +186,7 @@ export function ComplaintDetailScreen({ route, navigation }: any) {
             <Button
               label={t('complaintDetail.reopen')}
               variant="outline"
+              tint={categoryPalette[1]}
               loading={busy === 'reopen'}
               onPress={() => run('reopen', 'reopen')}
             />
@@ -199,7 +202,8 @@ export function ComplaintDetailScreen({ route, navigation }: any) {
           <Button
             label={t('complaintDetail.viewHistory')}
             variant="outline"
-            onPress={() =>
+            tint={categoryPalette[4]}
+            onPress={() => 
               navigation.navigate('EntityHistory', {
                 entityType: 'Complaint',
                 entityId: id,

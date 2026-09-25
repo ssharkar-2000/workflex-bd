@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../api/client';
 import { friendlyError } from '../api/errors';
 import { useApi } from '../api/hooks';
-import { Button, Card, ErrorState, Loading } from '../components';
+import { BackButton, Button, Card, ErrorState, Loading } from '../components';
 import { useI18n } from '../i18n/I18nContext';
 import { buildText, radii, spacing, ThemeColors } from '../theme';
 import { useTheme } from '../theme/ThemeContext';
@@ -162,6 +162,7 @@ export function CmsDetailScreen({ route, navigation }: any) {
       contentContainerStyle={[s.content, { paddingTop: insets.top + spacing.sm }]}
       keyboardShouldPersistTaps="handled"
     >
+      <BackButton onPress={() => navigation.goBack()} />
       <Text style={text.screenTitle}>{isNew ? t('cmsDetail.newBlock') : t('cmsDetail.editContent')}</Text>
 
       <Card style={{ marginTop: spacing.lg }}>

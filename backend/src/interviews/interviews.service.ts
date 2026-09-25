@@ -169,6 +169,7 @@ export class InterviewsService {
       body:
         `${job.company.name} has scheduled your interview for "${job.title}" (${job.code}) on ` +
         `${scheduledAt.toISOString()}. ${this.whereLine(interview.mode, dto.location ?? job.location)}`,
+      entityType: 'Interview',
       entityId: interview.id,
       email: true,
     });

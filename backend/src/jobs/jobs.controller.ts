@@ -2,10 +2,6 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } f
 import { ApplicationStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../common/current-user.decorator';
-import { CreateJobCategoryDto, CreateJobDto, ListJobsDto, RejectJobDto, UpdateJobDto } from './dto/job.dto';
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CurrentUser } from '../common/current-user.decorator';
 import { CreateJobDto, ListJobsDto, RejectJobDto, UpdateJobDto } from './dto/job.dto';
 import { JobsService } from './jobs.service';
 
@@ -29,13 +25,6 @@ export class JobsController {
   @Get('categories')
   categories() {
     return this.jobs.categories();
-  }
-
-  /// Lets the poster type a category that isn't in the preset list instead
-  /// of being limited to it. See JobsService.createCategory().
-  @Post('categories')
-  createCategory(@Body() dto: CreateJobCategoryDto, @CurrentUser() admin: Admin) {
-    return this.jobs.createCategory(dto, admin.id);
   }
 
   @Get('companies')

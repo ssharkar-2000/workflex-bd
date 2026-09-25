@@ -1,14 +1,19 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Alert as RNAlert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../api/client';
+import { friendlyError } from '../api/errors';
 import { useApi } from '../api/hooks';
 import { Job, Page } from '../api/types';
 import { Avatar, Button, Chip, ErrorState, FilterTabs, Loading } from '../components';
-import { colors, radii, shadow, spacing, text } from '../theme';
+import { useI18n } from '../i18n/I18nContext';
+import { buildText, categoryTint, radii, spacing, ThemeColors } from '../theme';
 import { experience, salaryRange, timeAgo } from '../theme/format';
+import { useTheme } from '../theme/ThemeContext';
 
 type Filter = 'ALL' | 'PENDING' | 'APPROVED' | 'FEATURED' | 'REJECTED';
+type Styles = ReturnType<typeof createStyles>;
+type Txt = ReturnType<typeof buildText>;
 
 const QUERY: Record<Filter, string> = {
   ALL: '',
@@ -20,6 +25,9 @@ const QUERY: Record<Filter, string> = {
 
 export function JobsScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
+  const { colors, text, shadow, categoryPalette } = useTheme();
+  const { t } = useI18n();
+  const s = useMemo(() => createStyles(colors, text), [colors, text]);
   const [filter, setFilter] = useState<Filter>('ALL');
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -31,11 +39,11 @@ export function JobsScreen({ navigation }: any) {
     try {
       await api(`/jobs/${job.id}/${action}`, {
         method: 'POST',
-        body: action === 'reject' ? { reason: 'Did not meet posting guidelines' } : undefined,
+        body: action === 'reject' ? { reason: t('jobs.defaultRejectReason') } : undefined,
       });
       await Promise.all([refetch(), counts.refetch()]);
-    } catch (e: any) {
-      RNAlert.alert('Action failed', e.message);
+    } catch (e) {
+      RNAlert.alert(t('alertDetail.actionFailed'), friendlyError(e, t));
     } finally {
       setBusyId(null);
     }
@@ -45,20 +53,24 @@ export function JobsScreen({ navigation }: any) {
     <View style={[s.flex, { paddingTop: insets.top + spacing.sm }]}>
       <View style={s.header}>
         <View style={s.headRow}>
-          <Text style={text.screenTitle}>All Jobs</Text>
+          <Text style={text.screenTitle}>{t('jobs.title')}</Text>
           <Pressable style={s.postButton} onPress={() => navigation.navigate('PostJob')}>
-            <Text style={s.postLabel}>+ Post</Text>
+            <Text style={s.postLabel}>{t('jobs.post')}</Text>
           </Pressable>
         </View>
+        <Pressable style={s.analyticsLink} onPress={() => navigation.navigate('JobAnalytics')}>
+          <Text style={s.analyticsLinkText}>{t('jobAnalytics.title')}</Text>
+          <Text style={s.analyticsLinkArrow}>›</Text>
+        </Pressable>
         <FilterTabs<Filter>
           value={filter}
           onChange={setFilter}
           options={[
-            { value: 'ALL', label: 'All', count: counts.data?.all },
-            { value: 'PENDING', label: 'Pending', count: counts.data?.pending },
-            { value: 'APPROVED', label: 'Approved', count: counts.data?.approved },
-            { value: 'FEATURED', label: 'Featured', count: counts.data?.featured },
-            { value: 'REJECTED', label: 'Rejected', count: counts.data?.rejected },
+            { value: 'ALL', label: t('common.all'), count: counts.data?.all },
+            { value: 'PENDING', label: t('jobs.pending'), count: counts.data?.pending },
+            { value: 'APPROVED', label: t('jobs.approved'), count: counts.data?.approved },
+            { value: 'FEATURED', label: t('jobs.featured'), count: counts.data?.featured },
+            { value: 'REJECTED', label: t('reports.rejected'), count: counts.data?.rejected },
           ]}
         />
       </View>
@@ -81,6 +93,11 @@ export function JobsScreen({ navigation }: any) {
               onPress={() => navigation.navigate('JobDetail', { id: item.id })}
               onApprove={() => review(item, 'approve')}
               onReject={() => review(item, 'reject')}
+              styles={s}
+              text={text}
+              shadow={shadow}
+              t={t}
+              tint={categoryTint(categoryPalette, item.id).bg}
             />
           )}
         />
@@ -95,41 +112,51 @@ function JobCard({
   onPress,
   onApprove,
   onReject,
+  styles,
+  text,
+  shadow,
+  t,
+  tint,
 }: {
   job: Job;
   busy: boolean;
   onPress: () => void;
   onApprove: () => void;
   onReject: () => void;
+  styles: Styles;
+  text: Txt;
+  shadow: { card: object };
+  t: (key: string, vars?: Record<string, string | number>) => string;
+  tint?: string;
 }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [s.card, shadow.card, pressed && { opacity: 0.9 }]}>
-      <View style={s.banner}>
-        {job.status === 'PENDING' ? <Text style={s.bannerText}>PENDING REVIEW</Text> : null}
-        {job.featured ? <Text style={[s.bannerText, s.featured]}>FEATURED</Text> : null}
-        {job.urgency === 'URGENT' ? <Text style={[s.bannerText, s.urgent]}>URGENT</Text> : null}
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, shadow.card, tint ? { backgroundColor: tint } : null, pressed && { opacity: 0.9 }]}>
+      <View style={styles.banner}>
+        {job.status === 'PENDING' ? <Text style={styles.bannerText}>{t('jobs.pendingReview')}</Text> : null}
+        {job.featured ? <Text style={[styles.bannerText, styles.featured]}>{t('jobs.featuredBanner')}</Text> : null}
+        {job.urgency === 'URGENT' ? <Text style={[styles.bannerText, styles.urgent]}>{t('jobs.urgent')}</Text> : null}
       </View>
 
-      <View style={s.cardTop}>
+      <View style={styles.cardTop}>
         <Avatar initials={job.company.initials} size={40} />
-        <View style={s.grow}>
-          <View style={s.titleRow}>
+        <View style={styles.grow}>
+          <View style={styles.titleRow}>
             <Text style={text.cardTitle} numberOfLines={1}>
               {job.title}
             </Text>
-            <Text style={s.salary}>{salaryRange(job.salaryMin, job.salaryMax)}</Text>
+            <Text style={styles.salary}>{salaryRange(job.salaryMin, job.salaryMax)}</Text>
           </View>
           <Text style={text.caption} numberOfLines={1}>
             {job.location}
           </Text>
-          <Text style={[text.micro, { marginTop: 2 }]}>{timeAgo(job.postedAt)}</Text>
+          <Text style={[text.micro, { marginTop: 2 }]}>{timeAgo(job.postedAt, t)}</Text>
         </View>
       </View>
 
-      <View style={s.chipRow}>
+      <View style={styles.chipRow}>
         <Chip label={`${job.category.icon} ${job.category.name}`} />
-        <Chip label={job.availability === 'FULL_TIME' ? 'Full-time' : 'Part-time'} />
-        <Chip label={experience(job.experienceMonths)} />
+        <Chip label={job.availability === 'FULL_TIME' ? t('workers.fullTime') : t('workers.partTime')} />
+        <Chip label={experience(job.experienceMonths, t)} />
       </View>
 
       <Text style={text.body} numberOfLines={2}>
@@ -137,53 +164,69 @@ function JobCard({
       </Text>
 
       {job.status === 'PENDING' ? (
-        <View style={s.actions}>
-          <Button label="Approve" variant="success" loading={busy} onPress={onApprove} />
-          <Button label="Reject" variant="danger" loading={busy} onPress={onReject} />
+        <View style={styles.actions}>
+          <Button label={t('common.approve')} variant="success" loading={busy} onPress={onApprove} />
+          <Button label={t('common.reject')} variant="danger" loading={busy} onPress={onReject} />
         </View>
       ) : job.status === 'REJECTED' && job.rejectionReason ? (
-        <Text style={s.rejection}>Rejected — {job.rejectionReason}</Text>
+        <Text style={styles.rejection} numberOfLines={2}>
+          {t('jobs.rejectedReason', { reason: job.rejectionReason })}
+        </Text>
       ) : null}
     </Pressable>
   );
 }
 
-const s = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.background },
-  header: { paddingHorizontal: spacing.lg },
-  headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  postButton: {
-    backgroundColor: colors.primary,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  postLabel: { color: colors.onPrimary, fontWeight: '700', fontSize: 13 },
+function createStyles(colors: ThemeColors, text: Txt) {
+  return StyleSheet.create({
+    flex: { flex: 1, backgroundColor: colors.background },
+    header: { paddingHorizontal: spacing.lg },
+    headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    postButton: {
+      backgroundColor: colors.primary,
+      borderRadius: radii.pill,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+    },
+    postLabel: { color: colors.onPrimary, fontWeight: '700', fontSize: 13 },
+    analyticsLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.primarySoft,
+      borderRadius: radii.lg,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      marginTop: spacing.md,
+    },
+    analyticsLinkText: { ...text.label, color: colors.primary },
+    analyticsLinkArrow: { color: colors.primary, fontSize: 18, fontWeight: '700' },
 
-  list: { padding: spacing.lg, paddingTop: spacing.sm, gap: spacing.md },
-  card: { backgroundColor: colors.card, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.md },
+    list: { padding: spacing.lg, paddingTop: spacing.sm, gap: spacing.md },
+    card: { backgroundColor: colors.card, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.md },
 
-  banner: { flexDirection: 'row', gap: spacing.sm },
-  bannerText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-    color: colors.amberText,
-    backgroundColor: colors.amberBg,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radii.sm,
-    overflow: 'hidden',
-  },
-  featured: { color: colors.primary, backgroundColor: colors.primarySoft },
-  urgent: { color: colors.redText, backgroundColor: colors.redBg },
+    banner: { flexDirection: 'row', gap: spacing.sm },
+    bannerText: {
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 0.5,
+      color: colors.amberText,
+      backgroundColor: colors.amberBg,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 3,
+      borderRadius: radii.sm,
+      overflow: 'hidden',
+    },
+    featured: { color: colors.primary, backgroundColor: colors.primarySoft },
+    urgent: { color: colors.redText, backgroundColor: colors.redBg },
 
-  cardTop: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
-  grow: { flex: 1 },
-  titleRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
-  salary: { fontSize: 13, fontWeight: '700', color: colors.primary },
+    cardTop: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
+    grow: { flex: 1 },
+    titleRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
+    salary: { fontSize: 13, fontWeight: '700', color: colors.primary },
 
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  actions: { flexDirection: 'row', gap: spacing.sm },
-  rejection: { ...text.caption, color: colors.redText },
-});
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+    actions: { flexDirection: 'row', gap: spacing.sm },
+    rejection: { ...text.caption, color: colors.redText },
+  });
+}

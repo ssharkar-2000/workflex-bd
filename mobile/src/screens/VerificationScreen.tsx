@@ -1,24 +1,30 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Alert as RNAlert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../api/client';
+import { friendlyError } from '../api/errors';
 import { useApi } from '../api/hooks';
 import { Page, VerificationRequest, VerificationType } from '../api/types';
-import { Avatar, Button, ErrorState, Loading, SectionHeader } from '../components';
-import { colors, radii, shadow, spacing, text } from '../theme';
-import { humanise, longDate } from '../theme/format';
+import { Avatar, BackButton, Button, ErrorState, Loading, SectionHeader } from '../components';
+import { useI18n } from '../i18n/I18nContext';
+import { buildText, categoryTint, radii, spacing, ThemeColors } from '../theme';
+import { longDate } from '../theme/format';
+import { useTheme } from '../theme/ThemeContext';
 
-const TYPE_LABEL: Record<VerificationType, string> = {
-  NID: 'NID Verification',
-  FACE: 'Face Verification',
-  BUSINESS: 'Business Verification',
-  WORKER: 'Worker Verification',
-  EMPLOYER: 'Employer Verification',
-  COMPANY: 'Company Verification',
+const TYPE_LABEL_KEY: Record<VerificationType, string> = {
+  NID: 'verification.typeNid',
+  FACE: 'verification.typeFace',
+  BUSINESS: 'verification.typeBusiness',
+  WORKER: 'verification.typeWorker',
+  EMPLOYER: 'verification.typeEmployer',
+  COMPANY: 'verification.typeCompany',
 };
 
-export function VerificationScreen() {
+export function VerificationScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
+  const { colors, text, shadow, categoryPalette } = useTheme();
+  const { t } = useI18n();
+  const s = useMemo(() => createStyles(colors, text), [colors, text]);
   const [type, setType] = useState<VerificationType | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -35,8 +41,8 @@ export function VerificationScreen() {
     try {
       await api(`/verifications/${id}/${action}`, { method: 'POST', body: {} });
       await Promise.all([refetch(), counts.refetch()]);
-    } catch (e: any) {
-      RNAlert.alert('Action failed', e.message);
+    } catch (e) {
+      RNAlert.alert(t('alertDetail.actionFailed'), friendlyError(e, t));
     } finally {
       setBusyId(null);
     }
@@ -52,9 +58,10 @@ export function VerificationScreen() {
         refreshing={loading}
         ListHeaderComponent={
           <View>
-            <Text style={text.screenTitle}>Verification Center</Text>
+            <BackButton onPress={() => navigation.goBack()} />
+            <Text style={text.screenTitle}>{t('verification.title')}</Text>
             <Text style={[text.caption, { marginTop: spacing.xs }]}>
-              {counts.data?.total ?? 0} pending verifications need review
+              {t('verification.pendingCount', { count: counts.data?.total ?? 0 })}
             </Text>
 
             <View style={s.grid}>
@@ -64,13 +71,25 @@ export function VerificationScreen() {
                   <Pressable
                     key={entry.type}
                     onPress={() => setType(active ? null : entry.type)}
-                    style={[s.tile, shadow.card, active && s.tileActive]}
+                    style={[
+                      s.tile,
+                      shadow.card,
+                      !active && { backgroundColor: categoryTint(categoryPalette, entry.type).bg },
+                      active && s.tileActive,
+                    ]}
                   >
-                    <Text style={[s.tileLabel, active && s.tileLabelActive]} numberOfLines={2}>
-                      {TYPE_LABEL[entry.type]}
-                    </Text>
+                    <View style={s.tileLabelRow}>
+                      {!active ? (
+                        <View
+                          style={[s.tileDot, { backgroundColor: categoryTint(categoryPalette, entry.type).fg }]}
+                        />
+                      ) : null}
+                      <Text style={[s.tileLabel, active && s.tileLabelActive]} numberOfLines={2}>
+                        {t(TYPE_LABEL_KEY[entry.type])}
+                      </Text>
+                    </View>
                     <Text style={[s.tileCount, active && s.tileLabelActive]}>
-                      {entry.pending} pending
+                      {t('verification.pendingShort', { count: entry.pending })}
                     </Text>
                   </Pressable>
                 );
@@ -78,7 +97,7 @@ export function VerificationScreen() {
             </View>
 
             <View style={{ marginTop: spacing.xl }}>
-              <SectionHeader title={type ? TYPE_LABEL[type] : 'Pending Queue'} />
+              <SectionHeader title={type ? t(TYPE_LABEL_KEY[type]) : t('verification.pendingQueue')} />
             </View>
           </View>
         }
@@ -89,15 +108,15 @@ export function VerificationScreen() {
             <Loading />
           ) : (
             <View style={s.empty}>
-              <Text style={text.cardTitle}>Queue is clear</Text>
+              <Text style={text.cardTitle}>{t('verification.queueClear')}</Text>
               <Text style={[text.caption, { marginTop: spacing.xs }]}>
-                Nothing is waiting on review here.
+                {t('verification.nothingWaiting')}
               </Text>
             </View>
           )
         }
         renderItem={({ item }) => (
-          <View style={[s.card, shadow.card]}>
+          <View style={[s.card, shadow.card, { backgroundColor: categoryTint(categoryPalette, item.id).bg }]}>
             <View style={s.row}>
               <Avatar
                 initials={item.subjectName
@@ -108,21 +127,30 @@ export function VerificationScreen() {
                 size={40}
               />
               <View style={s.grow}>
-                <Text style={text.cardTitle}>{item.subjectName}</Text>
-                <Text style={text.caption}>
-                  {humanise(item.type)} · {longDate(item.submittedAt)}
+                <Text style={text.cardTitle} numberOfLines={1}>
+                  {item.subjectName}
                 </Text>
+                <View style={s.metaRow}>
+                  <View
+                    style={[s.typeBadge, { backgroundColor: categoryTint(categoryPalette, item.type).bg }]}
+                  >
+                    <Text style={[s.typeBadgeText, { color: categoryTint(categoryPalette, item.type).fg }]}>
+                      {t(TYPE_LABEL_KEY[item.type])}
+                    </Text>
+                  </View>
+                  <Text style={text.caption}>{longDate(item.submittedAt)}</Text>
+                </View>
               </View>
             </View>
             <View style={s.actions}>
               <Button
-                label="Reject"
+                label={t('common.reject')}
                 variant="danger"
                 loading={busyId === item.id}
                 onPress={() => review(item.id, 'reject')}
               />
               <Button
-                label="Approve"
+                label={t('common.approve')}
                 variant="success"
                 loading={busyId === item.id}
                 onPress={() => review(item.id, 'approve')}
@@ -135,26 +163,33 @@ export function VerificationScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.background },
-  list: { padding: spacing.lg, gap: spacing.md },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.lg },
-  tile: {
-    flexBasis: '47%',
-    flexGrow: 1,
-    backgroundColor: colors.card,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    gap: spacing.xs,
-  },
-  tileActive: { backgroundColor: colors.primary },
-  tileLabel: { ...text.label },
-  tileLabelActive: { color: colors.onPrimary },
-  tileCount: { ...text.caption, color: colors.primary, fontWeight: '700' },
+function createStyles(colors: ThemeColors, text: ReturnType<typeof buildText>) {
+  return StyleSheet.create({
+    flex: { flex: 1, backgroundColor: colors.background },
+    list: { padding: spacing.lg, gap: spacing.md },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.lg },
+    tile: {
+      flexBasis: '47%',
+      flexGrow: 1,
+      backgroundColor: colors.card,
+      borderRadius: radii.lg,
+      padding: spacing.lg,
+      gap: spacing.xs,
+    },
+    tileActive: { backgroundColor: colors.primary },
+    tileLabelRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+    tileDot: { width: 8, height: 8, borderRadius: 4 },
+    tileLabel: { ...text.label, flexShrink: 1 },
+    tileLabelActive: { color: colors.onPrimary },
+    tileCount: { ...text.caption, color: colors.primary, fontWeight: '700' },
 
-  card: { backgroundColor: colors.card, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.md },
-  row: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
-  grow: { flex: 1 },
-  actions: { flexDirection: 'row', gap: spacing.sm },
-  empty: { alignItems: 'center', paddingVertical: spacing.xxl },
-});
+    card: { backgroundColor: colors.card, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.md },
+    row: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
+    metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 2 },
+    typeBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 999 },
+    typeBadgeText: { fontSize: 11, fontWeight: '700' },
+    grow: { flex: 1 },
+    actions: { flexDirection: 'row', gap: spacing.sm },
+    empty: { alignItems: 'center', paddingVertical: spacing.xxl },
+  });
+}

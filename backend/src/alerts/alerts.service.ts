@@ -8,8 +8,6 @@ import {
 } from '@prisma/client';
 import { AuditService } from '../common/audit.service';
 import { UserNotificationsService } from '../common/user-notifications.service';
-import { AlertStatus, Prisma, TransactionStatus, TransactionType } from '@prisma/client';
-import { AuditService } from '../common/audit.service';
 import { paginate } from '../common/pagination.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ListAlertsDto } from './dto/alert.dto';
@@ -63,10 +61,6 @@ export class AlertsService {
 
   async findOne(id: string) {
     const alert = await this.prisma.alert.findUnique({ where: { id }, include: ALERT_INCLUDE });
-    const alert = await this.prisma.alert.findUnique({
-      where: { id },
-      include: { worker: { select: { id: true, fullName: true, code: true } } },
-    });
     if (!alert) throw new NotFoundException('That alert no longer exists.');
     return alert;
   }
@@ -171,9 +165,6 @@ export class AlertsService {
       });
     }
 
-        actionTaken: actionTaken ?? 'Escalated to authorities',
-      },
-    });
     await this.audit.record({
       adminId,
       action: 'alert.escalate',
@@ -203,8 +194,5 @@ export class AlertsService {
       select: { job: { select: { company: { select: { id: true, name: true } } } } },
     });
     return hire?.job.company ?? null;
-  }
-    });
-    return updated;
   }
 }

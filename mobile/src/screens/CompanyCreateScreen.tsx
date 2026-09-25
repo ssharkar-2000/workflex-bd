@@ -3,7 +3,7 @@ import { Alert as RNAlert, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../api/client';
 import { friendlyError } from '../api/errors';
-import { Button, Card } from '../components';
+import { BackButton, Button, Card } from '../components';
 import { useI18n } from '../i18n/I18nContext';
 import { buildText, radii, spacing, ThemeColors } from '../theme';
 import { useTheme } from '../theme/ThemeContext';
@@ -41,6 +41,7 @@ export function CompanyCreateScreen({ navigation }: any) {
 
   return (
     <ScrollView style={s.flex} contentContainerStyle={[s.content, { paddingTop: insets.top + spacing.sm }]}>
+      <BackButton onPress={() => navigation.goBack()} />
       <Text style={text.screenTitle}>{t('companyCreate.title')}</Text>
 
       <Card style={{ marginTop: spacing.lg }}>

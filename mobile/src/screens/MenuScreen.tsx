@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Alert as RNAlert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '../api/hooks';
 import { useAuth } from '../auth/AuthContext';
 import { Avatar, Card, SectionHeader } from '../components';
-import { colors, radii, shadow, spacing, text } from '../theme';
+import { useI18n } from '../i18n/I18nContext';
+import { buildText, categoryTint, radii, spacing, ThemeColors } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
 
 type Badges = {
   workers: number;
@@ -15,36 +17,101 @@ type Badges = {
   notifications: number;
 };
 
-/** Every row in the design's menu now resolves to a real screen. */
-const SECTIONS: { label: string; icon: string; route: string; badge?: keyof Badges }[] = [
-  { label: 'Dashboard', icon: '🏠', route: 'Home' },
-  { label: 'Workers Management', icon: '👷', route: 'Workers', badge: 'workers' },
-  { label: 'Employer Management', icon: '🏢', route: 'Employers' },
-  { label: 'Company Management', icon: '🏬', route: 'Companies' },
-  { label: 'Job Management', icon: '💼', route: 'Jobs', badge: 'newJobs' },
-  { label: 'Verification Center', icon: '✅', route: 'Verifications', badge: 'verifications' },
-  { label: 'Attendance', icon: '🕒', route: 'Attendance' },
-  { label: 'Payments', icon: '💳', route: 'Payments' },
-  { label: 'Analytics', icon: '📊', route: 'Analytics' },
-  { label: 'AI Monitoring', icon: '🛡️', route: 'AIMonitoring', badge: 'alerts' },
-  { label: 'Support', icon: '💬', route: 'Complaints', badge: 'complaints' },
-  { label: 'Notifications', icon: '🔔', route: 'Notifications', badge: 'notifications' },
-  { label: 'Reports', icon: '📄', route: 'Reports' },
-  { label: 'Security', icon: '🔒', route: 'Security' },
-  { label: 'CMS', icon: '📝', route: 'Cms' },
-  { label: 'System Management', icon: '⚙️', route: 'System' },
-  { label: 'Settings', icon: '🎛️', route: 'Settings' },
+/** Every row in the design's menu now resolves to a real screen. Labels are translation keys (item 12). */
+const SECTIONS: { labelKey: string; icon: string; route: string; badge?: keyof Badges }[] = [
+  { labelKey: 'dashboard.title', icon: '🏠', route: 'Home' },
+  { labelKey: 'menu.workers', icon: '👷', route: 'Workers', badge: 'workers' },
+  { labelKey: 'menu.employers', icon: '🏢', route: 'Employers' },
+  { labelKey: 'menu.companies', icon: '🏬', route: 'Companies' },
+  { labelKey: 'menu.jobs', icon: '💼', route: 'Jobs', badge: 'newJobs' },
+  { labelKey: 'menu.verifications', icon: '✅', route: 'Verifications', badge: 'verifications' },
+  // Item 10 — the interview list, alongside the rest of the hiring flow.
+  { labelKey: 'menu.interviews', icon: '🗓️', route: 'Interviews' },
+  { labelKey: 'menu.attendance', icon: '🕒', route: 'Attendance' },
+  { labelKey: 'nav.payments', icon: '💳', route: 'Payments' },
+  { labelKey: 'menu.subscriptions', icon: '⭐', route: 'Subscriptions' },
+  { labelKey: 'menu.analytics', icon: '📊', route: 'Analytics' },
+  // Item 13 — same screen, renamed everywhere a person reads it.
+  { labelKey: 'menu.suspicious', icon: '🛡️', route: 'AIMonitoring', badge: 'alerts' },
+  // Item 8 — irregular transactions and the 24-hour ban notices.
+  { labelKey: 'menu.suspiciousTransactions', icon: '🚩', route: 'SuspiciousTransactions' },
+  { labelKey: 'menu.complaints', icon: '💬', route: 'Complaints', badge: 'complaints' },
+  { labelKey: 'menu.reports', icon: '📄', route: 'Reports' },
+  { labelKey: 'menu.security', icon: '🔒', route: 'Security' },
+  { labelKey: 'menu.cms', icon: '📝', route: 'Cms' },
+  { labelKey: 'menu.system', icon: '⚙️', route: 'System' },
+  { labelKey: 'menu.settings', icon: '🎛️', route: 'Settings' },
 ];
+
+function createStyles(colors: ThemeColors, text: ReturnType<typeof buildText>) {
+  return StyleSheet.create({
+    flex: { flex: 1, backgroundColor: colors.background },
+    content: { padding: spacing.lg, paddingBottom: spacing.xxl * 2 },
+
+    profile: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
+    grow: { flex: 1 },
+
+    langRow: { flexDirection: 'row', gap: spacing.sm },
+    lang: {
+      flex: 1,
+      paddingVertical: spacing.md,
+      borderRadius: radii.md,
+      backgroundColor: colors.background,
+      alignItems: 'center',
+    },
+    langActive: { backgroundColor: colors.primary },
+    langText: { ...text.label, color: colors.textGray },
+    langTextActive: { color: colors.onPrimary },
+
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      backgroundColor: colors.card,
+      borderRadius: radii.md,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.lg,
+    },
+    rowIcon: { fontSize: 16, width: 22 },
+    redDot: {
+      position: 'absolute',
+      top: -2,
+      right: 2,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.red,
+    },
+    backlogText: { fontSize: 11, fontWeight: '700', color: colors.redText },
+    chevron: { fontSize: 20, color: colors.textLight },
+    badge: {
+      backgroundColor: colors.primarySoft,
+      borderRadius: radii.pill,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2,
+    },
+    badgeText: { fontSize: 11, fontWeight: '700', color: colors.primary },
+    signOut: { marginTop: spacing.md, backgroundColor: colors.redBg },
+  });
+}
 
 export function MenuScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { admin, signOut, setLanguage } = useAuth();
+  const { admin, signOut } = useAuth();
   const badges = useApi<Badges>('/dashboard/menu-badges');
+  // "Onek din dhore jome ache" — a red dot on Complaints & Support when
+  // tickets have sat OPEN/IN_PROGRESS/ESCALATED for 3+ days, separate from
+  // the plain open-count badge above (which doesn't say anything about age).
+  const backlog = useApi<{ count: number; thresholdDays: number }>('/complaints/backlog');
+
+  const { colors, text, shadow, categoryPalette } = useTheme();
+  const { t, language, setLanguage } = useI18n();
+  const s = useMemo(() => createStyles(colors, text), [colors, text]);
 
   const confirmSignOut = () => {
-    RNAlert.alert('Sign out?', 'You will need to sign in again to continue.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: signOut },
+    RNAlert.alert(t('menu.signOut') + '?', t('menu.signOutConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('menu.signOut'), style: 'destructive', onPress: signOut },
     ]);
   };
 
@@ -53,7 +120,7 @@ export function MenuScreen({ navigation }: any) {
       style={s.flex}
       contentContainerStyle={[s.content, { paddingTop: insets.top + spacing.sm }]}
     >
-      <Text style={text.screenTitle}>All Sections</Text>
+      <Text style={text.screenTitle}>{t('menu.title')}</Text>
 
       <Card style={{ marginTop: spacing.lg }}>
         <View style={s.profile}>
@@ -73,13 +140,13 @@ export function MenuScreen({ navigation }: any) {
       </Card>
 
       <Card style={{ marginTop: spacing.lg }}>
-        <SectionHeader title="Language" />
+        <SectionHeader title={t('settings.language')} />
         <Text style={[text.caption, { marginTop: -spacing.sm, marginBottom: spacing.md }]}>
-          Choose display language
+          {t('settings.languageHint')}
         </Text>
         <View style={s.langRow}>
           {(['en', 'bn'] as const).map((code) => {
-            const active = admin?.language === code;
+            const active = language === code;
             return (
               <Pressable
                 key={code}
@@ -87,7 +154,7 @@ export function MenuScreen({ navigation }: any) {
                 style={[s.lang, active && s.langActive]}
               >
                 <Text style={[s.langText, active && s.langTextActive]}>
-                  {code === 'en' ? 'EN' : 'বাংলা'}
+                  {code === 'en' ? t('settings.languageEnglish') : t('settings.languageBangla')}
                 </Text>
               </Pressable>
             );
@@ -98,14 +165,28 @@ export function MenuScreen({ navigation }: any) {
       <View style={{ marginTop: spacing.lg, gap: spacing.sm }}>
         {SECTIONS.map((section) => {
           const count = section.badge ? badges.data?.[section.badge] : undefined;
+          const hasBacklog = section.route === 'Complaints' && (backlog.data?.count ?? 0) > 0;
           return (
             <Pressable
-              key={section.label}
+              key={section.labelKey}
               onPress={() => navigation.navigate(section.route)}
-              style={({ pressed }) => [s.row, shadow.card, pressed && { opacity: 0.9 }]}
+              style={({ pressed }) => [
+                s.row,
+                shadow.card,
+                { backgroundColor: categoryTint(categoryPalette, section.labelKey).bg },
+                pressed && { opacity: 0.9 },
+              ]}
             >
-              <Text style={s.rowIcon}>{section.icon}</Text>
-              <Text style={[text.body, { flex: 1, fontWeight: '500' }]}>{section.label}</Text>
+              <View>
+                <Text style={s.rowIcon}>{section.icon}</Text>
+                {hasBacklog ? <View style={s.redDot} /> : null}
+              </View>
+              <Text style={[text.body, { flex: 1, fontWeight: '500' }]}>{t(section.labelKey)}</Text>
+              {hasBacklog ? (
+                <Text style={s.backlogText}>
+                  {t('menu.backlogDays', { days: backlog.data!.thresholdDays })}
+                </Text>
+              ) : null}
               {count ? (
                 <View style={s.badge}>
                   <Text style={s.badgeText}>{count > 999 ? `${Math.round(count / 1000)}k` : count}</Text>
@@ -120,50 +201,10 @@ export function MenuScreen({ navigation }: any) {
         <Pressable onPress={confirmSignOut} style={[s.row, s.signOut, shadow.card]}>
           <Text style={s.rowIcon}>🚪</Text>
           <Text style={[text.body, { flex: 1, fontWeight: '600', color: colors.redText }]}>
-            Sign Out
+            {t('menu.signOut')}
           </Text>
         </Pressable>
       </View>
     </ScrollView>
   );
 }
-
-const s = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl * 2 },
-
-  profile: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
-  grow: { flex: 1 },
-
-  langRow: { flexDirection: 'row', gap: spacing.sm },
-  lang: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    borderRadius: radii.md,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-  },
-  langActive: { backgroundColor: colors.primary },
-  langText: { ...text.label, color: colors.textGray },
-  langTextActive: { color: colors.onPrimary },
-
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.card,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-  },
-  rowIcon: { fontSize: 16, width: 22 },
-  chevron: { fontSize: 20, color: colors.textLight },
-  badge: {
-    backgroundColor: colors.primarySoft,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  badgeText: { fontSize: 11, fontWeight: '700', color: colors.primary },
-  signOut: { marginTop: spacing.md, backgroundColor: colors.redBg },
-});

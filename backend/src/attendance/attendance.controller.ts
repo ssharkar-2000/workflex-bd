@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../common/current-user.decorator';
 import { AttendanceService } from './attendance.service';
@@ -22,5 +22,10 @@ export class AttendanceController {
   @Post()
   mark(@Body() dto: MarkAttendanceDto, @CurrentUser() admin: { id: string }) {
     return this.attendance.mark(dto, admin.id);
+  }
+
+  @Post(':id/check-out')
+  checkOut(@Param('id') id: string, @CurrentUser() admin: { id: string }) {
+    return this.attendance.checkOut(id, admin.id);
   }
 }

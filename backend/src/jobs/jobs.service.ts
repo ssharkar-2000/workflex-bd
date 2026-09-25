@@ -4,11 +4,6 @@ import { AuditService } from '../common/audit.service';
 import { UserNotificationsService } from '../common/user-notifications.service';
 import { paginate } from '../common/pagination.dto';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateJobCategoryDto, CreateJobDto, ListJobsDto, UpdateJobDto } from './dto/job.dto';
-import { JobStatus, Prisma } from '@prisma/client';
-import { AuditService } from '../common/audit.service';
-import { paginate } from '../common/pagination.dto';
-import { PrismaService } from '../prisma/prisma.service';
 import { CreateJobDto, ListJobsDto, UpdateJobDto } from './dto/job.dto';
 
 const JOB_INCLUDE = {
@@ -91,10 +86,6 @@ export class JobsService {
     const job = await this.prisma.job.create({
       data: {
         code,
-    const count = await this.prisma.job.count();
-    const job = await this.prisma.job.create({
-      data: {
-        code: `JOB-${String(count + 1).padStart(4, '0')}`,
         title: dto.title,
         description: dto.description,
         companyId: dto.companyId,
@@ -186,8 +177,6 @@ export class JobsService {
     }
 
     const existing = await this.findOne(id);
-  async reject(id: string, reason: string, adminId: string) {
-    await this.findOne(id);
     const job = await this.prisma.job.update({
       where: { id },
       data: {
@@ -211,17 +200,12 @@ export class JobsService {
       email: true,
     });
 
-        rejectionReason: reason,
-      },
-      include: JOB_INCLUDE,
-    });
     await this.audit.record({
       adminId,
       action: 'job.reject',
       entityType: 'Job',
       entityId: id,
       reason: trimmed,
-      reason,
     });
     return job;
   }
@@ -268,43 +252,6 @@ export class JobsService {
 
   categories() {
     return this.prisma.jobCategory.findMany({ orderBy: { name: 'asc' } });
-  }
-
-  /**
-   * Lets whoever is posting a job add a category on the spot instead of
-   * being limited to the preset list. The slug is derived from the name
-   * (lowercased, spaces to hyphens) rather than typed, since it only needs
-   * to be a stable unique key — the name is what's actually shown anywhere.
-   * A category typed twice reuses the existing row rather than erroring,
-   * since from the poster's side "add Plumbing" a second time should just
-   * work, not fail with a duplicate-slug error.
-   */
-  async createCategory(dto: CreateJobCategoryDto, adminId: string) {
-    const name = dto.name.trim();
-    if (!name) throw new BadRequestException('Give the category a name.');
-
-    const slug = name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 60);
-    if (!slug) throw new BadRequestException('That name has no usable characters.');
-
-    const existing = await this.prisma.jobCategory.findUnique({ where: { slug } });
-    if (existing) return existing;
-
-    const category = await this.prisma.jobCategory.create({
-      data: { slug, name, icon: dto.icon?.trim() || '💼' },
-    });
-
-    await this.audit.record({
-      adminId,
-      action: 'job_category.create',
-      entityType: 'JobCategory',
-      entityId: category.id,
-    });
-
-    return category;
   }
 
   /// Item 23 follow-up: JobDetailScreen only ever showed an applicant
