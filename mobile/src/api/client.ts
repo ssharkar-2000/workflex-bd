@@ -1,115 +1,144 @@
-import { getTokens, saveTokens, clearTokens } from '../auth/tokenStorage';
+import axios, {
+  AxiosError,
+  type AxiosInstance,
+  type InternalAxiosRequestConfig,
+} from 'axios';
+import { ApiErrorCode, type ApiError, type AuthTokens } from '@workflex/shared';
+import { env } from '../lib/env';
+import { useAuthStore } from '../store/auth-store';
 
-const BASE_URL = 'http://192.168.0.243:3000/api';
+/** Bare instance for refresh calls — using `api` here would recurse. */
+const plain = axios.create({ baseURL: env.apiUrl, timeout: 15_000 });
 
-export class ApiError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-  }
-}
+export const api: AxiosInstance = axios.create({
+  baseURL: env.apiUrl,
+  timeout: 15_000,
+  headers: { 'Content-Type': 'application/json' },
+});
 
-let refreshInFlight: Promise<string | null> | null = null;
+type RetriableConfig = InternalAxiosRequestConfig & { _retried?: boolean };
 
-async function refreshAccessToken(): Promise<string | null> {
-  if (refreshInFlight) return refreshInFlight;
+api.interceptors.request.use((config) => {
+  const token = useAuthStore.getState().accessToken;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
 
-  refreshInFlight = (async () => {
-    try {
-      const tokens = await getTokens();
-      if (!tokens?.refreshToken) {
-        return null;
-      }
+/**
+ * Single-flight refresh.
+ *
+ * On a cold start the app fires several requests at once; without this, each
+ * 401 would trigger its own refresh, and because refresh tokens rotate, the
+ * losers would present an already-rotated token. The server reads that as
+ * theft and revokes the whole family — logging the user out for no reason.
+ */
+let refreshInFlight: Promise<AuthTokens> | null = null;
 
-      const res = await fetch(`${BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: tokens.refreshToken }),
-      });
+async function refreshTokens(): Promise<AuthTokens> {
+  const { refreshToken } = useAuthStore.getState();
+  if (!refreshToken) throw new Error('No refresh token');
 
-      if (!res.ok) {
-        // 🟢 শুধুমাত্র ৪০১ বা ৪০৩ (ইনভ্যালিড টোকেন) হলেই টোকেন ক্লিয়ার হবে
-        if (res.status === 401 || res.status === 403) {
-          await clearTokens();
-        }
-        return null;
-      }
-
-      const next = await res.json();
-      if (next?.accessToken) {
-        await saveTokens(next);
-        return next.accessToken as string;
-      }
-      return null;
-    } catch (err) {
-      // 🟢 নেটওয়ার্ক ড্রপ করলে টোকেন ডিলিট না করে সাইলেন্টলি নাল রিটার্ন করবে
-      console.log('Background token refresh network error:', err);
-      return null;
-    }
-  })().finally(() => {
-    refreshInFlight = null;
+  const { data } = await plain.post<AuthTokens>('/auth/refresh', {
+    refreshToken,
   });
-
-  return refreshInFlight;
+  await useAuthStore.getState().setTokens(data);
+  return data;
 }
 
-export async function api<T>(
-  path: string,
-  options: { method?: string; body?: unknown; auth?: boolean } = {},
-): Promise<T> {
-  const { method = 'GET', body, auth = true } = options;
+api.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError<ApiError>) => {
+    const config = error.config as RetriableConfig | undefined;
+    const status = error.response?.status;
 
-  const send = async (token?: string | null) => {
-    try {
-      return await fetch(`${BASE_URL}${path}`, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      });
-    } catch (netErr: any) {
-      // 🟢 ব্যাকগ্রাউন্ড নেটওয়ার্ক ড্রপ করলে ফ্যাটাল ক্র্যাশ না ঘটিয়ে হ্যান্ডেল করা
-      throw new ApiError(0, netErr.message || 'Network unreachable');
+    const canRetry =
+      status === 401 &&
+      config &&
+      !config._retried &&
+      !config.url?.includes('/auth/refresh') &&
+      useAuthStore.getState().refreshToken !== null;
+
+    if (canRetry) {
+      config._retried = true;
+      try {
+        refreshInFlight ??= refreshTokens().finally(() => {
+          refreshInFlight = null;
+        });
+        const tokens = await refreshInFlight;
+
+        config.headers.Authorization = `Bearer ${tokens.accessToken}`;
+        return api.request(config);
+      } catch {
+        // Refresh itself failed: the session is genuinely gone.
+        await useAuthStore.getState().signOut();
+      }
     }
+
+    return Promise.reject(toApiError(error));
+  },
+);
+
+/**
+ * Bearer header for requests that cannot go through this axios instance —
+ * `<Image>` fetches the raw bytes itself, so it needs the token handed to it.
+ */
+export function authHeaders(): Record<string, string> {
+  const token = useAuthStore.getState().accessToken;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/** Network failures and server errors reach the UI in one shape. */
+export function toApiError(error: unknown): ApiError {
+  // Idempotent: the response interceptor below already rejects with an
+  // ApiError, and screens call this again on whatever they catch. Without
+  // this guard the second pass would not recognise its own output and would
+  // replace a real message with "Unexpected error".
+  if (isApiError(error)) return error;
+
+  if (axios.isAxiosError<ApiError>(error)) {
+    if (error.response?.data?.code) return error.response.data;
+
+    if (!error.response) {
+      return {
+        statusCode: 0,
+        code: ApiErrorCode.INTERNAL,
+        message:
+          'Cannot reach the server. Check your connection and try again.',
+      };
+    }
+
+    // Prefer whatever the server said over axios's "Request failed with
+    // status code 409", which tells the user nothing.
+    const body = error.response.data as { message?: string } | undefined;
+    return {
+      statusCode: error.response.status,
+      code: ApiErrorCode.INTERNAL,
+      message: body?.message ?? error.message,
+    };
+  }
+
+  return {
+    statusCode: 0,
+    code: ApiErrorCode.INTERNAL,
+    message: error instanceof Error ? error.message : 'Unexpected error',
   };
+}
 
-  let token = auth ? (await getTokens())?.accessToken : null;
-  let res = await send(token);
-
-  if (res.status === 401 && auth) {
-    token = await refreshAccessToken();
-    if (token) {
-      res = await send(token);
-    }
-  }
-
-  let text = '';
-  try {
-    text = await res.text();
-  } catch {
-    text = '';
-  }
-
-  let data: any = null;
-  if (text) {
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = null;
-    }
-  }
-
-  if (!res.ok) {
-    // 🟢 ব্যাকগ্রাউন্ডে ইনভ্যালিড সেশনের কারণে ৪০১ পেলে তবেই ক্লিয়ার করবে
-    if (res.status === 401) {
-      await clearTokens();
-    }
-    const message = Array.isArray(data?.message)
-      ? data.message[0]
-      : data?.message ?? 'Something went wrong. Try again.';
-    throw new ApiError(res.status, message);
-  }
-
-  return data as T;
+/**
+ * `statusCode` is the discriminator, not `code`.
+ *
+ * An AxiosError also carries `code` ('ERR_BAD_REQUEST' on a 4xx) and
+ * `message`, so duck-typing on those two made every rejected request look
+ * like an already-converted ApiError. toApiError then returned it untouched,
+ * and the UI fell back to a generic message instead of the real reason.
+ */
+export function isApiError(value: unknown): value is ApiError {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !axios.isAxiosError(value) &&
+    typeof (value as { statusCode?: unknown }).statusCode === 'number' &&
+    'code' in value &&
+    'message' in value
+  );
 }
