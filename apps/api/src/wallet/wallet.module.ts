@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Env } from '../config/env.schema';
-import { DepositService } from './deposit.service';
 import { PAYMENT_GATEWAY, type PaymentGateway } from './gateway/payment-gateway';
 import { SimulatorGateway } from './gateway/simulator.gateway';
 import { SslcommerzGateway } from './gateway/sslcommerz.gateway';
@@ -13,16 +12,10 @@ import { WalletController } from './wallet.controller';
 import { WalletService } from './wallet.service';
 
 /**
- * The wallet.
- *
- * Money comes in two ways: through the payment gateway, which charges a card
- * or a mobile wallet and credits on the gateway's own confirmation, or
- * declared by hand — money the person sent to the platform's account, which
- * someone checks before crediting. Both end at the same ledger.
- *
- * It moves between accounts as a payment or a transfer, including by QR, and
- * leaves as a withdrawal: a request that a person pays out and marks paid.
- * The gateway takes money in; it does not send money out.
+ * One gateway per process, chosen by PAYMENT_PROVIDER. Null when it is off:
+ * the wallet still pays and withdraws, it just cannot be topped up. The
+ * credentials were checked at boot (see env.schema.ts), so the non-null
+ * assertions below cannot fail.
  */
 function createGateway(config: ConfigService<Env, true>): PaymentGateway | null {
   switch (config.get('PAYMENT_PROVIDER', { infer: true })) {
@@ -49,9 +42,7 @@ function createGateway(config: ConfigService<Env, true>): PaymentGateway | null 
     },
     WalletService,
     TopUpService,
-    DepositService,
     WalletAdminService,
   ],
-  exports: [WalletService, DepositService],
 })
 export class WalletModule {}
