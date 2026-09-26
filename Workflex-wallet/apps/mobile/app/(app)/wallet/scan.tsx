@@ -26,7 +26,7 @@ import { font, radius, space } from '../../../src/lib/theme';
 function newRequestId(): string {
   return globalThis.crypto?.randomUUID
     ? globalThis.crypto.randomUUID()
-    : `${Date.now().toString(16)}-0000-4000-8000-${Math.random().toString(16).slice(2, 14)}`;
+    : ${Date.now().toString(16)}-0000-4000-8000-${Math.random().toString(16).slice(2, 14)};
 }
 
 /**
@@ -240,3 +240,5 @@ const styles = StyleSheet.create({
   payeeMeta: { fontSize: font.xs },
   change: { fontSize: font.sm, fontWeight: '800' },
 });
+Compose
+Write to Shotorupa Sharkar
