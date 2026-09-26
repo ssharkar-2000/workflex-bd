@@ -233,7 +233,7 @@ export function Chip({
   );
 }
 
-/** A boxed message. `warning` for things to know, `danger` for problems. */
+/** A boxed message. warning for things to know, danger for problems. */
 export function Notice({
   tone,
   title,
@@ -346,3 +346,4 @@ const styles = StyleSheet.create({
   },
   outlineText: { fontSize: font.md, fontWeight: '800' },
 });
+Compose
