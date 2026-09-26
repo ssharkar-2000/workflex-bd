@@ -85,7 +85,6 @@ export class ProfileService {
     const status = await this.kycStatus(userId);
 
     return {
-      publicId: user.publicId,
       accountType: user.accountType,
       phone: user.phone,
       firstName: user.firstName,
@@ -134,4 +133,32 @@ export class ProfileService {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
-        // Written only when it changed, in the same whole-name
+        // Written only when it changed, in the same whole-name shape as
+        // registration: an untouched two-part name keeps its two parts.
+        ...(renaming ? { firstName: dto.fullName, lastName: null } : {}),
+        address: dto.address,
+        // An individual has no designation to hold, so a value sent by a
+        // stale client is dropped rather than stored where nothing reads it.
+        designation: isCompany ? dto.designation || null : null,
+      },
+    });
+
+    // Company rows are only touched for company accounts, and only updated —
+    // never created here. A company that does not exist yet means registration
+    // never completed, which is onboarding's job, not this endpoint's.
+    if (isCompany && dto.companyName) {
+      await this.prisma.company.updateMany({
+        where: { ownerId: userId },
+        data: {
+          name: dto.companyName,
+          registrationNumber: dto.companyRegistrationNumber || null,
+          tin: dto.tin || null,
+          tradeLicenseNo: dto.tradeLicenseNo || null,
+        },
+      });
+    }
+
+    this.logger.log(`Profile updated for user ${userId}`);
+    return this.get(userId);
+  }
+}
