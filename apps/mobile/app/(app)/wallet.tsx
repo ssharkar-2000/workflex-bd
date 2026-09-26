@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -17,22 +17,27 @@ import {
 import { toApiError } from '../../src/api/client';
 import {
   cancelWithdrawal,
+  fetchReceipts,
   fetchStatement,
-  fetchTopUp,
   fetchWallet,
 } from '../../src/api/wallet';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
-import { Card, MoneyScreen, Notice } from '../../src/components/wallet/WalletUi';
+import { MoneyScreen, Notice } from '../../src/components/wallet/WalletUi';
+import { BalanceCard } from '../../src/components/wallet/BalanceCard';
+import { PaymentReceivedModal } from '../../src/components/wallet/PaymentReceivedModal';
+import { QuickActions } from '../../src/components/wallet/QuickActions';
 import { useErrorMessage } from '../../src/lib/error-message';
 import { useLocale, useT, type Translate, type TranslationKey } from '../../src/i18n';
 import { useTheme } from '../../src/lib/use-theme';
+import { useAuthStore } from '../../src/store/auth-store';
+import { getSecure, setSecure } from '../../src/lib/secure-storage';
 import { font, radius, space } from '../../src/lib/theme';
 
 /**
  * The wallet: what is in it, what can be done with it, and everything that
  * has moved through it.
  *
- * Opened with `?topUp=<id>` when the payment gateway sends someone back, in
+ * Opened with ?topUp=<id> when the payment gateway sends someone back, in
  * which case the result of that payment is the first thing on the screen.
  */
 export default function WalletScreen() {
@@ -43,8 +48,27 @@ export default function WalletScreen() {
   const queryClient = useQueryClient();
   const errorMessage = useErrorMessage();
   const { topUp: topUpId } = useLocalSearchParams<{ topUp?: string }>();
+  const user = useAuthStore((state) => state.user);
+
+  // The moment this device last announced a payment. Kept here rather than on
+  // the server so the same payment is announced once per device, and a phone
+  // that has been closed for a week does not come back to a week of modals.
+  const [lastSeen, setLastSeen] = useState<string | null>(null);
+  const [announced, setAnnounced] = useState<string[]>([]);
+
+  useEffect(() => {
+    void getSecure('walletReceiptsSeenAt').then((value) => setLastSeen(value ?? EPOCH));
+  }, []);
 
   const wallet = useQuery({ queryKey: ['wallet'], queryFn: fetchWallet });
+  const receipts = useQuery({
+    queryKey: ['wallet-receipts', lastSeen],
+    queryFn: () => fetchReceipts(lastSeen ?? undefined),
+    enabled: lastSeen !== null,
+    // Often enough that a payment made while the screen is open is announced
+    // without the person refreshing; rarely enough to be free.
+    refetchInterval: 20_000,
+  });
   const statement = useInfiniteQuery({
     queryKey: ['wallet-statement'],
     queryFn: ({ pageParam }) => fetchStatement(pageParam),
@@ -55,6 +79,7 @@ export default function WalletScreen() {
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['wallet'] });
     void queryClient.invalidateQueries({ queryKey: ['wallet-statement'] });
+    void queryClient.invalidateQueries({ queryKey: ['deposits'] });
   };
 
   const cancel = useMutation({
@@ -64,6 +89,22 @@ export default function WalletScreen() {
 
   const entries = statement.data?.pages.flatMap((page) => page.entries) ?? [];
   const data = wallet.data;
+  const unannounced =
+    receipts.data?.filter((payment) => !announced.includes(payment.id)) ?? [];
+  const showing = unannounced[0] ?? null;
+
+  const dismissReceipt = () => {
+    if (!showing) return;
+    setAnnounced((ids) => [...ids, showing.id]);
+    // Remember the moment, not the id: anything older than this has been
+    // seen, so a reinstall does not replay months of payments.
+    void setSecure('walletReceiptsSeenAt', showing.receivedAt);
+    setLastSeen(showing.receivedAt);
+  };
+
+  // A wallet screen answers "what is in it and what just happened"; the
+  // whole ledger is a question for Insights, which is built for it.
+  const recent = entries.slice(0, RECENT_COUNT);
 
   return (
     <MoneyScreen
@@ -71,65 +112,76 @@ export default function WalletScreen() {
       refreshing={wallet.isRefetching || statement.isRefetching}
       onRefresh={refresh}
     >
-      {data?.gateway === 'simulator' ? (
-        <View
-          style={[
-            styles.simulator,
-            { backgroundColor: c.warningSoft, borderColor: c.warningBorder },
-          ]}
-        >
-          <Text style={[styles.simulatorText, { color: c.warning }]}>
-            {t('wallet.simulator')}
-          </Text>
-        </View>
-      ) : null}
-
-      {topUpId ? <TopUpResult id={topUpId} onSettled={refresh} /> : null}
-
       {wallet.error ? <ErrorBanner message={errorMessage(wallet.error)} tone="onSurface" /> : null}
 
-      <Card>
-        <Text style={[styles.balanceLabel, { color: c.textMuted }]}>{t('wallet.balance')}</Text>
-        {data ? (
-          <Text
-            style={[styles.balance, { color: c.text }]}
-            accessibilityLabel={`${t('wallet.balance')} ${formatTaka(data.balance)}`}
+      <PaymentReceivedModal payment={showing} onDismiss={dismissReceipt} />
+
+      <BalanceCard
+        wallet={data}
+        name={[user?.firstName, user?.lastName].filter(Boolean).join(' ') || null}
+        publicId={user?.publicId ?? null}
+        onLoadMoney={() => router.push('/(app)/wallet/add-money')}
+      />
+
+      <QuickActions
+        actions={[
+          {
+            icon: '＋',
+            label: t('wallet.addMoney'),
+            tint: '#E6F6EE',
+            ink: '#16794B',
+            onPress: () => router.push('/(app)/wallet/add-money'),
+          },
+          {
+            icon: '⇢',
+            label: t('wallet.pay'),
+            tint: '#EDEBFB',
+            ink: '#3A34A0',
+            onPress: () => router.push('/(app)/wallet/pay'),
+          },
+          {
+            icon: '◔',
+            label: t('wallet.insights'),
+            tint: '#FFEFE2',
+            ink: '#C2551F',
+            onPress: () => router.push('/(app)/wallet/insights'),
+          },
+          {
+            icon: '⌗',
+            label: t('wallet.scan'),
+            tint: '#E4F1FD',
+            ink: '#1D5FA8',
+            onPress: () => router.push('/(app)/wallet/scan'),
+          },
+          {
+            icon: '▣',
+            label: t('wallet.receive'),
+            tint: '#FDECF3',
+            ink: '#A83164',
+            onPress: () => router.push('/(app)/wallet/receive'),
+          },
+          {
+            icon: '↑',
+            label: t('wallet.withdraw'),
+            tint: '#FFF6DC',
+            ink: '#8A6200',
+            onPress: () => router.push('/(app)/wallet/withdraw'),
+          },
+        ]}
+      />
+
+      <View style={styles.sectionRow}>
+        <Text style={[styles.section, { color: c.text }]}>{t('wallet.recentHistory')}</Text>
+        {entries.length > recent.length ? (
+          <Pressable
+            onPress={() => router.push('/(app)/wallet/insights')}
+            accessibilityRole="button"
+            hitSlop={8}
           >
-            {formatTaka(data.balance)}
-          </Text>
-        ) : (
-          <ActivityIndicator color={c.primary} style={styles.balanceLoading} />
-        )}
-
-        <View style={[styles.divider, { backgroundColor: c.border }]} />
-
-        <View style={styles.figures}>
-          <Figure label={t('wallet.withdrawable')} value={data ? formatTaka(data.withdrawable) : '—'} />
-          {data && data.pendingWithdrawals > 0 ? (
-            <Figure
-              label={t('wallet.beingWithdrawn')}
-              value={formatTaka(data.pendingWithdrawals)}
-            />
-          ) : null}
-        </View>
-        <Text style={[styles.hint, { color: c.textMuted }]}>{t('wallet.earnedHint')}</Text>
-      </Card>
-
-      <View style={styles.actions}>
-        <Action
-          icon="＋"
-          label={t('wallet.addMoney')}
-          onPress={() => router.push('/(app)/wallet/add-money')}
-        />
-        <Action
-          icon="↑"
-          label={t('wallet.withdraw')}
-          onPress={() => router.push('/(app)/wallet/withdraw')}
-        />
-        <Action icon="↗" label={t('wallet.pay')} onPress={() => router.push('/(app)/hired')} />
+            <Text style={[styles.seeAll, { color: c.primary }]}>{t('wallet.seeAll')}</Text>
+          </Pressable>
+        ) : null}
       </View>
-
-      <Text style={[styles.section, { color: c.text }]}>{t('wallet.history')}</Text>
 
       {cancel.error ? <ErrorBanner message={errorMessage(cancel.error)} tone="onSurface" /> : null}
       {statement.error ? (
@@ -146,7 +198,7 @@ export default function WalletScreen() {
         </View>
       ) : (
         <View style={[styles.list, { backgroundColor: c.surface, borderColor: c.border }]}>
-          {entries.map((entry, i) => (
+          {recent.map((entry, i) => (
             <EntryRow
               key={entry.id}
               entry={entry}
@@ -159,126 +211,23 @@ export default function WalletScreen() {
         </View>
       )}
 
-      {statement.hasNextPage ? (
-        <Pressable
-          onPress={() => void statement.fetchNextPage()}
-          disabled={statement.isFetchingNextPage}
-          accessibilityRole="button"
-          style={styles.more}
-        >
-          {statement.isFetchingNextPage ? (
-            <ActivityIndicator color={c.primary} />
-          ) : (
-            <Text style={[styles.moreText, { color: c.primary }]}>{t('wallet.loadMore')}</Text>
-          )}
-        </Pressable>
-      ) : null}
     </MoneyScreen>
   );
 }
 
-/** How long to keep asking about a payment nobody has confirmed. */
-const POLL_FOR_MS = 3 * 60_000;
-
-/**
- * The result of a payment the person just came back from.
- *
- * Polled while it is still pending — the server asks the gateway each time,
- * which settles a payment whose callback was lost — and given up after three
- * minutes, so a payment someone walked away from does not poll for ever.
- */
-function TopUpResult({ id, onSettled }: { id: string; onSettled: () => void }) {
-  const t = useT();
-  const started = useRef(Date.now()).current;
-
-  const query = useQuery({
-    queryKey: ['top-up', id],
-    queryFn: () => fetchTopUp(id),
-    // A link to a top-up this account does not have will not start having
-    // one on a second try, so a 404 hides the banner at once.
-    retry: (failures, err) => failures < 1 && toApiError(err).statusCode !== 404,
-    refetchInterval: (q) =>
-      q.state.data?.status === 'PENDING' && Date.now() - started < POLL_FOR_MS ? 3000 : false,
-  });
-
-  const status = query.data?.status;
-  useEffect(() => {
-    if (status && status !== 'PENDING') onSettled();
-    // Only a change of status should refresh the wallet, not a new callback.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
-
-  if (!query.data) {
-    return query.error ? null : <Notice tone="info" body={t('wallet.topUp.checking')} />;
-  }
-
-  const amount = formatTaka(query.data.amount);
-  switch (query.data.status) {
-    case 'PAID':
-      return <Notice tone="success" title={`✓ ${t('wallet.topUp.PAID', { amount })}`} />;
-    case 'HELD':
-      return <Notice tone="warning" body={t('wallet.topUp.HELD')} />;
-    case 'FAILED':
-      return <Notice tone="danger" body={t('wallet.topUp.FAILED')} />;
-    case 'CANCELLED':
-      return <Notice tone="info" body={t('wallet.topUp.CANCELLED')} />;
-    case 'REJECTED':
-      return <Notice tone="danger" body={t('wallet.topUp.REJECTED')} />;
+/** The chip behind a row's icon, in the colour that kind of movement owns. */
+function chipTint(type: WalletEntry['type'], c: { successSoft: string; primarySoft: string; aiSoft: string; surfaceAlt: string }): string {
+  switch (type) {
+    case 'PAYMENT_RECEIVED':
+    case 'WITHDRAWAL_RETURNED':
+      return c.successSoft;
+    case 'TOP_UP':
+      return c.primarySoft;
+    case 'WITHDRAWAL':
+      return c.aiSoft;
     default:
-      return (
-        <Notice
-          tone="info"
-          body={
-            Date.now() - started < POLL_FOR_MS
-              ? t('wallet.topUp.checking')
-              : t('wallet.topUp.stillPending')
-          }
-        />
-      );
+      return c.surfaceAlt;
   }
-}
-
-function Figure({ label, value }: { label: string; value: string }) {
-  const { c } = useTheme();
-  return (
-    <View style={styles.figure}>
-      <Text style={[styles.figureLabel, { color: c.textMuted }]}>{label}</Text>
-      <Text style={[styles.figureValue, { color: c.text }]}>{value}</Text>
-    </View>
-  );
-}
-
-function Action({
-  icon,
-  label,
-  onPress,
-}: {
-  icon: string;
-  label: string;
-  onPress: () => void;
-}) {
-  const { c } = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      style={({ pressed }) => [
-        styles.action,
-        {
-          backgroundColor: pressed ? c.primarySoft : c.surface,
-          borderColor: c.primarySoftBorder,
-        },
-      ]}
-    >
-      <Text style={[styles.actionIcon, { color: c.primary }]}>{icon}</Text>
-      {/* Two lines, not one: "টাকা যোগ করুন" does not fit a third of a
-          phone's width, and a truncated label is a guess. */}
-      <Text style={[styles.actionLabel, { color: c.text }]} numberOfLines={2}>
-        {label}
-      </Text>
-    </Pressable>
-  );
 }
 
 const ENTRY_ICONS: Record<WalletEntry['type'], string> = {
@@ -290,7 +239,7 @@ const ENTRY_ICONS: Record<WalletEntry['type'], string> = {
 };
 
 function methodName(t: Translate, method: PayoutMethod): string {
-  return t(`wallet.method.${method}` as TranslationKey);
+  return t(wallet.method.${method} as TranslationKey);
 }
 
 /** "bKash" and "Nagad" in the reader's language; anything else as the gateway named it. */
@@ -356,7 +305,9 @@ function EntryRow({
 
   return (
     <View style={[styles.row, !first && { borderTopColor: c.border, borderTopWidth: 1 }]}>
-      <Text style={styles.rowIcon}>{ENTRY_ICONS[entry.type]}</Text>
+      <View style={[styles.rowChip, { backgroundColor: chipTint(entry.type, c) }]}>
+        <Text style={styles.rowChipIcon}>{ENTRY_ICONS[entry.type]}</Text>
+      </View>
       <View style={styles.rowBody}>
         <View style={styles.rowTop}>
           <Text style={[styles.rowTitle, { color: c.text }]} numberOfLines={2}>
@@ -384,7 +335,7 @@ function EntryRow({
         {entry.type === 'WITHDRAWAL' && w ? (
           <View style={styles.rowStatus}>
             <Text style={[styles.status, { color: statusTone }]}>
-              ● {t(`wallet.wstatus.${w.status}` as TranslationKey)}
+              ● {t(wallet.wstatus.${w.status} as TranslationKey)}
             </Text>
             {w.status === 'PAID' && w.reference ? (
               <Text style={[styles.rowMeta, { color: c.textMuted }]} selectable>
@@ -427,34 +378,39 @@ const styles = StyleSheet.create({
   },
   simulatorText: { fontSize: font.xs, fontWeight: '800' },
 
-  balanceLabel: { fontSize: font.sm, fontWeight: '700' },
-  balance: { fontSize: font.display, fontWeight: '800', letterSpacing: -0.8, marginTop: 2 },
-  balanceLoading: { alignSelf: 'flex-start', marginVertical: 14 },
-  divider: { height: 1, marginVertical: 12 },
-  figures: { flexDirection: 'row', gap: space.lg },
-  figure: { gap: 2 },
-  figureLabel: { fontSize: font.xs, fontWeight: '700' },
-  figureValue: { fontSize: font.md, fontWeight: '800' },
-  hint: { fontSize: font.xs, lineHeight: 17, marginTop: 10 },
+  earnedHint: { fontSize: font.xs, lineHeight: 17, marginTop: space.sm, marginBottom: space.md },
 
-  actions: { flexDirection: 'row', gap: 10, marginTop: space.md },
-  action: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
+  waiting: {
     borderWidth: 1,
     borderRadius: radius.lg,
-    paddingVertical: 14,
+    paddingHorizontal: space.md,
+    paddingVertical: 12,
+    marginTop: space.md,
   },
-  actionIcon: { fontSize: 20, fontWeight: '800' },
-  actionLabel: { fontSize: font.sm, fontWeight: '800', textAlign: 'center', paddingHorizontal: 4 },
+  waitingText: { fontSize: font.sm, fontWeight: '800' },
 
-  section: { fontSize: font.lg, fontWeight: '800', marginTop: space.lg, marginBottom: 10 },
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: space.lg,
+    marginBottom: 10,
+  },
+  section: { fontSize: font.lg, fontWeight: '800' },
+  seeAll: { fontSize: font.sm, fontWeight: '800' },
   loading: { marginTop: space.md },
 
   list: { borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 14 },
+  // Rows are taller now that the icon sits in a chip.
   row: { flexDirection: 'row', gap: 12, paddingVertical: 13 },
-  rowIcon: { fontSize: 18, width: 24, textAlign: 'center', marginTop: 1 },
+  rowChip: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowChipIcon: { fontSize: 18 },
   rowBody: { flex: 1, gap: 3 },
   rowTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   rowTitle: { flex: 1, fontSize: font.sm + 1, fontWeight: '700' },
@@ -473,3 +429,9 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: font.lg, fontWeight: '800' },
   emptyBody: { fontSize: font.sm, lineHeight: 20, textAlign: 'center', marginTop: 6 },
 });
+
+/** How many rows the wallet shows before sending you to Insights. */
+const RECENT_COUNT = 6;
+
+/** Before this app existed, so a first run announces only the last day. */
+const EPOCH = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
