@@ -54,16 +54,18 @@ export class OnboardingController {
       type: 'object',
       required: [
         'accountType',
-        'firstName',
-        'lastName',
+        'fullName',
         'address',
         'password',
         'confirmPassword',
       ],
       properties: {
         accountType: { type: 'string', enum: ['INDIVIDUAL', 'COMPANY'] },
-        firstName: { type: 'string', example: 'Rahim' },
-        lastName: { type: 'string', example: 'Uddin' },
+        fullName: {
+          type: 'string',
+          description: 'The whole name as the person writes it; never split',
+          example: 'Rahim Uddin',
+        },
         address: { type: 'string', example: 'House 12, Road 5, Dhanmondi, Dhaka' },
         password: {
           type: 'string',

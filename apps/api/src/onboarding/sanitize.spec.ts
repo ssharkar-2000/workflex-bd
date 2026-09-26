@@ -61,8 +61,7 @@ describe('passwordSchema', () => {
 describe('onboardingProfileSchema', () => {
   // One form for everyone — there is no account type to vary here any more.
   const profile = {
-    firstName: 'Rahim',
-    lastName: 'Uddin',
+    fullName: 'Rahim Uddin',
     address: 'House 12, Road 5, Dhanmondi, Dhaka',
     password: 'Workflex@2026',
     confirmPassword: 'Workflex@2026',
@@ -83,9 +82,22 @@ describe('onboardingProfileSchema', () => {
   it('rejects a name containing digits', () => {
     const result = onboardingProfileSchema.safeParse({
       ...profile,
-      firstName: 'Rahim2',
+      fullName: 'Rahim2',
     });
     expect(result.success).toBe(false);
+  });
+
+  it('takes a whole name in one field, of any shape', () => {
+    // A single name, a Bangla name and a long one with a prefix all pass —
+    // the field is never split, so there is no "last name" to go missing.
+    for (const fullName of ['Rahima', 'রহিম উদ্দিন', 'Md. Abdul Karim Chowdhury']) {
+      const result = onboardingProfileSchema.safeParse({ ...profile, fullName });
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.fullName).toBe(fullName);
+    }
+    expect(onboardingProfileSchema.safeParse({ ...profile, fullName: ' ' }).success).toBe(
+      false,
+    );
   });
 
   it('rejects an address that is too short', () => {

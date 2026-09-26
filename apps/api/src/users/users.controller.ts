@@ -113,10 +113,9 @@ export class UsersController {
     required: true,
     schema: {
       type: 'object',
-      required: ['firstName', 'lastName', 'address'],
+      required: ['fullName', 'address'],
       properties: {
-        firstName: { type: 'string', example: 'Susmita' },
-        lastName: { type: 'string', example: 'Sarkar' },
+        fullName: { type: 'string', example: 'Susmita Sarkar' },
         address: { type: 'string', example: 'House 12/A, Road 5, Dhaka' },
         designation: { type: 'string', example: 'Managing Director' },
         companyName: { type: 'string' },

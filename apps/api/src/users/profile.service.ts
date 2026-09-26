@@ -112,8 +112,11 @@ export class ProfileService {
     });
     const status = await this.kycStatus(userId);
 
-    const renaming =
-      dto.firstName !== user.firstName || dto.lastName !== user.lastName;
+    // The form shows the name as one line — both stored parts joined, for an
+    // account from before registration took a single full name — so an
+    // unchanged name compares equal and nothing is rewritten.
+    const currentName = [user.firstName, user.lastName].filter(Boolean).join(' ');
+    const renaming = dto.fullName !== currentName;
 
     if (renaming && this.nameLocked(status)) {
       throw new AppException(
@@ -130,8 +133,9 @@ export class ProfileService {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
-        firstName: dto.firstName,
-        lastName: dto.lastName,
+        // Written only when it changed, in the same whole-name shape as
+        // registration: an untouched two-part name keeps its two parts.
+        ...(renaming ? { firstName: dto.fullName, lastName: null } : {}),
         address: dto.address,
         // An individual has no designation to hold, so a value sent by a
         // stale client is dropped rather than stored where nothing reads it.

@@ -21,5 +21,7 @@ import { AdminContentService } from './admin-content.service';
     AdminInsightsService,
     AdminContentService,
   ],
+  // The console signs in through the same service (see ConsoleAuthController).
+  exports: [AdminAuthService],
 })
 export class AdminModule {}

@@ -182,10 +182,7 @@ export const en = {
   'home.fullyVerified': 'Fully verified. All features unlocked.',
   'home.roles.title': 'What brings you here?',
   'home.role.find': 'Find work',
-  'home.role.findBody': 'Permanent, part-time, shift and temporary jobs near you',
   'home.role.hire': 'Hire people',
-  'home.role.hireBody': 'Post a job as an individual or as a company',
-  'home.roles.note': 'You can do both from one account — switch any time.',
   'home.signOut': 'Sign out',
   'home.loadFailed': 'Could not load your profile',
 
@@ -236,9 +233,6 @@ export const en = {
   'speech.hint.stepsWeb':
     'Your browser has no voice for this language. On a phone the app uses the system voices instead.',
   'speech.hint.dismiss': 'Got it',
-
-  'home.role.browse': 'Browse jobs',
-  'home.role.post': 'Post a job',
 
   'post.title': 'Post a job',
   'post.subtitle': 'Tell people what you need done, and where.',
@@ -535,7 +529,8 @@ export const en = {
   'dash.afternoon': 'Good afternoon, {name}!',
   'dash.evening': 'Good evening, {name}!',
   'dash.greetingBody': 'Ready to find your next opportunity?',
-  'dash.searchHint': 'Search jobs, skills, companies...',
+  'dash.search': 'Search',
+  'dash.searchJobs': 'Search jobs',
   'app.name': 'WorkFlex BD',
   'dash.strength': 'Your profile strength',
   'dash.strengthComplete': 'Your profile is complete',
@@ -727,31 +722,6 @@ export const en = {
   'error.TOO_MANY_OPEN_TICKETS':
     'You already have several requests waiting for a reply. Please wait for us to answer those first.',
 
-  'admin.title': 'Admin dashboard',
-  'admin.queue.title': 'Pending review',
-  'admin.queue.count': '{count} waiting',
-  'admin.queue.empty': 'Nothing waiting for review.',
-  'admin.waitingHours': '{hours}h waiting',
-  'admin.documents': 'Documents',
-  'admin.approve': 'Approve',
-  'admin.approving': 'Approving…',
-  'admin.reject': 'Reject',
-  'admin.reject.placeholder': 'Reason the applicant can act on',
-  'admin.reject.confirm': 'Send rejection',
-  'admin.reject.sending': 'Sending…',
-  'admin.outbox.title': 'Dev SMS outbox',
-  'admin.outbox.subtitle':
-    'These codes were never sent. Development aid only.',
-  'admin.outbox.empty': 'No messages yet.',
-
-  'adminLogin.title': 'Admin sign-in',
-  'adminLogin.subtitle': 'For reviewers only — not a regular account.',
-  'adminLogin.email': 'Email',
-  'adminLogin.emailPlaceholder': 'you@admin.workflex.internal',
-  'adminLogin.password': 'Password',
-  'adminLogin.submit': 'Sign in',
-  'adminLogin.invalidEmail': 'Enter a valid email address',
-
   'email.title': 'Email address',
   'email.optional': 'Optional',
   'email.description':
@@ -815,8 +785,7 @@ export const en = {
   'ob.success.reviewNote':
     'Your documents are with our team. You can browse now — applying and posting unlock once you are approved.',
   'ob.success.cta': 'Go to Dashboard',
-  'ob.firstNamePlaceholder': 'Enter first name',
-  'ob.lastNamePlaceholder': 'Enter last name',
+  'ob.fullNamePlaceholder': 'Enter your full name',
   'ob.passwordPlaceholder': 'Enter password',
   'ob.confirmPasswordPlaceholder': 'Re-enter password',
 
@@ -837,8 +806,7 @@ export const en = {
   'ob.termsAnd': '&',
   'ob.privacyLink': 'Privacy Policy',
   'ob.termsSuffix': 'of WorkFlex BD.',
-  'ob.firstName': 'First name',
-  'ob.lastName': 'Last name',
+  'ob.fullName': 'Full name',
   'ob.companyName': 'Company name',
   'ob.companyRegistrationNumber': 'Company registration number',
   'ob.designation': 'Your designation',
@@ -1206,10 +1174,7 @@ export const bn: Record<TranslationKey, string> = {
   'home.fullyVerified': 'সম্পূর্ণ যাচাইকৃত। সব সুবিধা চালু।',
   'home.roles.title': 'আপনি কী খুঁজছেন?',
   'home.role.find': 'কাজ খুঁজুন',
-  'home.role.findBody': 'আপনার কাছাকাছি স্থায়ী, খণ্ডকালীন ও অস্থায়ী কাজ',
   'home.role.hire': 'কর্মী নিয়োগ',
-  'home.role.hireBody': 'ব্যক্তি বা কোম্পানি হিসেবে কাজ পোস্ট করুন',
-  'home.roles.note': 'একটি অ্যাকাউন্ট দিয়েই দুটোই করা যায় — যেকোনো সময় বদলান।',
   'home.signOut': 'সাইন আউট',
   'home.loadFailed': 'প্রোফাইল লোড করা যায়নি',
 
@@ -1259,9 +1224,6 @@ export const bn: Record<TranslationKey, string> = {
   'speech.hint.stepsWeb':
     'আপনার ব্রাউজারে এই ভাষার কোনো ভয়েস নেই। ফোনে অ্যাপটি সিস্টেমের ভয়েস ব্যবহার করে।',
   'speech.hint.dismiss': 'বুঝেছি',
-
-  'home.role.browse': 'কাজ দেখুন',
-  'home.role.post': 'কাজের বিজ্ঞপ্তি দিন',
 
   'post.title': 'কাজের বিজ্ঞপ্তি দিন',
   'post.subtitle': 'আপনার কী কাজ দরকার এবং কোথায়, তা জানান।',
@@ -1557,7 +1519,8 @@ export const bn: Record<TranslationKey, string> = {
   'dash.afternoon': 'শুভ অপরাহ্ন, {name}!',
   'dash.evening': 'শুভ সন্ধ্যা, {name}!',
   'dash.greetingBody': 'পরবর্তী সুযোগ খুঁজতে প্রস্তুত?',
-  'dash.searchHint': 'কাজ, দক্ষতা, প্রতিষ্ঠান খুঁজুন...',
+  'dash.search': 'খুঁজুন',
+  'dash.searchJobs': 'কাজ সার্চ করুন',
   'app.name': 'ওয়ার্কফ্লেক্স বিডি',
   'dash.strength': 'আপনার প্রোফাইলের সম্পূর্ণতা',
   'dash.strengthComplete': 'আপনার প্রোফাইল সম্পূর্ণ',
@@ -1749,30 +1712,6 @@ export const bn: Record<TranslationKey, string> = {
   'error.TOO_MANY_OPEN_TICKETS':
     'আপনার কয়েকটি অনুরোধ ইতিমধ্যে উত্তরের অপেক্ষায় আছে। আগে সেগুলোর উত্তর পাওয়া পর্যন্ত অপেক্ষা করুন।',
 
-  'admin.title': 'অ্যাডমিন ড্যাশবোর্ড',
-  'admin.queue.title': 'পর্যালোচনার অপেক্ষায়',
-  'admin.queue.count': '{count}টি অপেক্ষমাণ',
-  'admin.queue.empty': 'পর্যালোচনার জন্য কিছু নেই।',
-  'admin.waitingHours': '{hours} ঘণ্টা ধরে অপেক্ষমাণ',
-  'admin.documents': 'নথিপত্র',
-  'admin.approve': 'অনুমোদন',
-  'admin.approving': 'অনুমোদন হচ্ছে…',
-  'admin.reject': 'প্রত্যাখ্যান',
-  'admin.reject.placeholder': 'আবেদনকারী যা ঠিক করতে পারবে এমন কারণ লিখুন',
-  'admin.reject.confirm': 'প্রত্যাখ্যান পাঠান',
-  'admin.reject.sending': 'পাঠানো হচ্ছে…',
-  'admin.outbox.title': 'ডেভ এসএমএস আউটবক্স',
-  'admin.outbox.subtitle': 'এই কোডগুলো আসলে পাঠানো হয়নি। শুধু ডেভেলপমেন্ট সহায়ক।',
-  'admin.outbox.empty': 'এখনো কোনো বার্তা নেই।',
-
-  'adminLogin.title': 'অ্যাডমিন সাইন-ইন',
-  'adminLogin.subtitle': 'শুধু রিভিউয়ারদের জন্য — সাধারণ অ্যাকাউন্ট নয়।',
-  'adminLogin.email': 'ইমেইল',
-  'adminLogin.emailPlaceholder': 'you@admin.workflex.internal',
-  'adminLogin.password': 'পাসওয়ার্ড',
-  'adminLogin.submit': 'সাইন ইন',
-  'adminLogin.invalidEmail': 'সঠিক ইমেইল ঠিকানা দিন',
-
   'email.title': 'ইমেইল ঠিকানা',
   'email.optional': 'ঐচ্ছিক',
   'email.description':
@@ -1834,8 +1773,7 @@ export const bn: Record<TranslationKey, string> = {
   'ob.success.reviewNote':
     'আপনার নথি আমাদের টিমের কাছে আছে। এখনই ঘুরে দেখতে পারেন — অনুমোদনের পর আবেদন ও পোস্ট করা চালু হবে।',
   'ob.success.cta': 'ড্যাশবোর্ডে যান',
-  'ob.firstNamePlaceholder': 'নামের প্রথম অংশ লিখুন',
-  'ob.lastNamePlaceholder': 'নামের শেষ অংশ লিখুন',
+  'ob.fullNamePlaceholder': 'আপনার পূর্ণ নাম লিখুন',
   'ob.passwordPlaceholder': 'পাসওয়ার্ড লিখুন',
   'ob.confirmPasswordPlaceholder': 'আবার পাসওয়ার্ড লিখুন',
 
@@ -1856,8 +1794,7 @@ export const bn: Record<TranslationKey, string> = {
   'ob.termsAnd': 'ও',
   'ob.privacyLink': 'গোপনীয়তা নীতি',
   'ob.termsSuffix': '— ওয়ার্কফ্লেক্স বিডি।',
-  'ob.firstName': 'নামের প্রথম অংশ',
-  'ob.lastName': 'নামের শেষ অংশ',
+  'ob.fullName': 'পূর্ণ নাম',
   'ob.companyName': 'কোম্পানির নাম',
   'ob.companyRegistrationNumber': 'কোম্পানি নিবন্ধন নম্বর',
   'ob.designation': 'আপনার পদবি',

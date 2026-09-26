@@ -1,17 +1,12 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StyleSheet, Text } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import {
   bdPhoneSchema,
   onboardingProfileSchema,
   sanitizeAddress,
-  sanitizeDesignation,
-  sanitizeDigits,
-  sanitizeOrganisationName,
   sanitizePersonName,
-  sanitizeReferenceNumber,
-  type AccountType,
   type ExperienceType,
   type OnboardingProfileInput,
 } from '@workflex/shared';
@@ -33,8 +28,9 @@ export default function DetailsScreen() {
   const t = useT();
   const router = useRouter();
 
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  // One field for the whole name, by request, rather than first and last:
+  // it is stored as written and never split (see the shared schema).
+  const [fullName, setFullName] = useState('');
   const [address, setAddress] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -94,8 +90,7 @@ export default function DetailsScreen() {
     }
 
     const input = {
-      firstName,
-      lastName,
+      fullName,
       address,
       password,
       confirmPassword,
@@ -142,32 +137,17 @@ export default function DetailsScreen() {
         />
       }
     >
-      <View style={styles.nameRow}>
-        <View style={styles.nameCol}>
-          <GlassField
-            label={t('ob.firstName')}
-            value={firstName}
-            onChangeText={setFirstName}
-            sanitize={sanitizePersonName}
-            error={fieldErrors.firstName}
-            placeholder={t('ob.firstNamePlaceholder')}
-            icon="👤"
-            required
-            autoComplete="name"
-          />
-        </View>
-        <View style={styles.nameCol}>
-          <GlassField
-            label={t('ob.lastName')}
-            value={lastName}
-            onChangeText={setLastName}
-            sanitize={sanitizePersonName}
-            error={fieldErrors.lastName}
-            placeholder={t('ob.lastNamePlaceholder')}
-            required
-          />
-        </View>
-      </View>
+      <GlassField
+        label={t('ob.fullName')}
+        value={fullName}
+        onChangeText={setFullName}
+        sanitize={sanitizePersonName}
+        error={fieldErrors.fullName}
+        placeholder={t('ob.fullNamePlaceholder')}
+        icon="👤"
+        required
+        autoComplete="name"
+      />
 
       <PhoneField
         value={phone}
@@ -282,8 +262,6 @@ const EXPERIENCE_CHOICES = [
 ];
 
 const styles = StyleSheet.create({
-  nameRow: { flexDirection: 'row', gap: 10 },
-  nameCol: { flex: 1 },
   terms: {
     fontSize: 11.5,
     lineHeight: 17,
