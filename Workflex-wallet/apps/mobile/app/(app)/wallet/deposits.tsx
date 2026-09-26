@@ -8,7 +8,6 @@ import { useErrorMessage } from '../../../src/lib/error-message';
 import { useT, type TranslationKey } from '../../../src/i18n';
 import { useTheme } from '../../../src/lib/use-theme';
 import { font, radius, space } from '../../../src/lib/theme';
-
 /**
  * Deposits this account has declared, and where each one has got to.
  *
