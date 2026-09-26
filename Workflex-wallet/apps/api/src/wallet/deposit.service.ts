@@ -95,7 +95,7 @@ export class DepositService {
     }
 
     this.logger.log(
-      `Deposit ${created.id} declared: ${dto.amount} BDT via ${dto.method} by ${userId}`,
+      Deposit ${created.id} declared: ${dto.amount} BDT via ${dto.method} by ${userId},
     );
 
     if (this.autoApproves()) {
