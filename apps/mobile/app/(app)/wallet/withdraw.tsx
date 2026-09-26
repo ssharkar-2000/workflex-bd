@@ -37,7 +37,7 @@ const METHODS: PayoutMethod[] = ['BKASH', 'NAGAD', 'BANK'];
 
 /** +8801712345678 as people write it: 01712345678. */
 function localNumber(e164: string): string {
-  return e164.startsWith('+880') ? 0${e164.slice(4)} : e164;
+  return e164.startsWith('+880') ? `0${e164.slice(4)}` : e164;
 }
 
 /**
@@ -82,7 +82,7 @@ export default function WithdrawScreen() {
 
   const withdrawable = wallet.data?.withdrawable ?? 0;
   const value = Number.parseInt(amount || '0', 10);
-  const methodName = (m: PayoutMethod) => t(wallet.method.${m} as TranslationKey);
+  const methodName = (m: PayoutMethod) => t(`wallet.method.${m}` as TranslationKey);
 
   const submit = useMutation({
     mutationFn: requestWithdrawal,
@@ -157,8 +157,8 @@ export default function WithdrawScreen() {
   if (done) {
     const account =
       done.method === 'BANK'
-        ? ${done.bankName ?? ''} •••• ${done.accountNumber.slice(-4)}
-        : ${methodName(done.method)} ${maskPhone(done.accountNumber)};
+        ? `${done.bankName ?? ''} •••• ${done.accountNumber.slice(-4)}`
+        : `${methodName(done.method)} ${maskPhone(done.accountNumber)}`;
     return (
       <MoneyScreen
         title={t('withdraw.title')}
@@ -188,7 +188,7 @@ export default function WithdrawScreen() {
             <ShimmerButton
               label={
                 value > 0
-                  ? ${t('withdraw.submit')} · ${formatTaka(value)}
+                  ? `${t('withdraw.submit')} · ${formatTaka(value)}`
                   : t('withdraw.submit')
               }
               onPress={onSubmit}
@@ -318,4 +318,3 @@ const styles = StyleSheet.create({
   methods: { marginBottom: space.md },
   gateCta: { marginTop: 12 },
 });
-wallet.data

@@ -346,4 +346,3 @@ const styles = StyleSheet.create({
   },
   outlineText: { fontSize: font.md, fontWeight: '800' },
 });
-Compose
