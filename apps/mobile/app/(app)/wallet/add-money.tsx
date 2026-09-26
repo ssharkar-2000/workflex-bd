@@ -29,7 +29,7 @@ const QUICK_AMOUNTS = [500, 1000, 2000, 5000];
  * on a phone (workflex://wallet, or exp://…/--/wallet under Expo Go).
  */
 function returnUrl(): string {
-  if (Platform.OS === 'web') return `${window.location.origin}/wallet`;
+  if (Platform.OS === 'web') return ${window.location.origin}/wallet;
   return Linking.createURL('/wallet');
 }
 
@@ -93,7 +93,7 @@ export default function AddMoneyScreen() {
           {error ? <ErrorBanner message={error} tone="onSurface" /> : null}
           <ShimmerButton
             label={
-              inRange ? `${t('addMoney.continue')} · ${formatTaka(value)}` : t('addMoney.continue')
+              inRange ? ${t('addMoney.continue')} · ${formatTaka(value)} : t('addMoney.continue')
             }
             onPress={() => start.mutate()}
             loading={start.isPending}
@@ -122,7 +122,7 @@ export default function AddMoneyScreen() {
           invalid={amount !== '' && !inRange}
         />
         <View style={walletStyles.chips}>
-          {QUICK_AMOUNTS.map((n) => (
+          {QUICK_AMOUNTS.map(👎 => (
             <Chip
               key={n}
               label={formatTaka(n)}
@@ -151,3 +151,4 @@ const styles = StyleSheet.create({
   range: { fontSize: font.xs, fontWeight: '700', marginTop: 10 },
   returnHint: { fontSize: font.xs, textAlign: 'center', lineHeight: 17 },
 });
+wallet.data
