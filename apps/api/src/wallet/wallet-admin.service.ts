@@ -1,4 +1,5 @@
-import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type {
   TopUpStatus,
   WithdrawalStatus,
@@ -10,8 +11,8 @@ import {
   type AdminWithdrawalList,
 } from '@workflex/shared';
 import { PrismaService } from '../common/prisma/prisma.service';
+import type { Env } from '../config/env.schema';
 import { AppException } from '../common/exceptions/app.exception';
-import { PAYMENT_GATEWAY, type PaymentGateway } from './gateway/payment-gateway';
 import { WalletService } from './wallet.service';
 
 const DAY_MS = 86_400_000;
@@ -37,8 +38,17 @@ export class WalletAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly wallet: WalletService,
-    @Inject(PAYMENT_GATEWAY) private readonly gateway: PaymentGateway | null,
+    private readonly config: ConfigService<Env, true>,
   ) {}
+
+  /** Whether people have anywhere to send money to. */
+  private hasDepositAccount(): boolean {
+    return (
+      Boolean(this.config.get('WALLET_DEPOSIT_BKASH', { infer: true })) ||
+      Boolean(this.config.get('WALLET_DEPOSIT_NAGAD', { infer: true })) ||
+      Boolean(this.config.get('WALLET_DEPOSIT_BANK', { infer: true }))
+    );
+  }
 
   async summary(): Promise<AdminWalletSummary> {
     const since = new Date(Date.now() - 30 * DAY_MS);
@@ -68,7 +78,7 @@ export class WalletAdminService {
     ]);
 
     return {
-      gateway: this.gateway?.name ?? null,
+      canDeposit: this.hasDepositAccount(),
       heldInWallets: wallets._sum.balance ?? 0,
       withdrawableInWallets: wallets._sum.withdrawable ?? 0,
       pendingWithdrawals: {
@@ -133,60 +143,3 @@ export class WalletAdminService {
         userId: t.userId,
         userName: nameOf(t.user),
         userPhone: t.user.phone,
-        amount: t.amount,
-        status: t.status,
-        method: t.method,
-        tranId: t.tranId,
-        valId: t.valId,
-        bankTranId: t.bankTranId,
-        riskLevel: t.riskLevel,
-        riskTitle: t.riskTitle,
-        reviewNote: t.reviewNote,
-        createdAt: t.createdAt.toISOString(),
-        completedAt: t.completedAt?.toISOString() ?? null,
-      })),
-    };
-  }
-
-  /** Crediting a held payment after checking it in the gateway's panel. */
-  async approveTopUp(id: string, adminId: string): Promise<void> {
-    const credited = await this.wallet.creditTopUp(id, ['HELD'], {
-      reviewedBy: adminId,
-      reviewedAt: new Date(),
-    });
-    if (!credited) await this.explainNotHeld(id);
-    this.logger.log(`Held top-up ${id} approved by ${adminId}`);
-  }
-
-  /**
-   * Turning a held payment down. Nothing was credited, so the ledger is
-   * untouched; the money is refunded from the gateway's merchant panel.
-   */
-  async rejectTopUp(id: string, adminId: string, reason: string): Promise<void> {
-    const rejected = await this.prisma.topUp.updateMany({
-      where: { id, status: 'HELD' },
-      data: {
-        status: 'REJECTED',
-        reviewedBy: adminId,
-        reviewedAt: new Date(),
-        reviewNote: reason,
-      },
-    });
-    if (rejected.count === 0) await this.explainNotHeld(id);
-    this.logger.log(`Held top-up ${id} rejected by ${adminId}`);
-  }
-
-  private async explainNotHeld(id: string): Promise<never> {
-    const current = await this.prisma.topUp.findUnique({
-      where: { id },
-      select: { status: true },
-    });
-    if (!current) throw AppException.notFound('No such top-up');
-    throw new AppException(
-      ApiErrorCode.ALREADY_PROCESSED,
-      `This top-up is ${current.status.toLowerCase()}, not held`,
-      HttpStatus.CONFLICT,
-      { status: current.status },
-    );
-  }
-}
