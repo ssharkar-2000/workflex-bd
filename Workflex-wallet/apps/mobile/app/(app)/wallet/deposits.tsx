@@ -76,7 +76,7 @@ function Row({ deposit, first }: { deposit: Deposit; first: boolean }) {
         <Text style={[styles.amount, { color: c.text }]}>{formatTaka(deposit.amount)}</Text>
         <Text style={[styles.meta, { color: c.textMuted }]} numberOfLines={1}>
           {[
-            deposit.method ? t(`wallet.method.${deposit.method}` as TranslationKey) : null,
+            deposit.method ? t(wallet.method.${deposit.method} as TranslationKey) : null,
             deposit.reference,
             when,
           ]
@@ -89,7 +89,7 @@ function Row({ deposit, first }: { deposit: Deposit; first: boolean }) {
       </View>
 
       <Text style={[styles.status, { color: tone[deposit.status] }]}>
-        ● {t(`deposits.status.${deposit.status}` as TranslationKey)}
+        ● {t(deposits.status.${deposit.status} as TranslationKey)}
       </Text>
     </View>
   );
@@ -105,3 +105,4 @@ const styles = StyleSheet.create({
   note: { fontSize: font.xs, lineHeight: 17 },
   status: { fontSize: font.xs, fontWeight: '800' },
 });
+deposits.data
