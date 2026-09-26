@@ -1,137 +1,180 @@
-import { HttpStatus, Injectable, Logger } from '@nestjs/common';
-import { Jimp } from 'jimp';
-import {
-  ApiErrorCode,
-  type KycStatus,
-  type MyProfile,
-  type ProfileUpdateDto,
-} from '@workflex/shared';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { AppException } from '../common/exceptions/app.exception';
-import { StorageService } from '../storage/storage.service';
+import {
+  displayName,
+  initialsOf,
+  isoDate,
+  referenceCode,
+  toPaisa,
+  workerStatus,
+  type ConsoleWorkerStatus,
+} from './console.mappers';
 
-/** Avatar edge length. Comfortably covers a 50pt circle at 3x density. */
-const AVATAR_PX = 160;
+/** What the console's list screens page by. */
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 100;
 
 /**
- * Reading and editing the details captured at registration.
+ * The people the console calls "workers": every account on the platform.
  *
- * The one real constraint here is the legal name. Once an application is in
- * front of a reviewer, or has been approved, the name on file is the name
- * that was checked against the NID — letting it be edited afterwards would
- * leave an account whose verified level no longer matches its own claims,
- * silently. Everything else (address, designation, company details) is
- * correctable at any time, which is what people actually need.
+ * There is no separate worker table here — one account both looks for work
+ * and hires — so the console's Workers screen lists accounts, and its
+ * Employers screen (see the employers endpoints) lists the ones that have
+ * posted a job or registered a company.
  */
 @Injectable()
-export class ProfileService {
-  private readonly logger = new Logger(ProfileService.name);
+export class ConsoleWorkersService {
+  constructor(private readonly prisma: PrismaService) {}
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly storage: StorageService,
-  ) {}
+  async list(params: {
+    status?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = Math.max(1, params.page ?? 1);
+    const limit = Math.min(MAX_LIMIT, Math.max(1, params.limit ?? DEFAULT_LIMIT));
 
-  /**
-   * The verification selfie, resized for the dashboard avatar.
-   *
-   * The stored original is ~1 MB, which is absurd to push through a 50pt
-   * circle — and the client has to hold it in memory as a base64 string to
-   * get an auth header onto the request at all. Resizing here keeps that
-   * under ~10 KB.
-   */
-  async avatar(userId: string): Promise<{ data: Buffer; mimeType: string }> {
-    const doc = await this.prisma.document.findUnique({
-      where: { userId_kind: { userId, kind: 'SELFIE' } },
-    });
-    if (!doc) throw AppException.notFound('No photo on this account');
-
-    const original = await this.storage.read(doc.storageKey);
-
-    try {
-      const image = await Jimp.read(original);
-      // cover() rather than scaleToFit(): the avatar is a circle, so filling
-      // it and cropping the edges beats letterboxing a portrait photo.
-      image.cover({ w: AVATAR_PX, h: AVATAR_PX });
-      return {
-        data: await image.getBuffer('image/jpeg', { quality: 82 }),
-        mimeType: 'image/jpeg',
-      };
-    } catch (err) {
-      // A photo that will not decode should still not break the dashboard;
-      // the original is served instead and the client scales it.
-      this.logger.warn({ err, userId }, 'Could not resize avatar');
-      return { data: original, mimeType: doc.mimeType };
+    const where: Prisma.UserWhereInput = { isAdmin: false };
+    if (params.search) {
+      where.OR = [
+        { firstName: { contains: params.search, mode: 'insensitive' } },
+        { lastName: { contains: params.search, mode: 'insensitive' } },
+        { phone: { contains: params.search } },
+        { email: { contains: params.search, mode: 'insensitive' } },
+      ];
     }
-  }
+    Object.assign(where, statusFilter(params.status));
 
-  private async kycStatus(userId: string): Promise<KycStatus> {
-    const submission = await this.prisma.kycSubmission.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
-    return (submission?.status ?? 'NOT_STARTED') as KycStatus;
-  }
-
-  private nameLocked(status: KycStatus): boolean {
-    return status === 'PENDING_REVIEW' || status === 'APPROVED';
-  }
-
-  async get(userId: string): Promise<MyProfile> {
-    const user = await this.prisma.user.findUniqueOrThrow({
-      where: { id: userId },
-      include: { company: true },
-    });
-    const status = await this.kycStatus(userId);
+    const [total, rows] = await Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: WORKER_INCLUDE,
+      }),
+    ]);
 
     return {
-      publicId: user.publicId,
-      accountType: user.accountType,
-      phone: user.phone,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      address: user.address,
-      designation: user.designation,
-      email: user.email,
-      emailVerified: user.emailVerifiedAt !== null,
-      company: user.company
-        ? {
-            name: user.company.name,
-            registrationNumber: user.company.registrationNumber,
-            tin: user.company.tin,
-            tradeLicenseNo: user.company.tradeLicenseNo,
-          }
-        : null,
-      nameEditable: !this.nameLocked(status),
-      kycStatus: status,
+      items: rows.map((row) => this.toWorker(row)),
+      meta: { total, page, limit, pages: Math.max(1, Math.ceil(total / limit)) },
     };
   }
 
-  async update(userId: string, dto: ProfileUpdateDto): Promise<MyProfile> {
-    const user = await this.prisma.user.findUniqueOrThrow({
-      where: { id: userId },
+  /**
+   * The counts behind the filter tabs. Each is a separate query rather than
+   * a group-by: the console's four tabs do not map to one column — suspended
+   * comes from the account, the rest from the identity check.
+   */
+  async statusCounts() {
+    const base: Prisma.UserWhereInput = { isAdmin: false };
+    const [total, active, pending, suspended] = await Promise.all([
+      this.prisma.user.count({ where: base }),
+      this.prisma.user.count({ where: { ...base, ...statusFilter('ACTIVE') } }),
+      this.prisma.user.count({ where: { ...base, ...statusFilter('PENDING') } }),
+      this.prisma.user.count({ where: { ...base, ...statusFilter('SUSPENDED') } }),
+    ]);
+    return { total, active, pending, suspended };
+  }
+
+  async one(id: string) {
+    const row = await this.prisma.user.findUnique({
+      where: { id },
+      include: WORKER_INCLUDE,
     });
-    const status = await this.kycStatus(userId);
+    if (!row) throw new NotFoundException('No such account');
 
-    // The form shows the name as one line — both stored parts joined, for an
-    // account from before registration took a single full name — so an
-    // unchanged name compares equal and nothing is rewritten.
-    const currentName = [user.firstName, user.lastName].filter(Boolean).join(' ');
-    const renaming = dto.fullName !== currentName;
+    // The console calls it hired; this system marks the application
+    // ACCEPTED, which is the same moment.
+    const [hired, applications] = await Promise.all([
+      this.prisma.jobApplication.count({
+        where: { userId: id, status: 'ACCEPTED' },
+      }),
+      this.prisma.jobApplication.count({ where: { userId: id } }),
+    ]);
 
-    if (renaming && this.nameLocked(status)) {
-      throw new AppException(
-        ApiErrorCode.FORBIDDEN,
-        status === 'APPROVED'
-          ? 'Your name was verified against your NID and cannot be changed here. Contact support if it is wrong.'
-          : 'Your name cannot be changed while your documents are being reviewed.',
-        HttpStatus.FORBIDDEN,
-      );
-    }
+    return {
+      ...this.toWorker(row),
+      totalJobs: hired,
+      completionRate: applications ? Math.round((hired / applications) * 100) : 0,
+      skills: (row.cvProfile?.skills ?? []).map((name) => ({ name })),
+      certifications: [],
+      jobHistory: [],
+    };
+  }
 
-    const isCompany = user.accountType === 'COMPANY';
+  private toWorker(row: WorkerRow) {
+    const kyc = row.kycSubmissions[0]?.status ?? null;
+    const name = displayName(row.firstName, row.lastName, row.phone);
+    const cv = row.cvProfile;
 
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        // Written only when it changed, in the same whole-name
+    return {
+      id: row.id,
+      code: referenceCode('W', row.id),
+      fullName: name,
+      initials: initialsOf(name),
+      profession: cv?.titles[0] ?? '',
+      status: workerStatus(row.status, kyc) satisfies ConsoleWorkerStatus,
+      // Not asked anywhere in this product, so not invented here.
+      availability: null,
+      phone: row.phone,
+      email: row.email,
+      address: row.address ?? '',
+      bio: cv?.summary ?? null,
+      education: null,
+      lastCompany: null,
+      experienceMonths: (cv?.yearsExperience ?? 0) * 12,
+      rating: null,
+      reviewCount: null,
+      trustScore: row.verificationLevel * 33,
+      totalJobs: 0,
+      completionRate: 0,
+      totalEarnings: toPaisa(row.wallet?.withdrawable),
+      salaryMin: null,
+      salaryMax: null,
+      balance: toPaisa(row.wallet?.balance),
+      joinedAt: isoDate(row.createdAt) ?? new Date().toISOString(),
+    };
+  }
+}
+
+/** Newest identity check first — that is the one the console reports on. */
+const WORKER_INCLUDE = {
+  wallet: { select: { balance: true, withdrawable: true } },
+  cvProfile: { select: { titles: true, skills: true, summary: true, yearsExperience: true } },
+  kycSubmissions: {
+    orderBy: { createdAt: 'desc' },
+    take: 1,
+    select: { status: true },
+  },
+} satisfies Prisma.UserInclude;
+
+type WorkerRow = Prisma.UserGetPayload<{ include: typeof WORKER_INCLUDE }>;
+
+/** The console's tabs, in this system's terms. */
+function statusFilter(status?: string): Prisma.UserWhereInput {
+  switch (status) {
+    case 'ACTIVE':
+      return {
+        status: 'ACTIVE',
+        kycSubmissions: { some: { status: 'APPROVED' } },
+      };
+    case 'PENDING':
+      return {
+        status: 'ACTIVE',
+        kycSubmissions: { none: { status: 'APPROVED' } },
+      };
+    case 'REJECTED':
+      return {
+        status: 'ACTIVE',
+        kycSubmissions: { some: { status: 'REJECTED' } },
+      };
+    case 'SUSPENDED':
+      return { status: { in: ['SUSPENDED', 'DELETED'] } };
+    default:
+      return {};
+  }
+}

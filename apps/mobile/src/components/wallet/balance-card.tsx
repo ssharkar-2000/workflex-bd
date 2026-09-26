@@ -60,9 +60,7 @@ export function BalanceCard({
         <Text style={s.name} numberOfLines={1}>
           {name ?? t('wallet.noName')}
         </Text>
-        <Text style={s.publicId} numberOfLines={1}>
-          {publicId ?? '—'}
-        </Text>
+        {publicId ? <Text style={s.publicId} numberOfLines={1}>{publicId}</Text> : null}
 
         <View style={s.amountRow}>
           {wallet ? (
@@ -93,15 +91,15 @@ export function BalanceCard({
             tone="#2F7D57"
             wash="rgba(255,255,255,0.22)"
             icon="↓"
-            label={t('wallet.income')}
-            value={wallet ? formatTaka(wallet.income) : '—'}
+            label={t('wallet.withdrawable')}
+            value={wallet ? formatTaka(wallet.withdrawable) : '—'}
           />
           <Tile
             tone="#8A4A12"
             wash="rgba(255,255,255,0.22)"
             icon="＋"
-            label={t('wallet.toppedUp')}
-            value={wallet ? formatTaka(wallet.toppedUp) : '—'}
+            label={t('wallet.beingWithdrawn')}
+            value={wallet ? formatTaka(wallet.pendingWithdrawals) : '—'}
           />
         </View>
 
@@ -158,4 +156,26 @@ const s = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#2B3A2B',
   },
-  noteLeft: { left: 0, width: '46%', transform:
+  noteLeft: { left: 0, width: '46%', transform: [{ rotate: '-8deg' }] },
+  noteRight: { right: 0, width: '46%', transform: [{ rotate: '8deg' }] },
+  noteMiddle: { left: '22%', width: '56%', top: -8 },
+  body: { borderRadius: radius.lg, padding: space.lg, overflow: 'visible' },
+  fold: { position: 'absolute', left: 0, right: 0, top: 60, height: 90 },
+  name: { color: '#FFFFFF', fontSize: font.md, fontWeight: '700' },
+  publicId: { color: '#FFFFFF', fontSize: font.xs, marginTop: space.xs },
+  amountRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginVertical: space.lg },
+  balance: { flex: 1, color: '#FFFFFF', fontSize: 34, fontWeight: '800' },
+  loading: { flex: 1, paddingVertical: space.sm },
+  loadMoney: { backgroundColor: '#FFFFFF', borderRadius: radius.pill, padding: space.sm },
+  loadMoneyPressed: { opacity: 0.75 },
+  loadMoneyText: { color: '#93400F', fontSize: font.xs, fontWeight: '700' },
+  tiles: { flexDirection: 'row', gap: space.sm },
+  tile: { flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: radius.sm, padding: space.sm, gap: space.xs },
+  tileIcon: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  tileIconText: { fontSize: font.md, fontWeight: '700' },
+  tileBody: { flex: 1 },
+  tileLabel: { color: '#FFFFFF', fontSize: font.xs },
+  tileValue: { color: '#FFFFFF', fontSize: font.md, fontWeight: '700' },
+  clasp: { position: 'absolute', right: -10, top: 48, width: 28, height: 38, borderRadius: radius.sm, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  claspStud: { width: 10, height: 10, borderRadius: 5 },
+});
