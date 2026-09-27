@@ -1,3 +1,5 @@
+import { depositInstructionsSchema, depositListSchema, depositSchema, walletCodeSchema, resolvedWalletSchema, receivedPaymentsSchema,
+  type CreateDepositInput, type Deposit, type DepositInstructions, type WalletCode, type ResolvedWallet, type CreateTransferInput, type ReceiptQuery } from '@workflex/shared';
 import {
   payeeListSchema,
   paymentReceiptSchema,
@@ -66,3 +68,50 @@ export async function cancelWithdrawal(id: string): Promise<Withdrawal> {
   const { data } = await api.post(`/wallet/withdrawals/${id}/cancel`);
   return withdrawalSchema.parse(data);
 }
+
+/** The platform's own bKash, Nagad and bank accounts, for the add-money screen. */
+export async function fetchDepositAccounts(): Promise<DepositInstructions> {
+  const { data } = await api.get('/wallet/deposit-accounts');
+  return depositInstructionsSchema.parse(data);
+}
+
+/**
+ * Declare money already sent to one of those accounts. Comes back PENDING —
+ * nothing is credited until someone has found it on the statement.
+ */
+export async function declareDeposit(input: CreateDepositInput): Promise<Deposit> {
+  const { data } = await api.post('/wallet/deposits', input);
+  return depositSchema.parse(data);
+}
+
+/** This account's declared deposits, newest first. */
+export async function fetchDeposits(): Promise<Deposit[]> {
+  const { data } = await api.get('/wallet/deposits');
+  return depositListSchema.parse(data).deposits;
+}
+
+export async function fetchDeposit(id: string): Promise<Deposit> {
+  const { data } = await api.get(`/wallet/deposits/${id}`);
+  return depositSchema.parse(data);
+}
+
+/** This wallet as a QR payload and a short code, for someone else to scan. */
+export async function fetchWalletCode(): Promise<WalletCode> {
+  const { data } = await api.get('/wallet/code');
+  return walletCodeSchema.parse(data);
+}
+
+/** Who a scanned code, account id or phone number belongs to. */
+export async function resolveWallet(code: string): Promise<ResolvedWallet> {
+  const { data } = await api.get('/wallet/resolve', { params: { code } });
+  return resolvedWalletSchema.parse(data);
+}
+
+/** Send money to another account in the app. */
+export async function sendTransfer(input: CreateTransferInput): Promise<PaymentReceipt> {
+  const { data } = await api.post('/wallet/transfers', input);
+  return paymentReceiptSchema.parse(data);
+}
+
+
+export async function fetchReceipts(query: ReceiptQuery) { const {data} = await api.get('/wallet/receipts', {params: query}); return receivedPaymentsSchema.parse(data).receipts; }
