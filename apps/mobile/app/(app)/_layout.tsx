@@ -1,3 +1,4 @@
+import { PaymentReceivedModal } from '../../src/components/wallet/PaymentReceivedModal';
 import { ActivityIndicator, View } from 'react-native';
 import { Redirect, Stack } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -64,6 +65,7 @@ export default function AppLayout() {
         <PostJobFab />
       </View>
       <BottomNav />
+      <PaymentReceivedModal />
     </View>
   );
 }
