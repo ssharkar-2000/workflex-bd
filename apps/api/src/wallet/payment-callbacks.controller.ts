@@ -120,7 +120,7 @@ export class PaymentCallbacksController {
    * mobile browsers are free to refuse without a fresh tap.
    */
   private sendBack(res: Response, topUp: TopUp | null, body: Record<string, unknown>) {
-    if (!topUp) {
+    if (!topUp || !topUp.returnUrl || topUp.gateway === 'manual') {
       const reference = typeof body.tran_id === 'string' ? body.tran_id : null;
       this.html(res, noMatchPage(reference), 404);
       return;

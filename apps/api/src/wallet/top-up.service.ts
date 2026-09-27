@@ -183,7 +183,7 @@ export class TopUpService {
     const topUp = tranId
       ? await this.prisma.topUp.findUnique({ where: { tranId } })
       : null;
-    if (!topUp) {
+    if (!topUp || topUp.gateway === 'manual') {
       this.logger.warn(`Gateway return (${kind}) for unknown reference ${tranId ?? '-'}`);
       return null;
     }
@@ -212,7 +212,7 @@ export class TopUpService {
     const topUp = tranId
       ? await this.prisma.topUp.findUnique({ where: { tranId } })
       : null;
-    if (!topUp) {
+    if (!topUp || topUp.gateway === 'manual') {
       this.logger.warn(`IPN for unknown reference ${tranId ?? '-'}`);
       return;
     }

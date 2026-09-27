@@ -1,3 +1,5 @@
+import { ConfigService } from '@nestjs/config';
+import type { Env } from '../config/env.schema';
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import {
   Prisma,
@@ -7,7 +9,8 @@ import {
 } from '@prisma/client';
 import {
   ApiErrorCode,
-  maskPhone,
+  maskPhone, normalizeBdPhone, WALLET_QR_PREFIX,
+  type CreateTransferDto, type WalletCode, type ResolvedWallet, type ReceiptQuery,
   type CreatePaymentDto,
   type CreateWithdrawalDto,
   type PayeeList,
@@ -77,6 +80,7 @@ export class WalletService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly config: ConfigService<Env, true>,
     @Inject(PAYMENT_GATEWAY) private readonly gateway: PaymentGateway | null,
   ) {}
 
@@ -102,6 +106,7 @@ export class WalletService {
       pendingWithdrawals: pending._sum.amount ?? 0,
       canWithdraw: user.verificationLevel >= 1,
       gateway: this.gateway?.name ?? null,
+      canDeposit: (['WALLET_DEPOSIT_BKASH', 'WALLET_DEPOSIT_NAGAD', 'WALLET_DEPOSIT_BANK'] as const).some((key) => Boolean(this.config.get(key))),
     };
   }
 
@@ -462,6 +467,128 @@ export class WalletService {
       this.logger.log(`Top-up ${topUp.id}: ${topUp.amount} BDT credited to ${topUp.userId}`);
       return true;
     });
+  }
+
+  /** Database-issued, unique, stable ID; no truncated UUID collisions. */
+  async code(userId: string): Promise<WalletCode> {
+    const wallet = await this.prisma.wallet.upsert({where: {userId}, create: {userId}, update: {}, include: {user: {select: NAME}}});
+    return {code: wallet.publicId, payload: `${WALLET_QR_PREFIX}${wallet.publicId}`, name: displayName(wallet.user)};
+  }
+
+  async resolve(code: string): Promise<ResolvedWallet> {
+    const value = code.trim();
+    const candidate = value.startsWith(WALLET_QR_PREFIX) ? value.slice(WALLET_QR_PREFIX.length) : value;
+    const publicId = /^WF-\d{10}$/i.test(candidate) ? candidate.toUpperCase() : null;
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidate) ? candidate : null;
+    let phone: string | null = null;
+    if (!publicId && !uuid) { try { phone = normalizeBdPhone(candidate); } catch {} }
+    const user = await this.prisma.user.findFirst({
+      where: {status: 'ACTIVE', isAdmin: false, ...(publicId ? {wallet: {publicId}} : uuid ? {id: uuid} : {phone: phone ?? ''})},
+      select: {id: true, ...NAME},
+    });
+    if (!user) throw AppException.notFound('No active wallet for that code');
+    const wallet = await this.code(user.id);
+    return {userId: user.id, code: wallet.code, name: displayName(user), phone: maskPhone(user.phone)};
+  }
+
+  async receipts(userId: string, query: ReceiptQuery) {
+    const since = new Date(query.since);
+    const rows = await this.prisma.walletPayment.findMany({
+      where: {payeeId: userId, OR: [
+        {createdAt: {gt: since}},
+        ...(query.afterId ? [{createdAt: since, id: {gt: query.afterId}}] : []),
+      ]},
+      orderBy: [{createdAt: 'asc'}, {id: 'asc'}], take: 50,
+      include: {payer: {select: NAME}},
+    });
+    return {receipts: rows.map((p) => ({id: p.id, amount: p.amount, payerName: displayName(p.payer), jobTitle: p.jobTitle, note: p.note, receivedAt: p.createdAt.toISOString()}))};
+  }
+
+  async transfer(payerId: string, dto: CreateTransferDto): Promise<PaymentReceipt> {
+    const repeat = await this.paymentByRequest(payerId, dto.requestId);
+    if (repeat) return repeat;
+
+    const sender = await this.prisma.user.findUnique({where: {id: payerId}, select: {status: true}});
+    if (!sender || sender.status !== 'ACTIVE') throw AppException.notFound('No active sender account');
+    const payee = await this.resolve(dto.code);
+    if (payee.userId === payerId) {
+      throw new AppException(
+        ApiErrorCode.VALIDATION_FAILED,
+        'That is your own wallet',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const [first, second] = [payerId, payee.userId].sort();
+        const locks = new Map<string, LockedWallet>();
+        locks.set(first!, await this.lock(tx, first!));
+        locks.set(second!, await this.lock(tx, second!));
+        const payer = locks.get(payerId)!;
+        const recipient = locks.get(payee.userId)!;
+
+        const retried = await this.paymentByRequest(payerId, dto.requestId);
+        if (retried) return retried;
+
+        if (payer.balance < dto.amount) {
+          throw new AppException(
+            ApiErrorCode.INSUFFICIENT_BALANCE,
+            'Not enough money in the wallet for this transfer',
+            HttpStatus.CONFLICT,
+            { balance: payer.balance },
+          );
+        }
+
+        const payment = await tx.walletPayment.create({
+          data: {
+            payerId,
+            payeeId: payee.userId,
+            jobId: null,
+            jobTitle: null,
+            amount: dto.amount,
+            note: dto.note && dto.note.trim() ? dto.note.trim() : null,
+            requestId: dto.requestId,
+          },
+        });
+
+        const remaining = payer.balance - dto.amount;
+        const after = await this.post(
+          tx,
+          payer,
+          {
+            balance: -dto.amount,
+            withdrawable: Math.min(payer.withdrawable, remaining) - payer.withdrawable,
+          },
+          { type: 'PAYMENT_SENT', paymentId: payment.id },
+        );
+        await this.post(
+          tx,
+          recipient,
+          { balance: dto.amount, withdrawable: Math.max(0, dto.amount - (payer.balance - payer.withdrawable)) },
+          { type: 'PAYMENT_RECEIVED', paymentId: payment.id },
+        );
+
+        this.logger.log(
+          `Transfer ${payment.id}: ${dto.amount} BDT from ${payerId} to ${payee.userId}`,
+        );
+
+        return {
+          id: payment.id,
+          amount: payment.amount,
+          payeeName: payee.name,
+          jobTitle: null,
+          balance: after.balance,
+          createdAt: payment.createdAt.toISOString(),
+        };
+      });
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        const winner = await this.paymentByRequest(payerId, dto.requestId);
+        if (winner) return winner;
+      }
+      throw err;
+    }
   }
 
   // --- the ledger itself ---

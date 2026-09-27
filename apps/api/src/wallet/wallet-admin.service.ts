@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import type {
   TopUpStatus,
@@ -37,6 +38,7 @@ export class WalletAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly wallet: WalletService,
+    private readonly config: ConfigService,
     @Inject(PAYMENT_GATEWAY) private readonly gateway: PaymentGateway | null,
   ) {}
 
@@ -69,6 +71,7 @@ export class WalletAdminService {
 
     return {
       gateway: this.gateway?.name ?? null,
+      canDeposit: ['WALLET_DEPOSIT_BKASH', 'WALLET_DEPOSIT_NAGAD', 'WALLET_DEPOSIT_BANK'].some((key) => Boolean(this.config.get(key))),
       heldInWallets: wallets._sum.balance ?? 0,
       withdrawableInWallets: wallets._sum.withdrawable ?? 0,
       pendingWithdrawals: {
@@ -130,6 +133,7 @@ export class WalletAdminService {
     return {
       topUps: rows.map((t) => ({
         id: t.id,
+        gateway: t.gateway, depositMethod: t.depositMethod, senderAccount: t.senderAccount, reference: t.reference,
         userId: t.userId,
         userName: nameOf(t.user),
         userPhone: t.user.phone,
@@ -150,7 +154,9 @@ export class WalletAdminService {
 
   /** Crediting a held payment after checking it in the gateway's panel. */
   async approveTopUp(id: string, adminId: string): Promise<void> {
-    const credited = await this.wallet.creditTopUp(id, ['HELD'], {
+    const current = await this.prisma.topUp.findUnique({where: {id}});
+    if (!current) throw AppException.notFound('No such top-up');
+    const credited = await this.wallet.creditTopUp(id, current.gateway === 'manual' ? ['PENDING'] : ['HELD'], {
       reviewedBy: adminId,
       reviewedAt: new Date(),
     });
@@ -164,7 +170,7 @@ export class WalletAdminService {
    */
   async rejectTopUp(id: string, adminId: string, reason: string): Promise<void> {
     const rejected = await this.prisma.topUp.updateMany({
-      where: { id, status: 'HELD' },
+      where: { id, OR: [{gateway: 'manual', status: 'PENDING'}, {gateway: {not: 'manual'}, status: 'HELD'}] },
       data: {
         status: 'REJECTED',
         reviewedBy: adminId,
