@@ -9,6 +9,7 @@ import type { Locale } from '@workflex/shared';
  * blank label discovered by a user.
  */
 export const en = {
+  'deposit.manualOption': 'Deposit by bKash, Nagad or bank transfer',
   // --- errors ---
   // One per ApiErrorCode. The app never shows the server's own message or a
   // raw code; see lib/error-message.ts.
@@ -1384,6 +1385,7 @@ export const en = {
 export type TranslationKey = keyof typeof en;
 
 export const bn: Record<TranslationKey, string> = {
+  'deposit.manualOption': 'বিকাশ, নগদ বা ব্যাংকে ডিপোজিট করুন',
   'error.network':
     'সার্ভারে পৌঁছানো যাচ্ছে না। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।',
   'error.VALIDATION_FAILED': 'আপনার দেওয়া তথ্যগুলো একবার দেখে নিন।',

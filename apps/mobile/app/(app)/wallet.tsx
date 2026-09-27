@@ -19,7 +19,7 @@ import {
   cancelWithdrawal,
   fetchStatement,
   fetchTopUp,
-  fetchWallet,
+  fetchWallet, fetchWalletCode,
 } from '../../src/api/wallet';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { MoneyScreen, Notice } from '../../src/components/wallet/WalletUi';
@@ -67,6 +67,7 @@ export default function WalletScreen() {
   });
 
   const entries = statement.data?.pages.flatMap((page) => page.entries) ?? [];
+  const code = useQuery({queryKey: ['wallet-code'], queryFn: fetchWalletCode});
   const data = wallet.data;
   const user = useAuthStore((state) => state.user);
 
@@ -96,11 +97,14 @@ export default function WalletScreen() {
       <BalanceCard
         wallet={data}
         name={[user?.firstName, user?.lastName].filter(Boolean).join(' ') || null}
-        publicId={null}
+        publicId={code.data?.code ?? null}
         onLoadMoney={() => router.push('/(app)/wallet/add-money')}
       />
       <Text style={[styles.hint, { color: c.textMuted }]}>{t('wallet.earnedHint')}</Text>
       <QuickActions actions={[
+        { icon: '⌗', label: t('wallet.scan'), tint: '#E4F1FD', ink: '#1D5FA8', onPress: () => router.push('/(app)/wallet/scan') },
+        { icon: '▣', label: t('wallet.receive'), tint: '#FDECF3', ink: '#A83164', onPress: () => router.push('/(app)/wallet/receive') },
+        { icon: '≡', label: t('deposits.title'), tint: '#FFF6DC', ink: '#8A6200', onPress: () => router.push('/(app)/wallet/deposits') },
         { icon: '＋', label: t('wallet.addMoney'), tint: '#E6F6EE', ink: '#16794B', onPress: () => router.push('/(app)/wallet/add-money') },
         { icon: '↑', label: t('wallet.withdraw'), tint: '#FFF6DC', ink: '#8A6200', onPress: () => router.push('/(app)/wallet/withdraw') },
         { icon: '↗', label: t('wallet.pay'), tint: '#EDEBFB', ink: '#3A34A0', onPress: () => router.push('/(app)/hired') },

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -41,7 +41,7 @@ function returnUrl(): string {
  * and learns the outcome when the gateway sends them to the wallet. Card
  * numbers and PINs never pass through this app or its server.
  */
-export default function AddMoneyScreen() {
+function GatewayAddMoneyScreen() {
   const t = useT();
   const router = useRouter();
   const { c } = useTheme();
@@ -151,3 +151,14 @@ const styles = StyleSheet.create({
   range: { fontSize: font.xs, fontWeight: '700', marginTop: 10 },
   returnHint: { fontSize: font.xs, textAlign: 'center', lineHeight: 17 },
 });
+
+export default function AddMoneyChoice() {
+  const router = useRouter();
+  const t = useT();
+  return <View style={{flex: 1}}>
+    <Pressable accessibilityRole="button" onPress={() => router.push('/(app)/wallet/deposit')} style={{padding: 16, backgroundColor: '#E6F6EE'}}>
+      <Text style={{color: '#16794B', fontWeight: '700'}}>{t('deposit.manualOption')}</Text>
+    </Pressable>
+    <GatewayAddMoneyScreen />
+  </View>;
+}

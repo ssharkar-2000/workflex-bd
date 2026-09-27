@@ -126,6 +126,111 @@ export const createTopUpSchema = z.object({
 export type CreateTopUpDto = z.output<typeof createTopUpSchema>;
 export type CreateTopUpInput = z.input<typeof createTopUpSchema>;
 
+/**
+ * A deposit the person made themselves and is now declaring.
+ *
+ * Nothing is credited on this alone: it is a claim that money was sent, and
+ * it waits for someone to find it on the receiving account's statement. The
+ * account and reference are what make that possible.
+ */
+export const createDepositSchema = z.object({
+  amount: takaAmount(WALLET_LIMITS.topUpMin, WALLET_LIMITS.topUpMax),
+  method: payoutMethodSchema,
+  /** The number or account it was sent from, as their own app shows it. */
+  senderAccount: z
+    .string()
+    .trim()
+    .min(6, 'Give the number or account you sent it from')
+    .max(40),
+  /**
+   * The transaction id their app gave them — "TrxID" on bKash, "TrxID" on
+   * Nagad, the reference on a bank transfer. Rejected if it has been claimed
+   * before, so one receipt cannot be used twice.
+   */
+  reference: z
+    .string()
+    .trim()
+    .min(4, 'Give the transaction id from your bKash, Nagad or bank app')
+    .max(40)
+    .transform((value) => value.toUpperCase()),
+  /** One per confirmation, so a retry does not declare the same money twice. */
+  requestId: z.string().uuid(),
+});
+export type CreateDepositDto = z.output<typeof createDepositSchema>;
+export type CreateDepositInput = z.input<typeof createDepositSchema>;
+
+export const depositSchema = z.object({
+  id: z.string().uuid(),
+  amount: z.number().int(),
+  status: topUpStatusSchema,
+  method: payoutMethodSchema.nullable(),
+  senderAccount: z.string().nullable(),
+  reference: z.string().nullable(),
+  /** Why it was turned down, when it was. */
+  reviewNote: z.string().nullable(),
+  createdAt: z.string(),
+  completedAt: z.string().nullable(),
+});
+export type Deposit = z.infer<typeof depositSchema>;
+
+export const depositListSchema = z.object({ deposits: z.array(depositSchema) });
+export type DepositList = z.infer<typeof depositListSchema>;
+
+/** Where to send the money, shown on the add-money screen. */
+export const depositInstructionsSchema = z.object({
+  accounts: z.array(
+    z.object({
+      method: payoutMethodSchema,
+      /** The platform's own receiving number or account. */
+      account: z.string(),
+      accountName: z.string(),
+      /** "Send Money", "Cash Out" — what to pick in their app. */
+      howTo: z.string().nullable(),
+    }),
+  ),
+});
+export type DepositInstructions = z.infer<typeof depositInstructionsSchema>;
+
+// --- sending money to another account in the app, including by QR ---
+
+/**
+ * What a wallet's QR encodes.
+ *
+ * A URL rather than a bare id, so a phone camera outside the app shows
+ * something a person can read, and so a scan can be told apart from any
+ * other QR that happens to be in frame.
+ */
+export const WALLET_QR_PREFIX = 'workflex://wallet/scan?u=';
+
+export const walletCodeSchema = z.object({
+  /** Short and typable, for reading out when a camera will not focus. */
+  code: z.string(),
+  /** What the QR image itself contains. */
+  payload: z.string(),
+  name: z.string().nullable(),
+});
+export type WalletCode = z.infer<typeof walletCodeSchema>;
+
+/** Who a scanned code belongs to — shown for confirmation before paying. */
+export const resolvedWalletSchema = z.object({
+  userId: z.string().uuid(),
+  code: z.string(),
+  name: z.string(),
+  /** Masked: enough to recognise someone, not enough to be a directory. */
+  phone: z.string(),
+});
+export type ResolvedWallet = z.infer<typeof resolvedWalletSchema>;
+
+export const createTransferSchema = z.object({
+  /** The scanned payload, the short code, or the account's id. */
+  code: z.string().trim().min(6).max(200),
+  amount: takaAmount(WALLET_LIMITS.paymentMin, WALLET_LIMITS.transferMax),
+  note: z.string().trim().max(200).optional().or(z.literal('')),
+  requestId: z.string().uuid(),
+});
+export type CreateTransferDto = z.output<typeof createTransferSchema>;
+export type CreateTransferInput = z.input<typeof createTransferSchema>;
+
 export const createPaymentSchema = z.object({
   jobId: z.string().uuid(),
   payeeId: z.string().uuid(),
@@ -209,6 +314,7 @@ export const walletSummarySchema = z.object({
   canWithdraw: z.boolean(),
   /** Null when no gateway is configured, so money cannot be added right now. */
   gateway: paymentGatewaySchema.nullable(),
+  canDeposit: z.boolean().default(false),
 });
 export type WalletSummary = z.infer<typeof walletSummarySchema>;
 
@@ -285,7 +391,7 @@ export const paymentReceiptSchema = z.object({
   id: z.string().uuid(),
   amount: z.number().int(),
   payeeName: z.string(),
-  jobTitle: z.string(),
+  jobTitle: z.string().nullable(),
   /** The payer's balance after paying. */
   balance: z.number().int(),
   createdAt: z.string(),
@@ -318,6 +424,7 @@ const countAndTotal = z.object({
 export const adminWalletSummarySchema = z.object({
   /** Null when no gateway is configured and top-ups are switched off. */
   gateway: paymentGatewaySchema.nullable(),
+  canDeposit: z.boolean().default(false),
   /** Everything users hold, and how much of it they could ask to withdraw. */
   heldInWallets: z.number().int(),
   withdrawableInWallets: z.number().int(),
@@ -346,6 +453,10 @@ export const adminWithdrawalListSchema = z.object({
 export type AdminWithdrawalList = z.infer<typeof adminWithdrawalListSchema>;
 
 export const adminTopUpSchema = topUpSchema.extend({
+  gateway: z.string(),
+  depositMethod: payoutMethodSchema.nullable(),
+  senderAccount: z.string().nullable(),
+  reference: z.string().nullable(),
   userId: z.string().uuid(),
   userName: z.string().nullable(),
   userPhone: z.string(),
@@ -385,3 +496,15 @@ export const walletRejectSchema = z.object({
     .max(500),
 });
 export type WalletRejectDto = z.output<typeof walletRejectSchema>;
+
+/** Stable cursor: ties within the same timestamp are ordered by payment id. */
+export const receivedPaymentSchema = z.object({
+  id: z.string().uuid(), amount: z.number().int(), payerName: z.string(),
+  jobTitle: z.string().nullable(), note: z.string().nullable(), receivedAt: z.string().datetime(),
+});
+export type ReceivedPayment = z.infer<typeof receivedPaymentSchema>;
+export const receiptQuerySchema = z.object({
+  since: z.string().datetime(), afterId: z.string().uuid().optional(),
+});
+export type ReceiptQuery = z.infer<typeof receiptQuerySchema>;
+export const receivedPaymentsSchema = z.object({ receipts: z.array(receivedPaymentSchema) });

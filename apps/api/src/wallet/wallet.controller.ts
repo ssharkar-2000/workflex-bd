@@ -12,7 +12,8 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { z } from 'zod';
 import {
-  createPaymentSchema,
+  createPaymentSchema, createDepositSchema, createTransferSchema, receiptQuerySchema,
+  type CreateDepositDto, type CreateTransferDto, type ReceiptQuery,
   createTopUpSchema,
   createWithdrawalSchema,
   type CreatePaymentDto,
@@ -21,6 +22,7 @@ import {
 } from '@workflex/shared';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { DepositService } from './deposit.service';
 import { TopUpService } from './top-up.service';
 import { WalletService } from './wallet.service';
 
@@ -33,6 +35,7 @@ type StatementQuery = z.output<typeof statementQuerySchema>;
 export class WalletController {
   constructor(
     private readonly wallet: WalletService,
+    private readonly deposits: DepositService,
     private readonly topUps: TopUpService,
   ) {}
 
@@ -102,4 +105,24 @@ export class WalletController {
   ) {
     return this.wallet.cancelWithdrawal(userId, id);
   }
+  @Get('deposit-accounts')
+  depositAccounts() { return this.deposits.instructions(); }
+
+  @Post('deposits')
+  declareDeposit(@CurrentUser('userId') userId: string, @Body(new ZodValidationPipe(createDepositSchema)) dto: CreateDepositDto) {
+    return this.deposits.declare(userId, dto);
+  }
+  @Get('deposits')
+  async depositsList(@CurrentUser('userId') userId: string) { return {deposits: await this.deposits.list(userId)}; }
+  @Get('deposits/:id')
+  deposit(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) { return this.deposits.one(userId, id); }
+  @Get('code')
+  code(@CurrentUser('userId') userId: string) { return this.wallet.code(userId); }
+  @Get('resolve')
+  resolve(@Query(new ZodValidationPipe(z.object({code: z.string().trim().min(6).max(200)}))) query: {code: string}) { return this.wallet.resolve(query.code); }
+  @Post('transfers')
+  transfer(@CurrentUser('userId') userId: string, @Body(new ZodValidationPipe(createTransferSchema)) dto: CreateTransferDto) { return this.wallet.transfer(userId, dto); }
+  @Get('receipts')
+  receipts(@CurrentUser('userId') userId: string, @Query(new ZodValidationPipe(receiptQuerySchema)) query: ReceiptQuery) { return this.wallet.receipts(userId, query); }
+
 }

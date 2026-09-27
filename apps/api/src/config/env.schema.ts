@@ -125,6 +125,11 @@ export const envSchema = z.object({
   //
   // Unset means simulator in development and off in production — see
   // validateEnv.
+  WALLET_DEPOSIT_NAME: z.string().trim().max(100).optional(),
+  WALLET_DEPOSIT_BKASH: z.string().trim().max(100).optional(),
+  WALLET_DEPOSIT_NAGAD: z.string().trim().max(100).optional(),
+  WALLET_DEPOSIT_BANK: z.string().trim().max(300).optional(),
+
   PAYMENT_PROVIDER: z.enum(['off', 'simulator', 'sslcommerz']).default('simulator'),
   SSLCOMMERZ_STORE_ID: z.string().optional(),
   SSLCOMMERZ_STORE_PASSWORD: z.string().optional(),

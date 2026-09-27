@@ -1,3 +1,4 @@
+import { DepositService } from './deposit.service';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Env } from '../config/env.schema';
@@ -40,6 +41,7 @@ function createGateway(config: ConfigService<Env, true>): PaymentGateway | null 
       inject: [ConfigService],
       useFactory: createGateway,
     },
+    DepositService,
     WalletService,
     TopUpService,
     WalletAdminService,

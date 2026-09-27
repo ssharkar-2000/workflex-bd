@@ -33,6 +33,13 @@
           "photosPermission": "WorkFlex BD needs access to your photos so you can upload your NID and business documents.",
           "cameraPermission": "WorkFlex BD needs the camera to photograph your NID and complete face verification."
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "WorkFlex uses your camera to scan wallet QR codes.",
+          "recordAudioAndroid": false
+        }
       ]
     ],
     "experiments": {

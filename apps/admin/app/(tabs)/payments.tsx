@@ -68,7 +68,7 @@ export default function PaymentsScreen() {
   const [tab, setTab] = useState<Tab>('withdrawals');
   const [withdrawalFilter, setWithdrawalFilter] =
     useState<(typeof WITHDRAWAL_FILTERS)[number]>('PENDING');
-  const [topUpFilter, setTopUpFilter] = useState<(typeof TOP_UP_FILTERS)[number]>('HELD');
+  const [topUpFilter, setTopUpFilter] = useState<(typeof TOP_UP_FILTERS)[number]>('PENDING');
 
   const summary = useQuery({ queryKey: ['admin-wallet-summary'], queryFn: fetchWalletSummary });
   const withdrawals = useQuery({
@@ -396,7 +396,12 @@ function TopUpRow({ topUp: t }: { topUp: AdminTopUp }) {
       </Text>
 
       <View style={styles.destination}>
-        <Detail label="Reference (tran_id)" value={t.tranId} />
+        <Detail label="Internal reference" value={t.tranId} />
+        {t.gateway === 'manual' ? <>
+          <Detail label="Deposit method" value={t.depositMethod ?? '—'} />
+          <Detail label="Sender account" value={t.senderAccount ?? '—'} />
+          <Detail label="Transaction reference" value={t.reference ?? '—'} />
+        </> : null}
         {t.valId ? <Detail label="Gateway val_id" value={t.valId} /> : null}
         {t.bankTranId ? <Detail label="Bank transaction" value={t.bankTranId} /> : null}
         {t.riskLevel !== null ? (
@@ -408,7 +413,7 @@ function TopUpRow({ topUp: t }: { topUp: AdminTopUp }) {
         {t.reviewNote ? <Detail label="Note" value={t.reviewNote} /> : null}
       </View>
 
-      {t.status === 'HELD' ? (
+      {(t.status === 'HELD' && t.gateway !== 'manual') || (t.status === 'PENDING' && t.gateway === 'manual') ? (
         rejecting ? (
           <>
             <TextInput
@@ -433,7 +438,7 @@ function TopUpRow({ topUp: t }: { topUp: AdminTopUp }) {
         ) : (
           <>
             <Text style={styles.hint}>
-              Check this payment in the gateway's merchant panel before deciding.
+              Verify the amount, sender and transaction reference against the receiving account statement (manual deposit) or the gateway merchant panel.
               Approving credits the person's wallet.
             </Text>
             <View style={styles.actions}>

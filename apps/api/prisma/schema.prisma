@@ -885,6 +885,7 @@ model Report {
 
 /// One per account, created the first time money moves.
 model Wallet {
+  publicId String @unique @default(dbgenerated("('WF-'::text || lpad((nextval('wallet_public_id_seq'::regclass))::text, 10, '0'::text))"))
   id String @id @default(uuid()) @db.Uuid
 
   userId String @unique @db.Uuid
@@ -982,7 +983,10 @@ model TopUp {
   /// Where the person is sent back to after paying. Checked against an
   /// allowlist before it is stored, so the gateway cannot be used to bounce
   /// someone to an arbitrary site.
-  returnUrl String
+  returnUrl String?
+  depositMethod PayoutMethod?
+  senderAccount String?
+  reference String?
 
   // --- from the gateway's validation, never from the callback itself ---
   valId      String?
@@ -1006,6 +1010,7 @@ model TopUp {
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
+  @@unique([depositMethod, reference])
   @@map("wallet_top_ups")
 }
 
@@ -1021,8 +1026,8 @@ model WalletPayment {
   /// The posting the work was for. Not a FK, for the reason Report gives: a
   /// posting can be deleted, and the record of a payment must outlive it. The
   /// title is copied for the same reason.
-  jobId    String @db.Uuid
-  jobTitle String
+  jobId    String? @db.Uuid
+  jobTitle String?
 
   amount Int
   note   String?
@@ -1038,6 +1043,7 @@ model WalletPayment {
   @@index([payeeId, createdAt])
   @@index([jobId, payeeId])
   @@map("wallet_payments")
+  @@index([payeeId, createdAt, id])
 }
 
 enum PayoutMethod {
