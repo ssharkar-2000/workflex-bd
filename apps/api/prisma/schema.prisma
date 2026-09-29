@@ -38,6 +38,11 @@ enum DocumentKind {
   SELFIE
   TIN_CERTIFICATE
   TRADE_LICENSE
+  /// A one-minute video introduction: the elevator pitch a recruiter can
+  /// watch instead of reading. Like the CV it carries no verification weight,
+  /// and like the CV there is at most one per account.
+  INTRO_VIDEO
+
   /// A job seeker's CV. Unlike the others this is not identity evidence —
   /// it is the input to skill matching, and carries no verification weight.
   CV
@@ -90,6 +95,11 @@ enum AnalysisStatus {
 
 model User {
   id String @id @default(uuid()) @db.Uuid
+
+  /// The id a person can read out: "WF-3A9C1B". Printed on the wallet card,
+  /// typed by whoever is paying them, and quoted on every receipt — the uuid
+  /// above is for machines and is useless over a phone call.
+  publicId String @unique
 
   /// E.164, always +8801XXXXXXXXX. The primary identity in this product —
   /// most users have no email.
@@ -144,6 +154,20 @@ model User {
   applications       JobApplication[]
   cvProfile          CvProfile?
   reports            Report[]
+  courses            CourseCompletion[]
+  credentials        Credential[]
+  mockTests          MockTest[]
+  googleConnection   GoogleConnection?
+
+  subscriptions            Subscription[]
+  shifts                   Shift[]
+  interviewsHeld           Interview[]    @relation("InterviewEmployer")
+  interviewsAttended       Interview[]    @relation("InterviewCandidate")
+  conversationsAsWorker    Conversation[] @relation("ConversationWorker")
+  conversationsAsRecruiter Conversation[] @relation("ConversationRecruiter")
+  messagesSent             Message[]
+  reviewsWritten           Review[]       @relation("ReviewAuthor")
+  reviewsReceived          Review[]       @relation("ReviewSubject")
 
   wallet           Wallet?
   topUps           TopUp[]
@@ -534,6 +558,11 @@ model AttendanceRecord {
   userId String @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  /// The shift this attendance is for. Null on records from before shifts
+  /// existed, and on any check-in not tied to one.
+  shiftId String? @db.Uuid
+  shift   Shift?  @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+
   status     AttendanceStatus @default(CHECKED_IN)
   checkInAt  DateTime
   checkOutAt DateTime?
@@ -662,6 +691,11 @@ enum ExperienceLevel {
 
 model Job {
   id String @id @default(uuid()) @db.Uuid
+
+  reviews       Review[]
+  shifts        Shift[]
+  interviews    Interview[]
+  conversations Conversation[]
 
   title        String
   description  String
@@ -792,6 +826,12 @@ model JobApplication {
   appliedAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// When the recruiter confirmed the hired person's work is finished. Null
+  /// while it is still going on. The status stays ACCEPTED, so payments,
+  /// reviews and trust keep counting the hire; it only leaves the
+  /// recruiter's hired list.
+  completedAt DateTime?
+
   job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -885,7 +925,6 @@ model Report {
 
 /// One per account, created the first time money moves.
 model Wallet {
-  publicId String @unique @default(dbgenerated("('WF-'::text || lpad((nextval('wallet_public_id_seq'::regclass))::text, 10, '0'::text))"))
   id String @id @default(uuid()) @db.Uuid
 
   userId String @unique @db.Uuid
@@ -931,7 +970,7 @@ model WalletEntry {
   walletId String @db.Uuid
   wallet   Wallet @relation(fields: [walletId], references: [id], onDelete: Restrict)
 
-  type WalletEntryType
+  type         WalletEntryType
   /// Signed: positive into the wallet, negative out of it.
   amount       Int
   balanceAfter Int
@@ -975,18 +1014,27 @@ model TopUp {
   amount Int
   status TopUpStatus @default(PENDING)
 
-  /// Which gateway took it — "sslcommerz", or "simulator" in development.
+  /// How the money arrived. "manual" for a deposit the person made from
+  /// their own bKash, Nagad or bank app and then declared here.
   gateway String
   /// Our reference, sent to the gateway as `tran_id`.
   tranId  String @unique
 
-  /// Where the person is sent back to after paying. Checked against an
-  /// allowlist before it is stored, so the gateway cannot be used to bounce
-  /// someone to an arbitrary site.
+  /// Only a redirecting gateway needs somewhere to send the person back to,
+  /// so this is null for a declared deposit.
   returnUrl String?
+
+  // --- a deposit the person made themselves, and says they made ---
+
+  /// Which service it was sent from.
   depositMethod PayoutMethod?
+  /// The account it came from — their bKash or Nagad number, or a bank
+  /// account. Whoever approves it checks this against the receiving
+  /// statement.
   senderAccount String?
-  reference String?
+  /// The transaction id their own app gave them. Unique per method, so one
+  /// receipt cannot be claimed twice.
+  reference     String?
 
   // --- from the gateway's validation, never from the callback itself ---
   valId      String?
@@ -1008,9 +1056,9 @@ model TopUp {
   completedAt DateTime?
   updatedAt   DateTime  @updatedAt
 
+  @@unique([depositMethod, reference])
   @@index([userId, createdAt])
   @@index([status, createdAt])
-  @@unique([depositMethod, reference])
   @@map("wallet_top_ups")
 }
 
@@ -1026,6 +1074,8 @@ model WalletPayment {
   /// The posting the work was for. Not a FK, for the reason Report gives: a
   /// posting can be deleted, and the record of a payment must outlive it. The
   /// title is copied for the same reason.
+  /// Null when this is a person-to-person transfer rather than pay for a
+  /// job — the wallet's own send-money, including by QR.
   jobId    String? @db.Uuid
   jobTitle String?
 
@@ -1043,7 +1093,6 @@ model WalletPayment {
   @@index([payeeId, createdAt])
   @@index([jobId, payeeId])
   @@map("wallet_payments")
-  @@index([payeeId, createdAt, id])
 }
 
 enum PayoutMethod {
@@ -1104,4 +1153,641 @@ model Withdrawal {
   @@index([userId, createdAt])
   @@index([status, createdAt])
   @@map("wallet_withdrawals")
+}
+
+/// What someone gets for paying, and until when.
+///
+/// One row per purchase rather than one per account: a renewal is a new row,
+/// so the history of what was paid and when stays readable, and an expiry is
+/// a date that passed rather than a row that was overwritten.
+model Subscription {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  plan   SubscriptionPlan
+  status SubscriptionStatus @default(ACTIVE)
+
+  /// What was actually charged, in paisa — kept on the row because a plan's
+  /// price may change and an old subscription should still say what it cost.
+  price Int
+
+  startedAt DateTime  @default(now())
+  /// Null for a lifetime plan, which does not end.
+  expiresAt DateTime?
+
+  cancelledAt DateTime?
+
+  /// The wallet payment that bought it, so the two can be reconciled.
+  paymentId String? @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, startedAt])
+  @@index([status, expiresAt])
+  @@map("subscriptions")
+}
+
+enum SubscriptionPlan {
+  MONTHLY
+  YEARLY
+  LIFETIME
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+/// One person's verdict on another, for one job.
+///
+/// Both directions are the same table: the same account is rated as a worker
+/// on jobs it was hired for and as a recruiter on jobs it posted, and
+/// `subjectRole` says which of the two this row is about. Keeping them apart
+/// would mean two tables that are identical except for a word.
+///
+/// Tied to a job, and unique per author per person per job, so a review is
+/// evidence of work that happened rather than an opinion anyone can repeat.
+model Review {
+  id String @id @default(uuid()) @db.Uuid
+
+  jobId String @db.Uuid
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  authorId String @db.Uuid
+  author   User   @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  subjectId String @db.Uuid
+  subject   User   @relation("ReviewSubject", fields: [subjectId], references: [id], onDelete: Cascade)
+
+  /// Which side the subject was on for this job.
+  subjectRole ReviewRole
+
+  /// One to five. Halves are not offered: people do not agree on what 3.5
+  /// means, and the average carries the nuance.
+  rating  Int
+  comment String?
+
+  /// The two questions worth asking beyond a number, both optional because
+  /// a rating with no answers is still a rating.
+  onTime         Boolean?
+  wouldWorkAgain Boolean?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One review of each person per job. Per person rather than per role: a
+  /// recruiter who hired three people for one job reviews all three.
+  @@unique([jobId, authorId, subjectId])
+  @@index([subjectId, subjectRole, createdAt])
+  @@map("reviews")
+}
+
+enum ReviewRole {
+  WORKER
+  RECRUITER
+}
+
+/// A piece of work with a start and an end: one person, one job, one span of
+/// time.
+///
+/// A job is the posting — "cleaner needed, Dhanmondi" — and may be worked by
+/// several people on several days. A shift is one of those occasions, which
+/// is what somebody actually turns up to, checks into, and is paid for.
+///
+/// Created by whoever posted the job, for someone already hired onto it.
+model Shift {
+  id String @id @default(uuid()) @db.Uuid
+
+  jobId String @db.Uuid
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  /// Who is working it.
+  workerId String @db.Uuid
+  worker   User   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  status ShiftStatus @default(CONFIRMED)
+
+  startsAt DateTime
+  endsAt   DateTime
+
+  /// Where to turn up, when that differs from the job's own location.
+  location  String?
+  latitude  Float?
+  longitude Float?
+
+  /// What the shift pays, in paisa. Held here rather than read from the job
+  /// because a Friday night rate is not a Tuesday morning rate.
+  pay Int
+
+  // --- what the person needs to know before turning up ---
+  instructions       String?
+  contactName        String?
+  contactPhone       String?
+  dressCode          String?
+  /// "NID", "Trade licence" — what to bring.
+  requiredDocuments  String[]
+  cancellationPolicy String?
+
+  attendanceMethod AttendanceMethod @default(MANUAL)
+
+  // --- what it came to, filled in once it is over ---
+  basePay     Int?
+  overtimePay Int?
+  bonusPay    Int?
+
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  attendance AttendanceRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workerId, startsAt])
+  @@index([jobId, startsAt])
+  @@index([status, startsAt])
+  @@map("shifts")
+}
+
+enum ShiftStatus {
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+/// How someone proves they were there.
+enum AttendanceMethod {
+  /// Tap a button. Trusted because both sides can see the time it recorded.
+  MANUAL
+  /// Scan the employer's code at the site.
+  QR
+  /// Check in with coordinates, matched against the shift's own.
+  GPS
+}
+
+/// One thread between the two sides of one job.
+///
+/// Messaging here is not a social feature: a conversation exists because
+/// somebody applied to a job or was hired for it, and it is always about
+/// that job. That is what keeps the inbox free of strangers, and it is why
+/// the pair (job, worker) is unique — the same two people discussing two
+/// different jobs get two threads, which is what they would want.
+///
+/// Which section of the inbox a thread appears in is worked out when it is
+/// read, not stored: the same row is "an application" to the worker and
+/// "hiring" to the recruiter, and becomes "work" for both once a shift
+/// exists.
+model Conversation {
+  id String @id @default(uuid()) @db.Uuid
+
+  jobId String @db.Uuid
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  /// The person who applied or was hired.
+  workerId String @db.Uuid
+  worker   User   @relation("ConversationWorker", fields: [workerId], references: [id], onDelete: Cascade)
+
+  /// The person who posted the job.
+  recruiterId String @db.Uuid
+  recruiter   User   @relation("ConversationRecruiter", fields: [recruiterId], references: [id], onDelete: Cascade)
+
+  messages Message[]
+
+  /// When each side last opened the thread. Unread counts are messages
+  /// after that moment written by the other person — one timestamp per
+  /// side rather than a read flag per message, which would be a row per
+  /// message per reader for no extra truth.
+  workerReadAt    DateTime?
+  recruiterReadAt DateTime?
+
+  /// Muted threads stay in the inbox but stop notifying.
+  workerMuted    Boolean @default(false)
+  recruiterMuted Boolean @default(false)
+
+  /// A blocked thread takes no new messages from either side. Who did it is
+  /// kept so the other person can be told it was not a fault of theirs.
+  blockedAt DateTime?
+  blockedBy String?   @db.Uuid
+
+  lastMessageAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([jobId, workerId])
+  @@index([workerId, lastMessageAt])
+  @@index([recruiterId, lastMessageAt])
+  @@map("conversations")
+}
+
+/// One message. Most are text; the rest carry something the app renders as a
+/// card — a location, a shift, an interview invitation — with its details in
+/// `payload` rather than typed out in a sentence nobody can act on.
+model Message {
+  id String @id @default(uuid()) @db.Uuid
+
+  conversationId String       @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  authorId String @db.Uuid
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  kind MessageKind @default(TEXT)
+  body String?
+
+  /// Where an attachment lives in object storage, and what it is.
+  attachmentKey  String?
+  attachmentName String?
+  attachmentType String?
+
+  /// The card's own fields: coordinates, a shift id, interview times.
+  payload Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+enum MessageKind {
+  TEXT
+  IMAGE
+  FILE
+  LOCATION
+  /// A shift, rendered as a card the other side can open.
+  SHIFT
+  /// An invitation with a time on it, which can be accepted or declined.
+  INTERVIEW
+  /// Written by the platform rather than a person: "Shift confirmed."
+  SYSTEM
+}
+
+/// A meeting between the two sides of a job, before any work happens.
+///
+/// Held online through this system or in person at an address, which is the
+/// same arrangement either way: a time, a length, and two people who have
+/// both been told. Only somebody who applied can be invited to one — an
+/// interview is a step in an application, not a way to summon a stranger.
+///
+/// The candidate answers it. Until they do it is SCHEDULED and nobody should
+/// assume they are coming; a declined interview keeps its row so both sides
+/// can see what was proposed and what happened to it.
+model Interview {
+  id String @id @default(uuid()) @db.Uuid
+
+  jobId String @db.Uuid
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  /// Whoever posted the job — a person hiring for themselves, or somebody
+  /// representing a company.
+  employerId String @db.Uuid
+  employer   User   @relation("InterviewEmployer", fields: [employerId], references: [id], onDelete: Cascade)
+
+  candidateId String @db.Uuid
+  candidate   User   @relation("InterviewCandidate", fields: [candidateId], references: [id], onDelete: Cascade)
+
+  mode   InterviewMode
+  status InterviewStatus @default(SCHEDULED)
+
+  scheduledAt     DateTime
+  durationMinutes Int      @default(30)
+
+  /// Where to go, for a meeting in person.
+  location String?
+
+  /// Where to join, for one held online. Generated by this system unless the
+  /// employer supplies their own link.
+  meetingUrl String?
+
+  /// The Google Calendar event behind a Meet link, so moving or cancelling
+  /// the interview moves or cancels the event too. Null for Jitsi rooms.
+  googleEventId String?
+
+  /// Who the candidate should ask for, and anything they should bring or
+  /// prepare.
+  interviewerName String?
+  notes           String?
+
+  /// When the candidate accepted or declined, and what they said.
+  respondedAt   DateTime?
+  declineReason String?
+
+  /// What came of it, written afterwards by the employer.
+  outcome String?
+
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([candidateId, scheduledAt])
+  @@index([employerId, scheduledAt])
+  @@index([status, scheduledAt])
+  @@map("interviews")
+}
+
+enum InterviewMode {
+  /// Held in this app, over a link.
+  VIDEO
+  /// A phone call at an agreed time.
+  PHONE
+  /// At an address — what a company representative usually wants.
+  IN_PERSON
+}
+
+enum InterviewStatus {
+  /// Proposed, and waiting on the candidate.
+  SCHEDULED
+  /// The candidate said yes.
+  ACCEPTED
+  /// The candidate said no.
+  DECLINED
+  /// Moved to another time; the row keeps its history.
+  RESCHEDULED
+  COMPLETED
+  CANCELLED
+  /// The time passed with nobody there.
+  NO_SHOW
+}
+
+/// ---------------------------------------------------------------------------
+/// Learning lab
+/// ---------------------------------------------------------------------------
+
+/// A free course this platform suggested, that the person says they finished.
+///
+/// Suggestions themselves are not stored: they are generated from the CV and
+/// from live demand every time the screen opens, so a saved list would go
+/// stale against the postings it was derived from. What is worth keeping is
+/// the other half — what somebody actually went and did about a gap.
+///
+/// Nothing here is verified by this platform. `declaredAt` is the person's own
+/// word, and the certificate is a file they uploaded; neither is checked
+/// against the course provider, and the screens say so. A claim with a
+/// certificate attached is still only a claim, but it is one an employer can
+/// look at.
+model CourseCompletion {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The course as it was suggested, kept as text rather than a foreign key:
+  /// the suggestion it came from does not outlive the screen that made it.
+  title    String
+  provider String
+  /// Where it was found. A search, not a deep link — see courses.service.ts.
+  url      String?
+  /// The gap it was suggested for, so this can be read back against the CV.
+  skill    String
+
+  /// When the person said they had finished it.
+  declaredAt DateTime @default(now())
+
+  /// The certificate, when there is one. Optional by design: plenty of free
+  /// courses issue nothing at the end, and refusing the claim without paper
+  /// would record less of what people have actually done.
+  storageKey   String?
+  mimeType     String?
+  sizeBytes    Int?
+  originalName String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, declaredAt])
+  @@map("course_completions")
+}
+
+// --- verifiable credentials ---
+
+/// Who is allowed to attest to somebody's past.
+///
+/// A university, a training centre, or a company somebody used to work for.
+/// Each holds an ed25519 key pair; the public half lives here and the
+/// private half never touches this database — it stays with the institution,
+/// which is the entire point. WorkFlex BD cannot forge a credential it did
+/// not issue, and cannot be made to.
+///
+/// `approvedAt` is this platform vouching that the key really belongs to the
+/// named institution. A signature proves a key signed something; only a
+/// registry can say whose key it is, and that step is human.
+model Issuer {
+  id String @id @default(uuid()) @db.Uuid
+
+  name String
+  kind IssuerKind
+
+  /// A decentralised identifier, `did:key:z...`, derived from the public key.
+  /// Portable: a credential carries it, so anyone holding the credential can
+  /// check the signature without asking this server anything.
+  did String @unique
+
+  /// The verifying half, base64url. Never the signing half.
+  publicKey String
+
+  /// Where a sceptic can check this issuer exists. A website, not a promise.
+  website String?
+  contact String?
+
+  /// Null until an administrator has confirmed the key belongs to the name.
+  approvedAt DateTime?
+  approvedBy String?   @db.Uuid
+
+  credentials Credential[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind, approvedAt])
+  @@map("issuers")
+}
+
+enum IssuerKind {
+  UNIVERSITY
+  COLLEGE
+  TRAINING_CENTRE
+  EMPLOYER
+  GOVERNMENT
+}
+
+/// One signed statement about one person, and its place in the ledger.
+///
+/// Two independent things make this verifiable, and both are checked
+/// separately so a reader can see which one failed:
+///
+///   1. The signature. The issuer signed the canonical payload with a key
+///      this platform never held, so altering any field breaks it.
+///   2. The chain. Every credential records the hash of the one before it,
+///      so the record is append-only: changing an old row changes its hash
+///      and orphans everything issued after it.
+///
+/// The second is what a blockchain is for, built here as a local hash chain.
+/// See credentials.service.ts for what that does and does not give you, and
+/// what anchoring it to a public chain would add.
+model Credential {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Whose credential it is.
+  subjectId String @db.Uuid
+  subject   User   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  issuerId String @db.Uuid
+  issuer   Issuer @relation(fields: [issuerId], references: [id], onDelete: Restrict)
+
+  kind CredentialKind
+
+  /// "BSc in Computer Science", "Senior Electrician", "Food Safety Level 2".
+  title String
+  /// The subject, trade or department, where one applies.
+  field String?
+  /// A class, grade or CGPA, exactly as the institution words it.
+  grade String?
+
+  startDate DateTime?
+  endDate   DateTime?
+
+  /// Anything else the issuer chose to attest, signed along with the rest.
+  claims Json?
+
+  // --- the ledger ---
+
+  /// Position in the append-only chain, from zero.
+  index Int @unique
+
+  /// SHA-256 of the credential contents alone, hex. This is what the issuer
+  /// signs: it can be computed by the institution before the credential is
+  /// sent, without knowing where in the ledger it will land.
+  contentHash String
+
+  /// SHA-256 of the content hash together with its ledger position, hex.
+  /// This is what the chain links. Separating the two is what lets the
+  /// issuer sign offline and the ledger stay append-only.
+  hash String @unique
+
+  /// The hash of credential `index - 1`. All zeroes for the first.
+  prevHash String
+
+  /// ed25519 over `contentHash`, base64url. Made with the issuer's private
+  /// key, which this server has never held.
+  signature String
+
+  issuedAt DateTime @default(now())
+
+  /// Set when the issuer withdraws it — a degree rescinded, a letter issued
+  /// in error. The row is never deleted: a credential that vanishes cannot
+  /// be told apart from one that never existed, and the chain would break.
+  revokedAt    DateTime?
+  revokeReason String?
+
+  createdAt DateTime @default(now())
+
+  @@index([subjectId, issuedAt])
+  @@index([issuerId, issuedAt])
+  @@map("credentials")
+}
+
+enum CredentialKind {
+  DEGREE
+  DIPLOMA
+  CERTIFICATE
+  TRAINING
+  EXPERIENCE_LETTER
+  LICENCE
+}
+
+// --- mock tests ---
+
+/// One practice test: its questions, the attempt at it, and what it came to.
+///
+/// Test and attempt are one row rather than two. A mock test is generated
+/// fresh for the person taking it — that is what makes it practice rather
+/// than an exam — so a test with no attempt is not a thing that exists, and
+/// splitting them would mean a join that never has anything useful on the
+/// other side.
+///
+/// The questions are stored as written, answers and all. They have to be:
+/// scoring happens here, and a question whose correct answer lived only in
+/// the model's reply could never be marked twice the same way. What the app
+/// sends to the phone has the answers stripped — see MockTestsService.
+model MockTest {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  category JobCategory
+  level    MockLevel   @default(INTERMEDIATE)
+  /// "Frontend Development", "Customer Service" — what the person chose.
+  title    String
+
+  /// [{ prompt, code?, options: string[4], answer: 0-3, skill, why }]
+  questions Json
+  /// What they picked, by index, nulls for unanswered. Written on submit.
+  answers   Json?
+
+  durationSeconds Int @default(900)
+
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+
+  /// Correct answers out of `total`. Null until submitted.
+  score  Int?
+  total  Int
+  passed Boolean?
+
+  /// Per-skill percentages, for the breakdown bars.
+  /// [{ skill, correct, asked }]
+  breakdown Json?
+
+  /// Whether a model wrote the questions or they came from the bank.
+  source String @default("assembled")
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, category])
+  @@map("mock_tests")
+}
+
+/// How hard the questions are pitched.
+enum MockLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+// --- google meet ---
+
+/// A recruiter's link to their own Google account, for creating Meet rooms.
+///
+/// Only the refresh token is kept, and only encrypted — see GoogleService.
+/// Access tokens last an hour and are fetched fresh when needed rather than
+/// stored, because a stored access token is a credential sitting in a table
+/// for no benefit.
+model GoogleConnection {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @unique @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The Google account it belongs to, shown so the person knows which one.
+  googleEmail String
+
+  /// AES-256-GCM, "iv.tag.ciphertext" in base64url. Never logged.
+  refreshToken String
+
+  scope String
+
+  connectedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("google_connections")
 }

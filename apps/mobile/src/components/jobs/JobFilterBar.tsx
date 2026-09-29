@@ -135,16 +135,16 @@ const START_WINDOWS: Choice[] = [
   { value: 'FLEXIBLE', label: 'jobs.start.FLEXIBLE' },
 ];
 
-const BUTTONS: { key: GroupKey; icon: string; label: TranslationKey }[] = [
-  { key: 'jobType', icon: '🔍', label: 'filter.jobType' },
-  { key: 'category', icon: '📂', label: 'filter.category' },
-  { key: 'location', icon: '📍', label: 'filter.location' },
-  { key: 'pay', icon: '💰', label: 'filter.pay' },
-  { key: 'time', icon: '🕒', label: 'filter.workingTime' },
-  { key: 'duration', icon: '📅', label: 'filter.duration' },
-  { key: 'start', icon: '📆', label: 'filter.startDate' },
-  { key: 'urgency', icon: '⚡', label: 'filter.urgency' },
-  { key: 'workMode', icon: '🏠', label: 'filter.workMode' },
+const BUTTONS: { key: GroupKey; label: TranslationKey }[] = [
+  { key: 'jobType', label: 'filter.jobType' },
+  { key: 'category', label: 'filter.category' },
+  { key: 'location', label: 'filter.location' },
+  { key: 'pay', label: 'filter.pay' },
+  { key: 'time', label: 'filter.workingTime' },
+  { key: 'duration', label: 'filter.duration' },
+  { key: 'start', label: 'filter.startDate' },
+  { key: 'urgency', label: 'filter.urgency' },
+  { key: 'workMode', label: 'filter.workMode' },
 ];
 
 export function JobFilterBar({
@@ -263,7 +263,6 @@ export function JobFilterBar({
               },
             ]}
           >
-            <Text style={styles.buttonIcon}>🔖</Text>
             <Text style={[styles.buttonText, { color: c.text }]}>
               {t('jobs.saved')}
             </Text>
@@ -291,7 +290,6 @@ export function JobFilterBar({
                   },
                 ]}
               >
-                <Text style={styles.buttonIcon}>{b.icon}</Text>
                 <Text style={[styles.buttonText, { color: c.text }]}>
                   {t(b.label)}
                 </Text>
@@ -370,7 +368,7 @@ export function JobFilterBar({
                         // The count is what a separate category strip used to
                         // contribute; it belongs next to the name, not on its
                         // own row duplicating this list.
-                        label={`${cat.emoji} ${jobCategoryName(cat.key, locale)}${
+                        label={`${jobCategoryName(cat.key, locale)}${
                           n ? `  ${n}` : ''
                         }`}
                         on={isOn('categories', cat.key)}
@@ -659,7 +657,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  buttonIcon: { fontSize: 12 },
   buttonText: { fontSize: font.xs + 1, fontWeight: '700' },
   caret: { fontSize: 13, fontWeight: '800', marginTop: -3 },
   badge: {

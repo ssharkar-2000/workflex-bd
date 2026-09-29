@@ -1,248 +1,172 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { WALLET_LIMITS, formatTaka, type PaymentReceipt } from '@workflex/shared';
-import { fetchPayees, fetchWallet, payHire } from '../../../src/api/wallet';
+import { WALLET_LIMITS, formatTaka } from '@workflex/shared';
+import { fetchWallet, payForJob, payHire } from '../../../src/api/wallet';
 import { ErrorBanner } from '../../../src/components/ErrorBanner';
 import { ShimmerButton } from '../../../src/components/ShimmerButton';
 import {
-  Card,
   Field,
   MoneyInput,
   MoneyScreen,
   Notice,
-  OutlineButton,
 } from '../../../src/components/wallet/WalletUi';
 import { useErrorMessage } from '../../../src/lib/error-message';
-import { newRequestId } from '../../../src/lib/request-id';
 import { useT } from '../../../src/i18n';
 import { useTheme } from '../../../src/lib/use-theme';
-import { font, radius, space } from '../../../src/lib/theme';
+import { font, space } from '../../../src/lib/theme';
+
+function newRequestId(): string {
+  return globalThis.crypto?.randomUUID
+    ? globalThis.crypto.randomUUID()
+    : `${Date.now().toString(16)}-0000-4000-8000-${Math.random().toString(16).slice(2, 14)}`;
+}
 
 /**
- * Paying someone you hired, for one job.
+ * Paying someone for a job, typed out by hand.
  *
- * Two steps on purpose. A payment cannot be undone — it lands in the other
- * person's wallet at once and can be withdrawn from there — so the amount is
- * read back, with the name, before anything moves.
+ * Three identifiers, all required: who they are (their WorkFlex id), the
+ * number that must belong to that same account, and which job the money is
+ * for. The server checks that all three agree before it moves anything —
+ * one of them alone is a single typo away from paying a stranger.
+ *
+ * Opened from the hired list or an applicant card, the person is already
+ * known — the app passes their account id, the hire is already on record,
+ * and the screen asks only for an amount. Opened from the wallet, nothing is
+ * known and all three identifiers are typed.
  */
 export default function PayScreen() {
   const t = useT();
   const router = useRouter();
   const { c } = useTheme();
-  const queryClient = useQueryClient();
   const errorMessage = useErrorMessage();
-  const { jobId, payeeId } = useLocalSearchParams<{ jobId?: string; payeeId?: string }>();
+  const queryClient = useQueryClient();
 
-  const payees = useQuery({ queryKey: ['payees'], queryFn: fetchPayees });
+  const params = useLocalSearchParams<{
+    jobId?: string;
+    payeeId?: string;
+    publicId?: string;
+    phone?: string;
+  }>();
+  // Came from a list that already knows who is being paid, so the three
+  // identifying fields would be asking the app's own question back at it.
+  const known = Boolean(params.payeeId && params.jobId);
+
   const wallet = useQuery({ queryKey: ['wallet'], queryFn: fetchWallet });
-  const payee = payees.data?.payees.find((p) => p.jobId === jobId && p.payeeId === payeeId);
 
+  const [publicId, setPublicId] = useState(params.publicId ?? '');
+  const [phone, setPhone] = useState(params.phone ?? '');
+  const [jobId, setJobId] = useState(params.jobId ?? '');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
-  const [confirming, setConfirming] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [receipt, setReceipt] = useState<PaymentReceipt | null>(null);
-  // One per visit: a retry after a dropped connection is the same payment.
-  const [requestId] = useState(newRequestId);
 
-  const balance = wallet.data?.balance ?? 0;
   const value = Number.parseInt(amount || '0', 10);
-  const tooLittle = value < WALLET_LIMITS.paymentMin;
-  const tooMuch = value > balance;
+  const inRange =
+    value >= WALLET_LIMITS.paymentMin && value <= WALLET_LIMITS.transferMax;
+  const enough = (wallet.data?.balance ?? 0) >= value;
+  const complete = known
+    ? inRange
+    : publicId.trim().length >= 4 &&
+      phone.trim().length >= 6 &&
+      jobId.trim().length > 0 &&
+      inRange;
 
   const pay = useMutation({
     mutationFn: () =>
-      payHire({ jobId: jobId!, payeeId: payeeId!, amount: value, note, requestId }),
-    onSuccess: (done) => {
-      setReceipt(done);
-      for (const key of ['wallet', 'wallet-statement', 'payees', 'applicants']) {
-        void queryClient.invalidateQueries({ queryKey: [key] });
-      }
-    },
-    onError: (err) => {
-      setError(errorMessage(err));
-      setConfirming(false);
+      known
+        ? payHire({
+            jobId: params.jobId!,
+            payeeId: params.payeeId!,
+            amount: value,
+            note: note.trim() || undefined,
+            requestId: newRequestId(),
+          })
+        : payForJob({
+            publicId: publicId.trim(),
+            phone: phone.trim(),
+            jobId: jobId.trim(),
+            amount: value,
+            note: note.trim() || undefined,
+            requestId: newRequestId(),
+          }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['wallet'] });
+      void queryClient.invalidateQueries({ queryKey: ['wallet-statement'] });
+      router.replace('/(app)/wallet');
     },
   });
-
-  if (payees.isLoading || wallet.isLoading) {
-    return (
-      <MoneyScreen title={t('pay.title')}>
-        <ActivityIndicator color={c.primary} style={styles.loading} />
-      </MoneyScreen>
-    );
-  }
-
-  if (receipt) {
-    return (
-      <MoneyScreen
-        title={t('pay.title')}
-        footer={<OutlineButton label={t('pay.done')} onPress={() => router.back()} />}
-      >
-        <Notice
-          tone="success"
-          title={`✓ ${t('pay.doneTitle', { amount: formatTaka(receipt.amount), name: receipt.payeeName })}`}
-          body={t('pay.doneBody', { balance: formatTaka(receipt.balance) })}
-        />
-      </MoneyScreen>
-    );
-  }
-
-  if (!payee) {
-    return (
-      <MoneyScreen title={t('pay.title')}>
-        {payees.error ? (
-          <ErrorBanner message={errorMessage(payees.error)} tone="onSurface" />
-        ) : (
-          <Notice tone="danger" body={t('pay.notHired')} />
-        )}
-      </MoneyScreen>
-    );
-  }
-
-  const initials = payee.name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('');
 
   return (
     <MoneyScreen
       title={t('pay.title')}
+      subtitle={t('pay.subtitle')}
       footer={
-        <View style={styles.footer}>
-          {error ? <ErrorBanner message={error} tone="onSurface" /> : null}
-          {confirming ? (
-            <>
-              <Notice
-                tone="warning"
-                title={t('pay.confirmTitle', { amount: formatTaka(value), name: payee.name })}
-                body={t('pay.confirmBody')}
-              />
-              <View style={styles.confirmRow}>
-                <View style={styles.flex}>
-                  <OutlineButton
-                    label={t('pay.back')}
-                    onPress={() => setConfirming(false)}
-                    disabled={pay.isPending}
-                  />
-                </View>
-                <View style={styles.confirmPrimary}>
-                  <ShimmerButton
-                    label={t('pay.confirm')}
-                    onPress={() => pay.mutate()}
-                    loading={pay.isPending}
-                  />
-                </View>
-              </View>
-            </>
-          ) : (
-            <ShimmerButton
-              label={value > 0 ? `${t('pay.review')} · ${formatTaka(value)}` : t('pay.review')}
-              onPress={() => {
-                setError(null);
-                setConfirming(true);
-              }}
-              disabled={tooLittle || tooMuch}
-            />
-          )}
-        </View>
+        <ShimmerButton
+          label={t('pay.send', { amount: inRange ? formatTaka(value) : '' })}
+          onPress={() => pay.mutate()}
+          disabled={!complete || !enough || pay.isPending}
+          loading={pay.isPending}
+        />
       }
     >
-      <Card style={styles.who}>
-        <View style={[styles.avatar, { backgroundColor: c.tints[1], borderColor: c.tintBorders[1] }]}>
-          <Text style={[styles.avatarText, { color: c.text }]}>{initials || '?'}</Text>
-        </View>
-        <View style={styles.flex}>
-          <Text style={[styles.name, { color: c.text }]} numberOfLines={1}>
-            {payee.name}
-          </Text>
-          <Text style={[styles.meta, { color: c.textMuted }]} numberOfLines={1}>
-            {t('pay.for', { job: payee.jobTitle })}
-          </Text>
-          <Text style={[styles.meta, { color: c.textMuted }]}>
-            {t('pay.paidSoFar', { amount: formatTaka(payee.paidSoFar) })}
-          </Text>
-        </View>
-      </Card>
+      <Text style={[styles.available, { color: c.textMuted }]}>
+        {t('pay.available', { amount: formatTaka(wallet.data?.balance ?? 0) })}
+      </Text>
 
-      <Card>
-        <MoneyInput
-          label={t('pay.amount')}
-          value={amount}
-          onChange={(v) => {
-            setAmount(v);
-            setConfirming(false);
-            if (error) setError(null);
-          }}
-          invalid={amount !== '' && (tooLittle || tooMuch)}
-        />
+      {known ? null : (
+        <>
+          <Field
+            label={t('pay.publicId')}
+            value={publicId}
+            onChange={setPublicId}
+            placeholder="WF-3A9C1B"
+            autoCapitalize="none"
+          />
+          <Field
+            label={t('pay.phone')}
+            value={phone}
+            onChange={setPhone}
+            placeholder="01XXXXXXXXX"
+            keyboardType="phone-pad"
+          />
+          <Field
+            label={t('pay.jobId')}
+            value={jobId}
+            onChange={setJobId}
+            placeholder={t('pay.jobIdPlaceholder')}
+            autoCapitalize="none"
+          />
+        </>
+      )}
 
-        <View style={styles.balanceRow}>
-          <Text style={[styles.meta, { color: tooMuch ? c.danger : c.textMuted }]}>
-            {tooMuch ? t('pay.notEnough') : t('pay.inWallet', { amount: formatTaka(balance) })}
-          </Text>
-          {tooMuch || balance < WALLET_LIMITS.paymentMin ? (
-            <Pressable
-              onPress={() => router.push('/(app)/wallet/add-money')}
-              hitSlop={8}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.addMoney, { color: c.primary }]}>
-                ＋ {t('pay.addMoney')}
-              </Text>
-            </Pressable>
-          ) : null}
+      <MoneyInput label={t('addMoney.amount')} value={amount} onChange={setAmount} />
+
+      <Field
+        label={t('scan.note')}
+        value={note}
+        onChange={setNote}
+        placeholder={t('pay.notePlaceholder')}
+        optional
+        autoCapitalize="sentences"
+      />
+
+      {!enough && inRange ? (
+        <View style={styles.spacer}>
+          <Notice tone="warning" body={t('pay.notEnough')} />
         </View>
-        {amount !== '' && tooLittle ? (
-          <Text style={[styles.meta, { color: c.danger }]}>
-            {t('pay.min', { amount: formatTaka(WALLET_LIMITS.paymentMin) })}
-          </Text>
-        ) : null}
+      ) : null}
 
-        <View style={styles.noteGap} />
-        <Field
-          label={t('pay.note')}
-          value={note}
-          onChange={(v) => setNote(v.slice(0, 200))}
-          placeholder={t('pay.notePlaceholder')}
-          autoCapitalize="sentences"
-          optional
-        />
-      </Card>
+      {pay.error ? (
+        <ErrorBanner message={errorMessage(pay.error)} tone="onSurface" />
+      ) : null}
+
+      {known ? null : <Notice tone="info" body={t('pay.checks')} />}
     </MoneyScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  loading: { marginTop: space.lg },
-  flex: { flex: 1 },
-  footer: { gap: 8 },
-  confirmRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  confirmPrimary: { flex: 1.4 },
-
-  who: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { fontSize: font.md, fontWeight: '800' },
-  name: { fontSize: font.lg, fontWeight: '800' },
-  meta: { fontSize: font.xs + 1, marginTop: 2 },
-
-  balanceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: -6,
-  },
-  addMoney: { fontSize: font.sm, fontWeight: '800' },
-  noteGap: { height: 14 },
+  available: { fontSize: font.sm, fontWeight: '700', marginBottom: space.md },
+  spacer: { marginTop: space.sm },
 });

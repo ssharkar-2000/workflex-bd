@@ -66,7 +66,7 @@ export function NearbyJobs() {
     return (
       <View style={styles.section}>
         <Text style={[styles.title, { color: c.text }]}>
-          📍 {t('near.title')}
+          {t('near.title')}
         </Text>
         <View
           style={[
@@ -97,7 +97,7 @@ export function NearbyJobs() {
     <View style={styles.section}>
       <View style={styles.head}>
         <Text style={[styles.title, { color: c.text }]}>
-          📍 {t('near.title')}
+          {t('near.title')}
         </Text>
         <Pressable
           onPress={() => {
@@ -200,7 +200,6 @@ function NearbyRow({ row }: { row: NearbyJob }) {
       accessibilityLabel={job.title}
       style={[styles.row, { backgroundColor: c.surface, borderColor: c.border }]}
     >
-      <Text style={styles.emoji}>{JOB_CATEGORY_BY_KEY[job.category].emoji}</Text>
       <View style={styles.rowText}>
         <Text style={[styles.rowTitle, { color: c.text }]} numberOfLines={1}>
           {job.title}
@@ -242,7 +241,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
-  emoji: { fontSize: 22 },
   rowText: { flex: 1, minWidth: 0 },
   rowTitle: { fontSize: font.sm, fontWeight: '800' },
   rowFacts: { fontSize: font.xs, marginTop: 2, lineHeight: 17, fontWeight: '700' },

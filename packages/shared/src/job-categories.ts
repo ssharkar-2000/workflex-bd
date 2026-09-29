@@ -382,6 +382,10 @@ export function jobCategoryName(
   key: JobCategory,
   locale: 'en' | 'bn',
 ): string {
+  // Falls back to the key rather than throwing. Every caller reads this
+  // straight into a <Text>, and a category the taxonomy has not caught up
+  // with should show as its own name, not take the screen down with it.
   const info = JOB_CATEGORY_BY_KEY[key];
+  if (!info) return key;
   return locale === 'bn' ? info.bn : info.en;
 }

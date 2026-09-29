@@ -37,10 +37,11 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "WorkFlex uses your camera to scan wallet QR codes.",
+          "cameraPermission": "WorkFlex uses the camera to read a wallet QR code when you send money.",
           "recordAudioAndroid": false
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true

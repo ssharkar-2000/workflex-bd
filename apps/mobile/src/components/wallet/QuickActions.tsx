@@ -3,11 +3,10 @@ import { useTheme } from '../../lib/use-theme';
 import { font, radius, space } from '../../lib/theme';
 
 export type QuickAction = {
-  icon: string;
   label: string;
-  /** A light wash behind the icon, so each action is findable by colour. */
+  /** The action's own colour, so each tile is findable without reading it. */
   tint: string;
-  /** The icon's own colour, dark enough to read on that wash. */
+  /** A deeper shade of the same, for the mark that carries it. */
   ink: string;
   onPress: () => void;
 };
@@ -40,9 +39,10 @@ export function QuickActions({ actions }: { actions: QuickAction[] }) {
             },
           ]}
         >
-          <View style={[s.bubble, { backgroundColor: action.tint }]}>
-            <Text style={[s.icon, { color: action.ink }]}>{action.icon}</Text>
-          </View>
+          {/* A dot rather than the glyph that used to sit in a bubble here.
+              The colour is what this row is used by — "the green one" — and
+              it survives the icon going; an empty 42pt circle would not. */}
+          <View style={[s.dot, { backgroundColor: action.ink }]} />
           {/* Two lines: "টাকা যোগ করুন" does not fit a third of a phone's
               width, and a truncated label is a guess. */}
           <Text style={[s.label, { color: c.text }]} numberOfLines={2}>
@@ -67,13 +67,6 @@ const s = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
   },
-  bubble: {
-    width: 42,
-    height: 42,
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  icon: { fontSize: font.lg, fontWeight: '700' },
+  dot: { width: 10, height: 10, borderRadius: radius.pill },
   label: { fontSize: font.xs, fontWeight: '600', textAlign: 'center' },
 });

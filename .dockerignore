@@ -1,0 +1,26 @@
+# Everything the image builds for itself, or must never contain.
+node_modules
+**/node_modules
+**/dist
+**/.expo
+**/.turbo
+.git
+.github
+.metro-cache*
+.tmp
+
+# Secrets. The image reads its configuration from the environment.
+.env
+.env.*
+!.env.example
+
+# The phone apps and the console are built as static sites, not into this image.
+apps/mobile
+apps/admin
+
+# Local-only bits
+docs
+scripts
+*.md
+*.ps1
+docker-compose.yml

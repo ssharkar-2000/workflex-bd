@@ -19,49 +19,41 @@ const SHOWN = 3;
  */
 const KINDS: Record<
   ActivityEventKind,
-  { icon: string; title: TranslationKey; body: TranslationKey | null }
+  { title: TranslationKey; body: TranslationKey | null }
 > = {
   APPLICATION_VIEWED: {
-    icon: '👀',
     title: 'feed.viewed.title',
     body: 'feed.viewed.body',
   },
   APPLICATION_SHORTLISTED: {
-    icon: '🟢',
     title: 'feed.shortlisted.title',
     body: 'feed.shortlisted.body',
   },
   APPLICATION_ACCEPTED: {
-    icon: '🎉',
     title: 'feed.accepted.title',
     body: 'feed.accepted.body',
   },
   APPLICATION_REJECTED: {
-    icon: '📄',
     title: 'feed.rejected.title',
     body: 'feed.rejected.body',
   },
   NEW_APPLICANT: {
-    icon: '👤',
     title: 'feed.applicant.title',
     body: 'feed.applicant.body',
   },
   VERIFICATION_APPROVED: {
-    icon: '🪪',
     title: 'feed.verified.title',
     body: 'feed.verified.body',
   },
   VERIFICATION_ON_HOLD: {
-    icon: '🔍',
     title: 'feed.onHold.title',
     body: 'feed.onHold.body',
   },
   VERIFICATION_REJECTED: {
-    icon: '🪪',
     title: 'feed.kycRejected.title',
     body: null,
   },
-  ANNOUNCEMENT: { icon: '📢', title: 'feed.announcement.title', body: null },
+  ANNOUNCEMENT: { title: 'feed.announcement.title', body: null },
 };
 
 /**
@@ -98,7 +90,7 @@ export function RecentActivity() {
     <View style={styles.section}>
       <View style={styles.head}>
         <Text style={[styles.title, { color: c.text }]}>
-          🔔 {t('feed.title')}
+          {t('feed.title')}
         </Text>
         <Pressable
           onPress={() => router.push('/(app)/notifications')}
@@ -166,7 +158,6 @@ function EventRow({
         divided && { borderTopWidth: 1, borderTopColor: c.border },
       ]}
     >
-      <Text style={styles.icon}>{spec.icon}</Text>
       <View style={styles.rowText}>
         <Text style={[styles.rowTitle, { color: c.text }]} numberOfLines={1}>
           {heading}
@@ -239,7 +230,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   row: { flexDirection: 'row', gap: 10, padding: 14 },
-  icon: { fontSize: 18, lineHeight: 22 },
   rowText: { flex: 1, minWidth: 0 },
   rowTitle: { fontSize: font.sm, fontWeight: '800' },
   rowBody: { fontSize: font.xs, marginTop: 2, lineHeight: 17 },

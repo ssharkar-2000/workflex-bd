@@ -4,3 +4,12 @@ dist/
 .expo/
 # Temp dir for the dev-server launchers in scripts/ (kept off the full C: drive)
 .tmp/
+
+# Private uploads and machine-local files: never commit them (the repo is public)
+apps/api/storage/
+apps/api/models/
+logs/
+*.log
+.turbo/
+.metro-cache*/
+.stage-*/

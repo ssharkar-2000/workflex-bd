@@ -1,7 +1,6 @@
-import { newRequestId } from '../../../src/lib/request-id';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -10,6 +9,7 @@ import {
   type ResolvedWallet,
 } from '@workflex/shared';
 import { resolveWallet, sendTransfer } from '../../../src/api/wallet';
+import { newRequestId } from '../../../src/lib/request-id';
 import { ErrorBanner } from '../../../src/components/ErrorBanner';
 import { ShimmerButton } from '../../../src/components/ShimmerButton';
 import {
@@ -23,8 +23,6 @@ import { useErrorMessage } from '../../../src/lib/error-message';
 import { useT } from '../../../src/i18n';
 import { useTheme } from '../../../src/lib/use-theme';
 import { font, radius, space } from '../../../src/lib/theme';
-
-
 
 /**
  * Sending money to another account by scanning its QR.
@@ -43,18 +41,21 @@ export default function ScanScreen() {
   const { c } = useTheme();
   const errorMessage = useErrorMessage();
   const queryClient = useQueryClient();
-  const requestId = useRef(newRequestId());
 
   const [permission, requestPermission] = useCameraPermissions();
   const [payee, setPayee] = useState<ResolvedWallet | null>(null);
   const [typed, setTyped] = useState('');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
-  const [submitted, setSubmitted] = useState(false);
   // One scan at a time: the camera fires this continuously while a code is
   // in frame, and every extra call is another lookup for the same wallet.
   const scanning = useRef(false);
-  const {u} = useLocalSearchParams<{u?: string}>();
+  // One id for this payment, kept across retries: a second tap after a
+  // timeout is the same payment again, which the server answers without
+  // sending the money twice.
+  const requestId = useRef(newRequestId());
+  // Locked once sent, so a retry cannot quietly change who or how much.
+  const [submitted, setSubmitted] = useState(false);
 
   const lookUp = useMutation({
     mutationFn: (code: string) => resolveWallet(code),
@@ -64,10 +65,11 @@ export default function ScanScreen() {
     },
   });
 
-  useEffect(() => { if (u) lookUp.mutate(u); }, [u]);
-
   const value = Number(amount || '0');
-  const inRange = Number.isInteger(value) && value >= WALLET_LIMITS.paymentMin && value <= WALLET_LIMITS.transferMax;
+  const inRange =
+    Number.isInteger(value) &&
+    value >= WALLET_LIMITS.paymentMin &&
+    value <= WALLET_LIMITS.transferMax;
 
   const send = useMutation({
     mutationFn: () =>
@@ -82,6 +84,14 @@ export default function ScanScreen() {
       void queryClient.invalidateQueries({ queryKey: ['wallet-statement'] });
       router.replace('/(app)/wallet');
     },
+    onError: (err) => {
+      // A definite no from the server (4xx) stored nothing under this id, so
+      // the form can be corrected and sent again. No answer, or the server
+      // failing half way, may have gone through: it stays locked, and a
+      // retry repeats the same request.
+      const status = (err as { response?: { status?: number } }).response?.status;
+      if (status !== undefined && status >= 400 && status < 500) setSubmitted(false);
+    },
   });
 
   // --- step 2 and 3: who it is going to, and how much ---
@@ -92,7 +102,10 @@ export default function ScanScreen() {
         footer={
           <ShimmerButton
             label={t('scan.send', { amount: inRange ? formatTaka(value) : '' })}
-            onPress={() => { setSubmitted(true); send.mutate(); }}
+            onPress={() => {
+              setSubmitted(true);
+              send.mutate();
+            }}
             disabled={!inRange || send.isPending}
             loading={send.isPending}
           />
@@ -110,17 +123,30 @@ export default function ScanScreen() {
               {payee.phone} · {payee.code}
             </Text>
           </View>
-          <Pressable disabled={submitted} onPress={() => setPayee(null)} accessibilityRole="button" hitSlop={8}>
+          <Pressable
+            disabled={submitted}
+            onPress={() => setPayee(null)}
+            accessibilityRole="button"
+            hitSlop={8}
+          >
             <Text style={[styles.change, { color: c.primary }]}>{t('scan.change')}</Text>
           </Pressable>
         </Card>
 
-        <MoneyInput label={t('addMoney.amount')} value={amount} onChange={(v) => { if (!submitted) setAmount(v); }} />
+        <MoneyInput
+          label={t('addMoney.amount')}
+          value={amount}
+          onChange={(v) => {
+            if (!submitted) setAmount(v);
+          }}
+        />
 
         <Field
           label={t('scan.note')}
           value={note}
-          onChange={(v) => { if (!submitted) setNote(v); }}
+          onChange={(v) => {
+            if (!submitted) setNote(v);
+          }}
           placeholder={t('scan.notePlaceholder')}
           optional
           autoCapitalize="sentences"
@@ -183,8 +209,8 @@ export default function ScanScreen() {
         label={t('scan.byNumber')}
         value={typed}
         onChange={setTyped}
-        placeholder="WF-0000000001 / 01XXXXXXXXX"
-        autoCapitalize="none"
+        placeholder="01XXXXXXXXX"
+        keyboardType="phone-pad"
       />
       <Pressable
         onPress={() => lookUp.mutate(typed.trim())}

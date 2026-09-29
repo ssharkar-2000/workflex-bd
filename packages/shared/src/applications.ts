@@ -113,6 +113,10 @@ export const applicantSchema = z.object({
   phone: z.string().nullable(),
   /** Paid through the wallet for this job so far. */
   paidSoFar: z.number().int(),
+  /** There is a CV to open. */
+  hasCv: z.boolean(),
+  /** There is a one-minute video introduction to watch. */
+  hasIntro: z.boolean(),
 });
 export type Applicant = z.infer<typeof applicantSchema>;
 

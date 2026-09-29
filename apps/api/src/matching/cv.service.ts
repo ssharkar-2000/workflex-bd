@@ -28,17 +28,28 @@ export class CvService {
   ) {}
 
   async status(userId: string): Promise<CvStatus> {
-    const [doc, profile] = await Promise.all([
+    const [doc, profile, intro] = await Promise.all([
       this.prisma.document.findUnique({
         where: { userId_kind: { userId, kind: 'CV' } },
         select: { id: true },
       }),
       this.prisma.cvProfile.findUnique({ where: { userId } }),
+      this.prisma.document.findUnique({
+        where: { userId_kind: { userId, kind: 'INTRO_VIDEO' } },
+        select: { mimeType: true, sizeBytes: true, createdAt: true },
+      }),
     ]);
 
     return {
       hasCv: doc !== null,
       parsingEnabled: this.parser.enabled,
+      intro: intro
+        ? {
+            mimeType: intro.mimeType,
+            sizeBytes: intro.sizeBytes,
+            uploadedAt: intro.createdAt.toISOString(),
+          }
+        : null,
       profile: profile
         ? {
             skills: profile.skills,

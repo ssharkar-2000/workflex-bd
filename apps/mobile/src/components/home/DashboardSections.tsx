@@ -63,7 +63,7 @@ export function Greeting({ name }: { name: string }) {
         style={[styles.greetingTitle, { color: c.text }]}
         numberOfLines={1}
       >
-        {t(key, { name })} 👋
+        {t(key, { name })}
       </Text>
       <Text style={[styles.greetingBody, { color: c.textMuted }]}>
         {t('dash.greetingBody')}
@@ -234,14 +234,12 @@ export function ActivityOverview({ data }: { data: DashboardSummary }) {
    * the repetition.
    */
   const rows: {
-    icon: string;
     label: TranslationKey;
     value: number;
     hint?: string;
     href: string;
   }[] = [
     {
-      icon: '📄',
       label: 'dash.stat.applications',
       value: data.seeking.applications,
       hint:
@@ -253,13 +251,11 @@ export function ActivityOverview({ data }: { data: DashboardSummary }) {
       href: '/(app)/activity',
     },
     {
-      icon: '🔖',
       label: 'dash.stat.saved',
       value: data.seeking.savedJobs,
       href: '/(app)/jobs?saved=1',
     },
     {
-      icon: '📋',
       label: 'dash.stat.posted',
       value: data.hiring.jobsPosted,
       hint:
@@ -269,7 +265,6 @@ export function ActivityOverview({ data }: { data: DashboardSummary }) {
       href: '/(app)/activity?tab=jobs',
     },
     {
-      icon: '👥',
       label: 'dash.stat.applicants',
       value: data.hiring.applicants,
       hint:
@@ -297,7 +292,6 @@ export function ActivityOverview({ data }: { data: DashboardSummary }) {
               { backgroundColor: c.surface, borderColor: c.border },
             ]}
           >
-            <Text style={styles.statIcon}>{row.icon}</Text>
             <Text style={[styles.statValue, { color: c.text }]}>{row.value}</Text>
             <Text
               style={[styles.statLabel, { color: c.textMuted }]}
@@ -385,7 +379,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     alignItems: 'center',
   },
-  statIcon: { fontSize: 13, lineHeight: 16 },
   statValue: {
     fontSize: font.lg,
     fontWeight: '800',

@@ -59,7 +59,7 @@ export function NextSkillAI() {
       >
         <View style={styles.head}>
           <Text style={[styles.title, { color: c.text }]}>
-            🤖 {t('skill.title')}
+            {t('skill.title')}
           </Text>
           <Pressable
             onPress={() => router.push('/(app)/jobs')}
@@ -193,9 +193,8 @@ function WhyThisSkill({
 
   if (!gap) return null;
 
-  const facts: { icon: string; line: string }[] = [
+  const facts: { line: string }[] = [
     {
-      icon: '🔥',
       line: t('skill.why.demand', {
         count: gap.postings,
         total: path.jobsConsidered,
@@ -205,14 +204,13 @@ function WhyThisSkill({
   ];
 
   if (gap.unlocks > 0) {
-    facts.push({ icon: '💼', line: t('skill.why.unlocks', { count: gap.unlocks }) });
+    facts.push({ line: t('skill.why.unlocks', { count: gap.unlocks }) });
   } else {
-    facts.push({ icon: '💼', line: t('skill.why.noUnlocks') });
+    facts.push({ line: t('skill.why.noUnlocks') });
   }
 
   if (gap.pairedWith) {
     facts.push({
-      icon: '⭐',
       line: t('skill.why.paired', {
         skill: gap.pairedWith.skill,
         count: gap.pairedWith.jobs,
@@ -237,7 +235,6 @@ function WhyThisSkill({
           <View style={styles.factList}>
             {facts.map((fact) => (
               <View key={fact.line} style={styles.factRow}>
-                <Text style={styles.factIcon}>{fact.icon}</Text>
                 <Text style={[styles.factText, { color: c.text }]}>
                   {fact.line}
                 </Text>
@@ -322,7 +319,6 @@ const styles = StyleSheet.create({
   sheetTitle: { fontSize: font.xl, fontWeight: '800', marginTop: 4 },
   factList: { marginTop: 16, gap: 12 },
   factRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
-  factIcon: { fontSize: font.md, lineHeight: 22 },
   factText: { flex: 1, fontSize: font.sm, lineHeight: 21, fontWeight: '600' },
   sheetNote: { fontSize: font.xs, marginTop: 16, lineHeight: 17 },
   sheetClose: {

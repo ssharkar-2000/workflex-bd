@@ -12,7 +12,7 @@ npm run db:generate -w @workflex/api
 npm run db:deploy -w @workflex/api
 ```
 
-The migration adds deposit references, makes job fields optional for direct transfers, gives existing and new wallets unique `WF-0000000001` style IDs, and indexes incoming receipts. Back up a production database before normal migration deployment. No existing balances are changed by this migration.
+The migration (`20260925100000_wallet_manual_deposits_and_qr_transfers`) adds deposit references and makes job fields optional for direct transfers. Back up a production database before normal migration deployment. No existing balances are changed by this migration.
 
 Set the receiving accounts in the server's `.env`:
 
@@ -32,9 +32,13 @@ Restart the API. Reinstall dependencies and rebuild any native development clien
 1. **Wallet → Add money → Deposit by bKash, Nagad or bank transfer**: copy a configured receiving account, send money outside WorkFlex, and declare the amount, sender account and transaction reference.
 2. **Wallet → Deposits**: see pending, approved or rejected declarations and review notes. A declaration does not increase the balance.
 3. In `apps/admin`, open **Payments → Top-ups → PENDING**. Verify the amount and reference against the receiving account statement before approving. Rejection requires a reason. Approval and ledger credit occur atomically. Pending gateway payments cannot be manually approved through this path.
-4. **Wallet → Receive**: show the QR and unique wallet ID. The short ID is resolvable and may be copied.
-5. **Wallet → Scan**: scan a WorkFlex QR or type a wallet ID/phone number, check the displayed recipient and amount, then send. Own-wallet and insufficient-balance transfers are rejected. Retrying the same submitted request uses the same idempotency key.
-6. Incoming payments produce an in-app receipt popup while signed in. The cursor is saved per account/device, so acknowledged receipts are not shown again. This is polling, not OS push notifications; a closed app does not receive a system notification. Initial installation starts watching from that moment, and statement history remains available.
+4. **Wallet → Receive**: show the QR. It carries the account's id, which cannot be guessed; the short `WF-3A9C1B` code beside it is for reading out and does not open a wallet on its own, so nobody can walk through numbers to collect names.
+5. **Wallet → Scan**: scan a WorkFlex QR or type a phone number, check the displayed recipient and amount, then send. Own-wallet and insufficient-balance transfers are rejected. Retrying the same submitted request uses the same idempotency key.
+6. Incoming payments produce an in-app receipt popup on the wallet screen, once per device per payment. This is polling, not OS push notifications; statement history remains available.
+
+Only money earned from work can be withdrawn. Money a person added can pay for work and be sent to others, but not withdrawn.
+
+For development only, `WALLET_AUTO_APPROVE_DEPOSITS=true` credits a declared deposit immediately; the API refuses to start with it on in production.
 
 Gateway top-ups and payments to accepted hires still work. Manual/gateway top-ups remain spendable, not immediately withdrawable. Person-to-person transfers preserve that distinction: they cannot turn topped-up money into withdrawable earnings. Normal verified work payments retain the existing earning rules.
 
@@ -48,11 +52,4 @@ npm run test
 
 `wallet-features.spec.ts` covers pending-only deposits, duplicate references/retries, approval eligibility, self transfers, insufficient funds and preservation of withdrawable funds.
 
-`apps/api/scripts/check-wallet-migration.mjs` can validate the wallet migration with a separately installed PGlite package:
-
-```sh
-npm install --prefix /tmp/wallet-sql-check @electric-sql/pglite
-node apps/api/scripts/check-wallet-migration.mjs /tmp/wallet-sql-check/node_modules/@electric-sql/pglite/dist/index.js
-```
-
-This checks existing-wallet backfill, unique IDs, nullable job fields, reference uniqueness and balance constraints. Full PostGIS migrations remain a CI/deployment check. Unit tests use mocked database services; real-device camera checks and live-provider end-to-end payments still require the configured environment.
+Every migration is applied to an empty database by CI on each pull request. Unit tests use mocked database services; real-device camera checks and live-provider end-to-end payments still require the configured environment.

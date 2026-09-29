@@ -40,7 +40,7 @@ export function KycStatusCard() {
         ]}
       >
         <Text style={[styles.title, { color: c.warning }]}>
-          ⏳ {t('ob.pending.title')}
+          {t('ob.pending.title')}
         </Text>
         <Text style={[styles.body, { color: c.text }]}>
           {t('ob.pending.body')}
@@ -58,7 +58,7 @@ export function KycStatusCard() {
         ]}
       >
         <Text style={[styles.title, { color: c.danger }]}>
-          ⚠ {t('ob.rejected.title')}
+          {t('ob.rejected.title')}
         </Text>
         {data.rejectReason ? (
           <Text style={[styles.body, { color: c.text }]}>

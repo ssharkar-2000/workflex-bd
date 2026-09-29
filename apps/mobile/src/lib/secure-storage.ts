@@ -12,6 +12,8 @@ const KEYS = {
   /** Separate from the regular session — never both set at once. */
   adminAccessToken: 'workflex.adminAccessToken',
   adminUser: 'workflex.adminUser',
+  /** When this device last announced a payment that came in. */
+  walletReceiptsSeenAt: 'workflex.walletReceiptsSeenAt',
 } as const;
 
 export type SecureKey = keyof typeof KEYS;

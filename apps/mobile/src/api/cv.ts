@@ -78,3 +78,43 @@ export async function fetchSkillPath(): Promise<SkillPathResponse> {
   const { data } = await api.get('/cv/skill-path');
   return skillPathResponseSchema.parse(data);
 }
+
+/**
+ * The one-minute video introduction.
+ *
+ * Same two-platform dance as the CV upload: a blob on the web, a file object
+ * on a phone. The minute is enforced where the video is made — the picker
+ * stops recording at sixty seconds — because a server cannot check the length
+ * of a video without decoding it.
+ */
+export async function uploadIntro(file: {
+  uri: string;
+  name: string;
+  mimeType: string;
+}): Promise<CvStatus> {
+  const form = new FormData();
+  const web = Platform.OS === 'web';
+
+  if (web) {
+    const blob = await fetch(file.uri).then((response) => response.blob());
+    form.append('file', blob, file.name);
+  } else {
+    form.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: file.mimeType,
+    } as unknown as Blob);
+  }
+
+  const { data } = await api.post('/cv/intro', form, {
+    headers: { 'Content-Type': web ? undefined : 'multipart/form-data' },
+    // A minute of video over mobile data.
+    timeout: 180_000,
+  });
+  return cvStatusSchema.parse(data);
+}
+
+export async function removeIntro(): Promise<CvStatus> {
+  const { data } = await api.delete('/cv/intro');
+  return cvStatusSchema.parse(data);
+}

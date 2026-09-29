@@ -37,7 +37,6 @@ export function SpeechHint({ onDismiss }: { onDismiss: () => void }) {
       ]}
     >
       <View style={styles.head}>
-        <Text style={styles.icon}>🔇</Text>
         <Text style={[styles.title, { color: c.warning }]}>
           {t('speech.hint.title')}
         </Text>

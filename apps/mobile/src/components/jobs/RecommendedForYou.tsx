@@ -18,6 +18,7 @@ import {
 import { fetchRecommendations, toggleSavedJob } from '../../api/jobs';
 import { useLocale, useT, type TranslationKey } from '../../i18n';
 import { InteractiveCard } from '../InteractiveCard';
+import { Slideshow } from '../Slideshow';
 import { useTheme } from '../../lib/use-theme';
 import { font, radius, space } from '../../lib/theme';
 
@@ -36,13 +37,6 @@ const REASON_LABELS: Record<RecommendationReason, TranslationKey> = {
   LOCATION: 'rec.reason.LOCATION',
   AVAILABILITY: 'rec.reason.AVAILABILITY',
   PREFERENCE: 'rec.reason.PREFERENCE',
-};
-
-const REASON_ICONS: Record<RecommendationReason, string> = {
-  SKILLS: '🧠',
-  LOCATION: '📍',
-  AVAILABILITY: '⏰',
-  PREFERENCE: '⭐',
 };
 
 const PAYMENT_KEYS: Record<PaymentType, TranslationKey> = {
@@ -98,7 +92,7 @@ export function RecommendedForYou() {
     <View style={styles.section}>
       <View style={styles.head}>
         <Text style={[styles.title, { color: c.text }]}>
-          ✨ {t('rec.title')}
+          {t('rec.title')}
         </Text>
         <Pressable
           onPress={() => router.push('/(app)/jobs')}
@@ -111,20 +105,26 @@ export function RecommendedForYou() {
         </Pressable>
       </View>
 
-      <View style={styles.list}>
-        {data.items.slice(0, SHOWN).map((item) => (
-          <RecommendationCard
-            key={item.job.id}
-            item={item}
-            onExplain={() => setExplaining(item)}
-            onView={() =>
-              router.push({
-                pathname: '/(app)/job/[id]',
-                params: { id: item.job.id },
-              })
-            }
-          />
-        ))}
+      <View style={styles.stage}>
+        <Slideshow
+          items={data.items}
+          keyOf={(item) => item.job.id}
+          // The breakdown sheet reads the card it was opened from; rotating
+          // underneath it would answer a question about a different job.
+          paused={explaining !== null}
+          render={(item) => (
+            <RecommendationCard
+              item={item}
+              onExplain={() => setExplaining(item)}
+              onView={() =>
+                router.push({
+                  pathname: '/(app)/job/[id]',
+                  params: { id: item.job.id },
+                })
+              }
+            />
+          )}
+        />
       </View>
 
       <MatchBreakdown
@@ -217,16 +217,15 @@ function RecommendationCard({
         ]}
       >
         <Text style={[styles.matchText, { color: c.ai }]}>
-          🤖 {t('rec.aiMatch', { percent: item.fit })}
+          {t('rec.aiMatch', { percent: item.fit })}
         </Text>
         <Text style={[styles.matchHint, { color: c.ai }]}>ⓘ</Text>
       </Pressable>
 
       <View style={styles.facts}>
-        <Fact icon="📍" text={job.location} />
-        <Fact icon="💰" text={`${pay} · ${t(PAYMENT_KEYS[job.paymentType])}`} />
+        <Fact text={job.location} />
+        <Fact text={`${pay} · ${t(PAYMENT_KEYS[job.paymentType])}`} />
         <Fact
-          icon="💼"
           text={`${t(`jobs.type.${job.jobType}` as TranslationKey)} · ${jobCategoryName(
             job.category,
             locale,
@@ -248,7 +247,6 @@ function RecommendationCard({
               { color: job.saved ? c.primary : c.textMuted },
             ]}
           >
-            {job.saved ? '♥' : '♡'}{' '}
             {t(job.saved ? 'jobs.unsave' : 'jobs.save')}
           </Text>
         </Pressable>
@@ -267,11 +265,10 @@ function RecommendationCard({
   );
 }
 
-function Fact({ icon, text }: { icon: string; text: string }) {
+function Fact({ text }: { text: string }) {
   const { c } = useTheme();
   return (
     <View style={styles.fact}>
-      <Text style={styles.factIcon}>{icon}</Text>
       <Text style={[styles.factText, { color: c.textMuted }]} numberOfLines={1}>
         {text}
       </Text>
@@ -312,7 +309,7 @@ function MatchBreakdown({
           onPress={() => undefined}
         >
           <Text style={[styles.sheetTitle, { color: c.text }]}>
-            🤖 {t('rec.aiMatch', { percent: item.fit })}
+            {t('rec.aiMatch', { percent: item.fit })}
           </Text>
           <Text style={[styles.sheetJob, { color: c.textMuted }]} numberOfLines={2}>
             {item.job.title}
@@ -322,7 +319,7 @@ function MatchBreakdown({
             {item.factors.map((f) => (
               <View key={f.signal} style={styles.factorRow}>
                 <Text style={[styles.factorLabel, { color: c.text }]}>
-                  {REASON_ICONS[f.signal]} {t(REASON_LABELS[f.signal])}
+                  {t(REASON_LABELS[f.signal])}
                 </Text>
 
                 <View style={styles.factorRight}>
@@ -370,7 +367,19 @@ const styles = StyleSheet.create({
 
   // Stacked full width, not a horizontal rail: a card you have to scroll
   // sideways to reach is a card most people never see.
-  list: { marginTop: space.md, gap: 12 },
+
+  stage: { marginTop: space.md },
+  window: { overflow: 'hidden' },
+  dots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: space.sm,
+  },
+  // The current one is a bar rather than a bigger circle: at six pixels a
+  // colour change alone is not enough to see which one you are on.
+  dot: { height: 6, borderRadius: radius.pill },
 
   // Border, radius, surface and the hover lift all live in InteractiveCard.
   card: { padding: 14 },
@@ -404,7 +413,6 @@ const styles = StyleSheet.create({
 
   facts: { marginTop: 10, gap: 5 },
   fact: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  factIcon: { fontSize: 13 },
   factText: { flex: 1, fontSize: font.sm },
 
   /**

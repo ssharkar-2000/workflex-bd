@@ -109,11 +109,41 @@ export const envSchema = z.object({
   /// Per-file ceiling. NID photos from a phone camera are ~1-4 MB.
   MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(8_000_000),
 
+  /// Object storage. When all three of endpoint, key and secret are set,
+  /// uploads go here instead of STORAGE_DIR — see StorageService. Any
+  /// S3-compatible store works: Cloudflare R2 (region "auto"), Backblaze B2,
+  /// DigitalOcean Spaces, AWS S3 or MinIO.
   S3_ENDPOINT: z.string().url().optional(),
   S3_REGION: z.string().default('us-east-1'),
   S3_ACCESS_KEY: z.string().optional(),
   S3_SECRET_KEY: z.string().optional(),
   S3_BUCKET_DOCUMENTS: z.string().default('workflex-documents'),
+
+  /// Google Meet for video interviews. With both set, a recruiter can connect
+  /// their Google account and video interviews get a real Meet link, created
+  /// on their own calendar. Without them, video interviews fall back to a
+  /// Jitsi room and nothing else changes. From Google Cloud Console →
+  /// APIs & Services → Credentials → OAuth client (type: Web application).
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  /// Where Google sends the browser back to. Must match the redirect URI
+  /// registered on the OAuth client exactly. Defaults to this API's own
+  /// /google/callback under API_PUBLIC_URL (or localhost in development).
+  GOOGLE_REDIRECT_URI: z.string().url().optional(),
+
+  /// Where uploads go. Unset means disk in development and S3 in production.
+  /// Development deliberately ignores the S3 variables unless asked: the
+  /// .env.example ships MinIO values most machines are not running, and
+  /// honouring them would make every upload fail on a fresh clone.
+  STORAGE_DRIVER: z.enum(['disk', 's3']).optional(),
+
+  /// Set to true only when STORAGE_DIR is on a volume that survives a
+  /// redeploy. Production refuses local-disk storage without it — see the
+  /// check in validateEnv.
+  STORAGE_DISK_PERSISTENT: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
 
   // --- wallet top-ups ---
   // off        — no gateway; the wallet works, adding money does not. What a
@@ -125,11 +155,14 @@ export const envSchema = z.object({
   //
   // Unset means simulator in development and off in production — see
   // validateEnv.
-  WALLET_DEPOSIT_NAME: z.string().trim().max(100).optional(),
-  WALLET_DEPOSIT_BKASH: z.string().trim().max(100).optional(),
-  WALLET_DEPOSIT_NAGAD: z.string().trim().max(100).optional(),
-  WALLET_DEPOSIT_BANK: z.string().trim().max(300).optional(),
-
+  // --- payments ---
+  //
+  // off        — no gateway. Money can still move between wallets and be
+  //              declared as a deposit, but nothing can be charged.
+  // simulator  — a stand-in payment page served by this API, for developing
+  //              without a merchant account. Development only.
+  // sslcommerz — SSLCommerz's hosted page: bKash, Nagad, Rocket, cards and
+  //              internet banking behind one integration.
   PAYMENT_PROVIDER: z.enum(['off', 'simulator', 'sslcommerz']).default('simulator'),
   SSLCOMMERZ_STORE_ID: z.string().optional(),
   SSLCOMMERZ_STORE_PASSWORD: z.string().optional(),
@@ -139,12 +172,39 @@ export const envSchema = z.object({
     .default('true')
     .transform((v) => v === 'true'),
 
+  // --- the wallet's own accounts ---
+  //
+  // There is no payment gateway. Money is added by sending it to one of
+  // these accounts and declaring the transaction id, which someone checks
+  // against the receiving statement before anything is credited. An account
+  // left unset simply is not offered on the add-money screen.
+  WALLET_DEPOSIT_BKASH: z.string().trim().max(100).optional(),
+  WALLET_DEPOSIT_NAGAD: z.string().trim().max(100).optional(),
+  /** Bank name, branch and account details in one line. */
+  WALLET_DEPOSIT_BANK: z.string().trim().max(300).optional(),
+  /** The name on those accounts, so the sender can check it before sending. */
+  WALLET_DEPOSIT_NAME: z.string().trim().max(100).optional(),
+  /**
+   * Credit declared deposits the moment they are declared, with no review.
+   *
+   * For development, where waiting for a person to approve every deposit
+   * makes the wallet impossible to try. Production ignores it — see
+   * validateEnv — because it would let anyone credit themselves any amount.
+   */
+  WALLET_AUTO_APPROVE_DEPOSITS: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+
   /**
    * This API's address as the outside world reaches it, ending in /api/v1.
    * The gateway posts results to it and sends the payer's browser back
    * through it, so it has to be reachable from both. Optional in
    * development, where it is taken from each request's own host.
    */
+  /** Where video interviews are held. Defaults to the public Jitsi. */
+  INTERVIEW_MEETING_BASE_URL: z.string().url().optional(),
+
   API_PUBLIC_URL: z.string().url().optional(),
   /**
    * Web addresses a payer may be sent back to, comma separated — the
@@ -170,13 +230,6 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     );
   }
 
-  // In production an unset provider means off, not the simulator. A
-  // deployment nobody has given a gateway should refuse to take money, not
-  // pretend to.
-  if (parsed.data.NODE_ENV === 'production' && raw.PAYMENT_PROVIDER === undefined) {
-    parsed.data.PAYMENT_PROVIDER = 'off';
-  }
-
   const paymentProblem = paymentConfigProblem(parsed.data);
   if (paymentProblem) throw new Error(paymentProblem);
 
@@ -199,6 +252,25 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     if (parsed.data.OTP_EXPOSE_DEV_CODE) {
       throw new Error(
         'Refusing to start in production with OTP_EXPOSE_DEV_CODE=true — it would hand every caller a valid login code.',
+      );
+    }
+
+    // A container's own disk is wiped on every deploy. Storing NID photos,
+    // CVs and intro videos there works perfectly until the next push, and
+    // then every one of them is gone with nothing logged. Failing at boot is
+    // the only way that mistake gets noticed before it costs anybody their
+    // documents.
+    const s3 =
+      (parsed.data.STORAGE_DRIVER ?? 's3') === 's3' &&
+      Boolean(parsed.data.S3_ENDPOINT) &&
+      Boolean(parsed.data.S3_ACCESS_KEY) &&
+      Boolean(parsed.data.S3_SECRET_KEY);
+    if (!s3 && !parsed.data.STORAGE_DISK_PERSISTENT) {
+      throw new Error(
+        'Refusing to start in production with uploads on local disk — a redeploy would delete ' +
+          'every stored CV, NID photo and video. Set S3_ENDPOINT, S3_ACCESS_KEY and S3_SECRET_KEY ' +
+          '(Cloudflare R2 has a free tier), or set STORAGE_DISK_PERSISTENT=true if STORAGE_DIR ' +
+          'is on a persistent volume.',
       );
     }
   }
@@ -258,26 +330,26 @@ function paymentConfigProblem(env: Env): string | null {
     );
   }
 
-  if (env.PAYMENT_PROVIDER !== 'sslcommerz') return null;
-
-  const missing = (['SSLCOMMERZ_STORE_ID', 'SSLCOMMERZ_STORE_PASSWORD'] as const).filter(
-    (k) => !env[k],
-  );
-  if (missing.length > 0) {
-    return `PAYMENT_PROVIDER=sslcommerz requires: ${missing.join(', ')}`;
-  }
-
-  if (production && env.SSLCOMMERZ_SANDBOX) {
-    return (
-      'Refusing to start in production with SSLCOMMERZ_SANDBOX=true — sandbox ' +
-      'payments are not real money, and they would be credited as if they were.'
+  if (env.PAYMENT_PROVIDER === 'sslcommerz') {
+    const missing = (['SSLCOMMERZ_STORE_ID', 'SSLCOMMERZ_STORE_PASSWORD'] as const).filter(
+      (k) => !env[k],
     );
+    if (missing.length > 0) {
+      return `PAYMENT_PROVIDER=sslcommerz requires: ${missing.join(', ')}`;
+    }
+
+    if (production && env.SSLCOMMERZ_SANDBOX) {
+      return (
+        'Refusing to start in production with SSLCOMMERZ_SANDBOX=true — sandbox ' +
+        'payments are not real money, and they would be credited as if they were.'
+      );
+    }
   }
 
-  if (production && !env.API_PUBLIC_URL) {
+  if (env.NODE_ENV === 'production' && env.WALLET_AUTO_APPROVE_DEPOSITS) {
     return (
-      'PAYMENT_PROVIDER=sslcommerz in production requires API_PUBLIC_URL — the ' +
-      'gateway has to be told where to send its results.'
+      'Refusing to start in production with WALLET_AUTO_APPROVE_DEPOSITS=true — ' +
+      'anyone could credit their own wallet without sending money.'
     );
   }
 

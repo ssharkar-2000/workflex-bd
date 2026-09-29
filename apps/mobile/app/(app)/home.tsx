@@ -15,17 +15,12 @@ import { updateLocale } from '../../src/api/email';
 import { useErrorMessage } from '../../src/lib/error-message';
 import { useAuthStore } from '../../src/store/auth-store';
 import { useI18nStore, useLocale, useT } from '../../src/i18n';
+import { AppFooter } from '../../src/components/AppFooter';
 import { RecommendedForYou } from '../../src/components/jobs/RecommendedForYou';
-import { NextSkillAI } from '../../src/components/home/NextSkillAI';
-import { TrustScore } from '../../src/components/home/TrustScore';
+import { OpportunityNearYou } from '../../src/components/home/OpportunityNearYou';
+import { NextSkillBanner } from '../../src/components/home/NextSkillBanner';
 import { MyHiringActivity } from '../../src/components/home/MyHiringActivity';
-import { UpcomingWork } from '../../src/components/home/UpcomingWork';
 import { NearbyJobs } from '../../src/components/home/NearbyJobs';
-import {
-  ActivityOverview,
-  useDashboardSummary,
-} from '../../src/components/home/DashboardSections';
-import { RecentActivity } from '../../src/components/home/RecentActivity';
 import { DashboardHeader } from '../../src/components/home/DashboardHeader';
 import { RolePicker } from '../../src/components/home/RolePicker';
 import { useScrollDirectionHandler } from '../../src/lib/scroll-direction';
@@ -48,12 +43,6 @@ export default function HomeScreen() {
     queryKey: ['me'],
     queryFn: fetchMe,
   });
-
-  // Fetched alongside `me` rather than inside each panel: the counts belong to
-  // one request, and a panel that fetched its own would make the dashboard
-  // four round trips deep on a phone connection. Undefined while it loads, so
-  // the sections that need it simply do not render yet.
-  const { data: summary } = useDashboardSummary();
 
   // The language follows the person, not only the phone. A phone nobody has
   // picked a language on takes the account's, so signing in on a new phone
@@ -131,14 +120,15 @@ export default function HomeScreen() {
         <DashboardHeader user={data} onSignOut={() => void onSignOut()} />
 
         <RolePicker />
-        <UpcomingWork />
+        {/* Where the work is, then what is recommended, then what to learn
+            to get more of it — the order somebody actually reads in. */}
+        <OpportunityNearYou />
         <RecommendedForYou />
+        <NextSkillBanner />
         <NearbyJobs />
         <MyHiringActivity />
-        <NextSkillAI />
-        {summary ? <ActivityOverview data={summary} /> : null}
-        <TrustScore />
-        <RecentActivity />
+
+        <AppFooter style={styles.pushDown} />
 
       </ScrollView>
     </SafeAreaView>
@@ -148,7 +138,9 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   centered: { alignItems: 'center', justifyContent: 'center', padding: space.lg },
-  container: { padding: space.lg, paddingBottom: space.fab },
+  container: { padding: space.lg, paddingBottom: space.md, flexGrow: 1 },
+  /** See AppFooter: the footer sits at the bottom, not under the content. */
+  pushDown: { marginTop: 'auto', marginBottom: space.fab },
 
   primaryButton: {
     marginTop: space.lg,

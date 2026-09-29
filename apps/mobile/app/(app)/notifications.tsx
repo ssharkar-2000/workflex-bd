@@ -121,7 +121,6 @@ export default function NotificationsScreen() {
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>🔔</Text>
               <Text style={[styles.emptyTitle, { color: c.text }]}>
                 {t('notif.emptyTitle')}
               </Text>
@@ -270,7 +269,6 @@ const styles = StyleSheet.create({
 
   emptyWrap: { flexGrow: 1, justifyContent: 'center' },
   empty: { alignItems: 'center', paddingHorizontal: space.lg },
-  emptyIcon: { fontSize: 44, marginBottom: 12 },
   emptyTitle: { fontSize: font.lg, fontWeight: '800' },
   emptyBody: {
     fontSize: font.sm,

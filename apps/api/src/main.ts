@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -20,12 +21,29 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix('api/v1');
   app.enableShutdownHooks();
 
-  // The mobile app is not a browser origin, so CORS matters only for the
-  // future admin panel and for Swagger during development.
+  // The phone app is not a browser origin, so CORS matters for the two web
+  // builds — the console and the app on the web — and for Swagger.
+  //
+  // In production the allowed origins come from APP_WEB_ORIGINS, comma
+  // separated, because where those builds are served from is a deployment
+  // decision rather than something to hard-code here. An empty list means no
+  // browser may call this API, which is the safe end to fail towards.
+  const webOrigins = (config.get('APP_WEB_ORIGINS', { infer: true }) ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin: isDev ? true : ['https://admin.workflex.com.bd'],
+    origin: isDev ? true : webOrigins,
     credentials: true,
   });
+
+  if (!isDev && webOrigins.length === 0) {
+    new Logger('Bootstrap').warn(
+      'APP_WEB_ORIGINS is empty: no browser origin may call this API. ' +
+        'Set it to the console and web app addresses.',
+    );
+  }
 
   if (isDev) {
     const doc = SwaggerModule.createDocument(

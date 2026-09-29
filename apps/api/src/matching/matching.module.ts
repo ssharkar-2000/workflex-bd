@@ -4,6 +4,8 @@ import { VerificationModule } from '../verification/verification.module';
 import { MatchingController } from './matching.controller';
 import { CvService } from './cv.service';
 import { CvParserService } from './cv-parser.service';
+import { CvWriterService } from './cv-writer.service';
+import { AnalyzerService } from './analyzer.service';
 import { MatchService } from './match.service';
 import { RecommendService } from './recommend.service';
 import { SkillGapService } from './skill-gap.service';
@@ -20,6 +22,8 @@ import { SkillGapService } from './skill-gap.service';
   providers: [
     CvService,
     CvParserService,
+    CvWriterService,
+    AnalyzerService,
     MatchService,
     RecommendService,
     SkillGapService,

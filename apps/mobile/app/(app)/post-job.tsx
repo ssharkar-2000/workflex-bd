@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -33,6 +33,7 @@ import { fetchMe } from '../../src/api/auth';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { ShimmerButton } from '../../src/components/ShimmerButton';
 import { useErrorMessage } from '../../src/lib/error-message';
+import { useJobDraftStore } from '../../src/store/job-draft-store';
 import { useLocale, useT, type TranslationKey } from '../../src/i18n';
 import { useTheme } from '../../src/lib/use-theme';
 import { font, radius, space } from '../../src/lib/theme';
@@ -151,6 +152,29 @@ export default function PostJobScreen() {
   const [workplaceType, setWorkplaceType] = useState('ONSITE');
   const [requirements, setRequirements] = useState('');
   const [benefits, setBenefits] = useState('');
+
+  /**
+   * Arriving from the assistant with a draft.
+   *
+   * Taken once and cleared. After this the form is the only authority on
+   * what gets posted — the employer edits here and presses the button here,
+   * so a draft that kept reapplying would be overwriting their own edits.
+   */
+  useEffect(() => {
+    const draft = useJobDraftStore.getState().take();
+    if (!draft) return;
+
+    setTitle(draft.title);
+    setDescription(draft.description);
+    if (draft.category) setCategory(draft.category);
+    if (draft.location) setLocation(draft.location);
+    if (draft.jobType) setJobType(draft.jobType);
+    if (draft.duration) setDuration(draft.duration);
+    if (draft.paymentType) setPaymentType(draft.paymentType);
+    if (draft.payMin !== null) setPayMin(String(draft.payMin));
+    if (draft.payMax !== null) setPayMax(String(draft.payMax));
+    if (draft.skills.length > 0) setRequirements(draft.skills.join('\n'));
+  }, []);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -378,7 +402,7 @@ export default function PostJobScreen() {
                 {JOB_CATEGORIES.map((cat) => (
                   <Option
                     key={cat.key}
-                    label={`${cat.emoji} ${jobCategoryName(cat.key, locale)}`}
+                    label={jobCategoryName(cat.key, locale)}
                     on={category === cat.key}
                     onPress={() => {
                       setCategory(cat.key);
@@ -783,7 +807,7 @@ function ModeTab({
       ]}
     >
       <Text style={[styles.modeLabel, { color: c.text }]}>
-        {locked ? '🔒 ' : ''}
+        {locked ? '' : ''}
         {label}
       </Text>
       <Text style={[styles.modeHint, { color: c.textMuted }]}>{hint}</Text>

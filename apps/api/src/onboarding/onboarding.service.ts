@@ -57,7 +57,11 @@ export class OnboardingService {
     const needed = requiredDocuments();
     // A CV is stored as a Document but is input to job matching, not identity
     // evidence — it must never count towards the registration checklist.
-    const identityDocs = user.documents.filter((d) => d.kind !== 'CV');
+    // Identity evidence only: the CV and the video introduction live on the
+    // same table but prove nothing about who somebody is.
+    const identityDocs = user.documents.filter(
+      (d) => d.kind !== 'CV' && d.kind !== 'INTRO_VIDEO',
+    );
     const have = new Set(identityDocs.map((d) => d.kind as string));
 
     return {
@@ -72,8 +76,8 @@ export class OnboardingService {
       emailVerified: user.emailVerifiedAt !== null,
       documents: identityDocs.map((d) => ({
         // Narrowed by the filter above; Prisma's row type still carries the
-        // full enum, which now includes CV.
-        kind: d.kind as Exclude<DocumentKind, 'CV'>,
+        // full enum, which now includes CV and the video introduction.
+        kind: d.kind as Exclude<DocumentKind, 'CV' | 'INTRO_VIDEO'>,
         uploadedAt: d.createdAt.toISOString(),
         sizeBytes: d.sizeBytes,
         analysis: d.analysis

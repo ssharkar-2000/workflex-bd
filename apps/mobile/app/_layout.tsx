@@ -17,6 +17,7 @@ import {
 } from '../src/store/launch-store';
 import { useI18nStore } from '../src/i18n';
 import { useTheme, useThemeStore } from '../src/lib/use-theme';
+import { useLato } from '../src/lib/lato';
 import { MeshBackground } from '../src/components/MeshBackground';
 import { BrandMark } from '../src/components/BrandMark';
 import { BrandName } from '../src/components/BrandName';
@@ -133,6 +134,9 @@ function ThemedStatusBar() {
 }
 
 export default function RootLayout() {
+  // Held until Lato is on screen: swapping the font under a rendered screen
+  // reflows every line at once, which reads as the app breaking.
+  const fontsReady = useLato();
   const hydrate = useAuthStore((s) => s.hydrate);
   const hydrateLocale = useI18nStore((s) => s.hydrate);
   const hydrateTheme = useThemeStore((s) => s.hydrate);
@@ -149,6 +153,8 @@ export default function RootLayout() {
       openGateForPaymentReturn(),
     ]).then(() => hydrate());
   }, [hydrate, hydrateLocale, hydrateTheme]);
+
+  if (!fontsReady) return null;
 
   return (
     <QueryClientProvider client={queryClient}>

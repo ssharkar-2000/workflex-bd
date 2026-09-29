@@ -120,9 +120,16 @@ export class PaymentCallbacksController {
    * mobile browsers are free to refuse without a fresh tap.
    */
   private sendBack(res: Response, topUp: TopUp | null, body: Record<string, unknown>) {
-    if (!topUp || !topUp.returnUrl || topUp.gateway === 'manual') {
+    if (!topUp) {
       const reference = typeof body.tran_id === 'string' ? body.tran_id : null;
       this.html(res, noMatchPage(reference), 404);
+      return;
+    }
+
+    // A deposit declared by hand never went through a gateway and has no
+    // return address, so there is nowhere to send anyone back to.
+    if (!topUp.returnUrl) {
+      this.html(res, returnPage('', topUp.status, topUp.amount));
       return;
     }
 

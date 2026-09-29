@@ -229,11 +229,29 @@ const light: Palette = {
   glassHighlight: 'rgba(255,255,255,0.86)',
 };
 
+/**
+ * The dark palette.
+ *
+ * Nothing here is black. Near-white text on pure black measures 18.4:1,
+ * which sounds like a virtue and is not: above roughly 15:1 the letters
+ * halate — their edges smear — on the OLED screens most of this market
+ * carries. Black is also the one background a surface cannot sit behind,
+ * because depth in the dark is shown by getting lighter, and from black
+ * there is nowhere further down to go.
+ *
+ * The dark it uses instead carries a trace of the brand's indigo. That is
+ * what lets the orange accent read as an accent: against a hueless grey the
+ * same orange looks like a colour cast rather than a choice.
+ *
+ * Measured against this page: body text 15.8:1, muted text 7.6:1, the accent
+ * 9.7:1 and primary 7.0:1 — all far above the 4.5:1 this file holds body
+ * text to, with room left for two more surface levels above the page.
+ */
 const dark: Palette = {
-  bg: '#111120',
-  surface: '#1A1A2B',
-  surfaceAlt: '#232338',
-  border: '#34344C',
+  bg: '#15142A',
+  surface: '#1E1D36',
+  surfaceAlt: '#262544',
+  border: '#383757',
 
   text: '#F1EFF7',
   textMuted: '#A9A6C0',
@@ -252,23 +270,23 @@ const dark: Palette = {
    */
   primary: '#9E97F0',
   primaryPressed: '#8880E4',
-  primarySoft: '#22203F',
+  primarySoft: '#252342',
   primarySoftBorder: '#3D3A66',
   primaryText: '#15132E',
 
   accent: '#FFAA79',
 
   ai: '#B9A6FA',
-  aiSoft: '#241C3D',
+  aiSoft: '#271F40',
   aiSoftBorder: '#3F3163',
 
   success: '#6BD1A0',
-  successSoft: '#12302A',
+  successSoft: '#15332D',
   warning: '#FFC24D',
-  warningSoft: '#33280F',
+  warningSoft: '#362B12',
   warningBorder: '#5C4718',
   danger: '#FF8A82',
-  dangerSoft: '#3A1B1A',
+  dangerSoft: '#3D1E1D',
   dangerBorder: '#6B2E2A',
 
   // Lifted from #7A7A93, which measured 4.10:1 on the dark surface and so
@@ -316,6 +334,190 @@ const dark: Palette = {
 };
 
 export const palettes: Record<ThemeMode, Palette> = { light, dark };
+
+/**
+ * Terracotta & Beige — the brand palette, used from the dashboard onwards.
+ *
+ * Four colours were given: terracotta #B5523C, tan #D98B5A, beige #E8D5C4 and
+ * cream #F9F5EC. Four cannot dress an interface on their own — a page, a card,
+ * a recessed field and a hairline are four values before any colour has
+ * meant anything — so the neutrals here are mixed from the beige and the
+ * cream, and nothing steps outside that family.
+ *
+ * Text is pure black, as asked. Everywhere a second level of text was a
+ * different grey it is now the same black at lower opacity, which keeps the
+ * hierarchy without introducing a colour that is not in the palette.
+ *
+ * Two places keep a hue from outside it, and both are deliberate. Red has to
+ * stay red: this palette's own terracotta is already a red-orange, so a
+ * warning drawn in it would be indistinguishable from an ordinary button, and
+ * "missed" on the calendar has to read as wrong at a glance. Green does the
+ * same job for success. Both are pulled towards the earth tones as far as
+ * they can go while staying unmistakable.
+ *
+ * The sign-in flow does not use any of this — see palette-set.ts.
+ */
+const brandLight: Palette = {
+  // The page is a shade deeper than the cream so a cream card lifts off it;
+  // at the same value the card would disappear into the background.
+  bg: '#F4EBDE',
+  surface: '#F9F5EC',
+  surfaceAlt: '#E8D5C4',
+  border: '#DCC6B0',
+
+  text: '#000000',
+  textMuted: 'rgba(0,0,0,0.62)',
+
+  textOnBrand: '#000000',
+  textMutedOnBrand: 'rgba(0,0,0,0.65)',
+  accentOnBrand: '#8F3D2B',
+
+  /**
+   * The blue from the welcome screen's button, by request, rather than the
+   * palette's own terracotta.
+   *
+   * `primary` is not only buttons — it is everything you can act on, so the
+   * active tab, the links and the selected chips follow the buttons into
+   * blue. That is the point: one colour means "press this" everywhere, and
+   * splitting it would leave a page where some blue things are pressable and
+   * some terracotta things are too.
+   *
+   * The terracotta has not gone anywhere. It is the page, the cards, the
+   * beige fills and `accent` — the app still reads as the palette that was
+   * given, with its actions in a colour that stands apart from it.
+   */
+  primary: '#3A34A0',
+  primaryPressed: '#2B2680',
+  primarySoft: '#EDECF8',
+  primarySoftBorder: '#C5C2E8',
+  // White on this blue measures 9.7:1; black on it fails at 3.1:1. The
+  // instruction about black text is about the text of the app, not the label
+  // inside a filled button, and an unreadable button is not what it asked for.
+  primaryText: '#FFFFFF',
+
+  accent: '#D98B5A',
+
+  // Muted violet: the one thing on screen that has to say "a machine worked
+  // this out" rather than "you can press this", which no shade of the brand
+  // can say while the brand is what every button is drawn in.
+  ai: '#6E4B8F',
+  aiSoft: '#F0E9F6',
+  aiSoftBorder: '#D6C6E6',
+
+  success: '#3F6B4A',
+  successSoft: '#E4EDE3',
+  warning: '#9A6A16',
+  warningSoft: '#F7EAD3',
+  warningBorder: '#E4CFA3',
+  // A true red rather than a deeper terracotta, which at a glance would be
+  // the primary colour again.
+  danger: '#A4161A',
+  dangerSoft: '#F8E0DC',
+  dangerBorder: '#E5B4AC',
+
+  locked: 'rgba(0,0,0,0.48)',
+
+  bandBg: '#E8D5C4',
+  bandText: '#000000',
+  bandBorder: '#D0B296',
+
+  formBg: '#F2E9DC',
+  formBorder: '#DCC6B0',
+
+  // Near-white, so a box to type in still reads as a blank on a beige page.
+  fieldBg: '#FFFDF9',
+
+  // Four fills for cards that are meant to differ in kind. Within one family
+  // and all pale, because black body text sits on every one of them.
+  tints: ['#F8E4D8', '#F3E5CE', '#EBE1D3', '#F2E7DA'],
+  tintBorders: ['#E8C7B4', '#E2CDA9', '#D8C9B4', '#E3D4C0'],
+
+  gradient: ['#F7EDE1', '#F4E7D9', '#F0E6DA', '#F9F5EC'],
+  orbs: ['#E8C3A8', '#DEC9B4', '#F0DFCB'],
+  doodle: '#3A2A20',
+  doodleOpacity: 0.55,
+
+  glassFill: 'rgba(255,253,248,0.55)',
+  glassBorder: 'rgba(58,42,32,0.16)',
+  glassStrongFill: 'rgba(255,253,248,0.78)',
+  glassHighlight: 'rgba(255,255,255,0.86)',
+};
+
+/**
+ * The same palette after dark.
+ *
+ * Pure black text cannot survive here — on a dark page it is invisible — so
+ * the cream takes its place, which keeps the text inside the four colours
+ * given rather than reaching for a white that is not one of them. The
+ * terracotta and the tan are lifted for the same reason every dark theme
+ * lifts its brand: at their daylight values they read as brown smudges.
+ */
+const brandDark: Palette = {
+  bg: '#1E1611',
+  surface: '#2A201A',
+  surfaceAlt: '#382A22',
+  border: '#4A382C',
+
+  text: '#F9F5EC',
+  textMuted: 'rgba(249,245,236,0.70)',
+
+  textOnBrand: '#F9F5EC',
+  textMutedOnBrand: 'rgba(249,245,236,0.70)',
+  accentOnBrand: '#E8A87C',
+
+  // The same move as light mode: actions take the brand blue, lifted to
+  // where it reads on a dark page, while the page itself stays warm.
+  primary: '#9E97F0',
+  primaryPressed: '#8880E4',
+  primarySoft: '#282444',
+  primarySoftBorder: '#433D6E',
+  primaryText: '#15132E',
+
+  accent: '#E8A87C',
+
+  ai: '#B79BD9',
+  aiSoft: '#2B2338',
+  aiSoftBorder: '#453763',
+
+  success: '#7BC79A',
+  successSoft: '#1B2E22',
+  warning: '#E8B667',
+  warningSoft: '#33260F',
+  warningBorder: '#5A431B',
+  danger: '#F08A7C',
+  dangerSoft: '#3A1E18',
+  dangerBorder: '#6B332A',
+
+  locked: 'rgba(249,245,236,0.55)',
+
+  // The band is the brand lockup and looks the same in both modes.
+  bandBg: '#E8D5C4',
+  bandText: '#000000',
+  bandBorder: '#D0B296',
+
+  formBg: '#2A211B',
+  formBorder: '#46362B',
+
+  fieldBg: '#2F251E',
+
+  tints: ['#33231C', '#2E2519', '#2A231C', '#302A20'],
+  tintBorders: ['#4E3529', '#4A3C24', '#443A2D', '#4A4132'],
+
+  gradient: ['#1A1310', '#1E1611', '#221913', '#1C1512'],
+  orbs: ['#4A3226', '#3A2D20', '#2E241C'],
+  doodle: '#E8A87C',
+  doodleOpacity: 0.55,
+
+  glassFill: 'rgba(255,255,255,0.06)',
+  glassBorder: 'rgba(255,255,255,0.14)',
+  glassStrongFill: 'rgba(30,22,17,0.74)',
+  glassHighlight: 'rgba(255,255,255,0.16)',
+};
+
+export const brandPalettes: Record<ThemeMode, Palette> = {
+  light: brandLight,
+  dark: brandDark,
+};
 
 /**
  * Sizes are shared across modes. Font sizes sit a step above the usual mobile

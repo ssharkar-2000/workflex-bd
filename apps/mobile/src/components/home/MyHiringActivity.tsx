@@ -63,7 +63,7 @@ export function MyHiringActivity() {
     <View style={styles.section}>
       <View style={styles.head}>
         <Text style={[styles.title, { color: c.text }]}>
-          📢 {t('hiring.title')}
+          {t('hiring.title')}
         </Text>
         {data.jobs.length > 0 ? (
           <Pressable
@@ -197,7 +197,6 @@ function JobCard({ job }: { job: MyJob }) {
             { color: job.isOpen ? c.success : c.textMuted },
           ]}
         >
-          {job.isOpen ? '🟢' : '⚪'}{' '}
           {t(job.isOpen ? 'myJobs.live' : 'myJobs.closed')}
         </Text>
         {/* Muted at zero: "0 applicants" is not news worth colouring, and a

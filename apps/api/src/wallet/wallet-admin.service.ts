@@ -1,5 +1,5 @@
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import type {
   TopUpStatus,
   WithdrawalStatus,
@@ -11,8 +11,8 @@ import {
   type AdminWithdrawalList,
 } from '@workflex/shared';
 import { PrismaService } from '../common/prisma/prisma.service';
+import type { Env } from '../config/env.schema';
 import { AppException } from '../common/exceptions/app.exception';
-import { PAYMENT_GATEWAY, type PaymentGateway } from './gateway/payment-gateway';
 import { WalletService } from './wallet.service';
 
 const DAY_MS = 86_400_000;
@@ -38,9 +38,17 @@ export class WalletAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly wallet: WalletService,
-    private readonly config: ConfigService,
-    @Inject(PAYMENT_GATEWAY) private readonly gateway: PaymentGateway | null,
+    private readonly config: ConfigService<Env, true>,
   ) {}
+
+  /** Whether people have anywhere to send money to. */
+  private hasDepositAccount(): boolean {
+    return (
+      Boolean(this.config.get('WALLET_DEPOSIT_BKASH', { infer: true })) ||
+      Boolean(this.config.get('WALLET_DEPOSIT_NAGAD', { infer: true })) ||
+      Boolean(this.config.get('WALLET_DEPOSIT_BANK', { infer: true }))
+    );
+  }
 
   async summary(): Promise<AdminWalletSummary> {
     const since = new Date(Date.now() - 30 * DAY_MS);
@@ -70,8 +78,7 @@ export class WalletAdminService {
     ]);
 
     return {
-      gateway: this.gateway?.name ?? null,
-      canDeposit: ['WALLET_DEPOSIT_BKASH', 'WALLET_DEPOSIT_NAGAD', 'WALLET_DEPOSIT_BANK'].some((key) => Boolean(this.config.get(key))),
+      canDeposit: this.hasDepositAccount(),
       heldInWallets: wallets._sum.balance ?? 0,
       withdrawableInWallets: wallets._sum.withdrawable ?? 0,
       pendingWithdrawals: {
@@ -133,7 +140,6 @@ export class WalletAdminService {
     return {
       topUps: rows.map((t) => ({
         id: t.id,
-        gateway: t.gateway, depositMethod: t.depositMethod, senderAccount: t.senderAccount, reference: t.reference,
         userId: t.userId,
         userName: nameOf(t.user),
         userPhone: t.user.phone,
@@ -146,31 +152,56 @@ export class WalletAdminService {
         riskLevel: t.riskLevel,
         riskTitle: t.riskTitle,
         reviewNote: t.reviewNote,
+        gateway: t.gateway,
+        depositMethod: t.depositMethod,
+        senderAccount: t.senderAccount,
+        reference: t.reference,
         createdAt: t.createdAt.toISOString(),
         completedAt: t.completedAt?.toISOString() ?? null,
       })),
     };
   }
 
-  /** Crediting a held payment after checking it in the gateway's panel. */
+  /**
+   * Crediting a declared deposit found on the statement, or a held payment
+   * checked in the gateway's panel.
+   *
+   * Which status may be approved depends on where the money came from. A
+   * declared deposit waits as PENDING. A gateway payment is approvable only
+   * once the gateway has flagged it HELD: a PENDING one is a payment page
+   * nobody finished, and approving it would credit money that never arrived.
+   */
   async approveTopUp(id: string, adminId: string): Promise<void> {
-    const current = await this.prisma.topUp.findUnique({where: {id}});
-    if (!current) throw AppException.notFound('No such top-up');
-    const credited = await this.wallet.creditTopUp(id, current.gateway === 'manual' ? ['PENDING'] : ['HELD'], {
-      reviewedBy: adminId,
-      reviewedAt: new Date(),
+    const current = await this.prisma.topUp.findUnique({
+      where: { id },
+      select: { gateway: true },
     });
+    if (!current) throw AppException.notFound('No such top-up');
+
+    const credited = await this.wallet.creditTopUp(
+      id,
+      current.gateway === 'manual' ? ['PENDING'] : ['HELD'],
+      { reviewedBy: adminId, reviewedAt: new Date() },
+    );
     if (!credited) await this.explainNotHeld(id);
     this.logger.log(`Held top-up ${id} approved by ${adminId}`);
   }
 
   /**
-   * Turning a held payment down. Nothing was credited, so the ledger is
-   * untouched; the money is refunded from the gateway's merchant panel.
+   * Turning a declared deposit down (the money was never found on the
+   * receiving account) or a held gateway payment (refunded from the
+   * gateway's merchant panel). Nothing was credited, so the ledger is
+   * untouched. Same status rule as approveTopUp.
    */
   async rejectTopUp(id: string, adminId: string, reason: string): Promise<void> {
     const rejected = await this.prisma.topUp.updateMany({
-      where: { id, OR: [{gateway: 'manual', status: 'PENDING'}, {gateway: {not: 'manual'}, status: 'HELD'}] },
+      where: {
+        id,
+        OR: [
+          { gateway: 'manual', status: 'PENDING' },
+          { gateway: { not: 'manual' }, status: 'HELD' },
+        ],
+      },
       data: {
         status: 'REJECTED',
         reviewedBy: adminId,

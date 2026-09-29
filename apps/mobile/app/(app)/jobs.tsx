@@ -30,6 +30,7 @@ import {
   fetchJobs,
   toggleSavedJob,
 } from '../../src/api/jobs';
+import { BookmarkIcon } from '../../src/components/home/HomeIcons';
 import { JobFilterBar } from '../../src/components/jobs/JobFilterBar';
 import { JobHighlights } from '../../src/components/jobs/JobHighlights';
 import { MatchBadge } from '../../src/components/jobs/MatchBadge';
@@ -244,7 +245,6 @@ export default function JobsScreen() {
             { backgroundColor: c.surface, borderColor: c.border },
           ]}
         >
-          <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
             value={search}
             onChangeText={setSearch}
@@ -292,7 +292,6 @@ export default function JobsScreen() {
           }}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>🔍</Text>
               <Text style={[styles.emptyTitle, { color: c.text }]}>
                 {t('jobs.emptyTitle')}
               </Text>
@@ -379,7 +378,7 @@ function JobCard({
           ]}
         >
           <Text style={[styles.urgentText, { color: c.danger }]}>
-            🔥 {t(URGENCY_KEYS[job.urgency])}
+            {t(URGENCY_KEYS[job.urgency])}
           </Text>
         </View>
       ) : null}
@@ -442,12 +441,14 @@ function JobCard({
         // inside the header row.
         style={styles.bookmarkButton}
       >
-        {/* Same glyph in both states, faded when unsaved. Two different emoji
-            read as two different actions — the 🏷 outline variant in
-            particular renders as a price tag, not a bookmark. */}
-        <Text style={[styles.bookmark, !job.saved && styles.bookmarkOff]}>
-          🔖
-        </Text>
+        {/* One mark in two states — outlined, then filled — rather than two
+            glyphs that read as two different actions. Drawn, so it takes the
+            theme's colour instead of the font's. */}
+        <BookmarkIcon
+          size={20}
+          color={job.saved ? c.primary : c.textMuted}
+          filled={job.saved}
+        />
       </Pressable>
     </View>
   );
@@ -533,8 +534,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoText: { fontSize: font.sm, fontWeight: '800' },
-  bookmark: { fontSize: 18 },
-  bookmarkOff: { opacity: 0.3 },
 
   urgent: {
     alignSelf: 'flex-start',
@@ -562,7 +561,6 @@ const styles = StyleSheet.create({
 
   emptyWrap: { flexGrow: 1, justifyContent: 'center' },
   empty: { alignItems: 'center', paddingHorizontal: space.lg },
-  emptyIcon: { fontSize: 44, marginBottom: 12 },
   emptyTitle: { fontSize: font.lg, fontWeight: '800' },
   emptyBody: {
     fontSize: font.sm,

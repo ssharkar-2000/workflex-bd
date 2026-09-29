@@ -1,6 +1,13 @@
+import type { ReactElement } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePathname, useRouter } from 'expo-router';
+import {
+  ActivityIcon,
+  HomeIcon,
+  JobSearchIcon,
+  ProfileIcon,
+} from './home/HomeIcons';
 import { useT, type TranslationKey } from '../i18n';
 import { useScrollingDown } from '../lib/scroll-direction';
 import { useTheme } from '../lib/use-theme';
@@ -16,13 +23,13 @@ import { font, radius, space } from '../lib/theme';
  */
 const TABS: {
   href: string;
-  icon: string;
   label: TranslationKey;
+  Icon: (props: { size: number; color: string }) => ReactElement;
 }[] = [
-  { href: '/(app)/home', icon: '🏠', label: 'nav.home' },
-  { href: '/(app)/jobs', icon: '🔍', label: 'nav.findWork' },
-  { href: '/(app)/activity', icon: '📊', label: 'nav.activity' },
-  { href: '/(app)/profile', icon: '👤', label: 'nav.profile' },
+  { href: '/(app)/home', label: 'nav.home', Icon: HomeIcon },
+  { href: '/(app)/jobs', label: 'nav.findWork', Icon: JobSearchIcon },
+  { href: '/(app)/activity', label: 'nav.activity', Icon: ActivityIcon },
+  { href: '/(app)/profile', label: 'nav.profile', Icon: ProfileIcon },
 ];
 
 /**
@@ -104,10 +111,7 @@ export function BottomNav() {
             accessibilityLabel={t(tab.label)}
             style={styles.tab}
           >
-            {/* Emoji render in their own colours, so the active state has to
-                be carried by the label and a dot rather than by tinting the
-                glyph — which does nothing to a colour emoji. */}
-            <Text style={[styles.icon, !active && styles.dim]}>{tab.icon}</Text>
+            <tab.Icon size={22} color={active ? c.primary : c.textMuted} />
             <Text
               style={[
                 styles.label,
@@ -137,12 +141,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     gap: 3,
-    // Comfortably past the 44pt minimum touch target, including the label.
-    paddingVertical: 2,
+    // Comfortably past the 44pt minimum touch target, icon and label together.
+    paddingVertical: 3,
   },
-  icon: { fontSize: 20, lineHeight: 24 },
-  // Emoji cannot be tinted, so an inactive tab is faded instead.
-  dim: { opacity: 0.55 },
+  // Back under an icon, so the label is a caption again rather than the whole
+  // tab. Both are tinted by the active state — the icons are drawn, not
+  // typed, so unlike the emoji they replaced they can take the colour.
   label: { fontSize: font.xs - 1, fontWeight: '700' },
   labelActive: { fontWeight: '800' },
 
