@@ -5,13 +5,15 @@ import { useQuery } from '@tanstack/react-query';
 import type { Conversation, Inbox, InboxFilter } from '@workflex/shared';
 import { fetchInbox } from '../../../src/api/messaging';
 import { ErrorBanner } from '../../../src/components/ErrorBanner';
+import { MessageTicks } from '../../../src/components/chat/MessageTicks';
 import { MoneyScreen } from '../../../src/components/wallet/WalletUi';
+import { useChatLive, useOnline, useTyping } from '../../../src/lib/chat-socket';
 import { useErrorMessage } from '../../../src/lib/error-message';
 import { useT, type TranslationKey } from '../../../src/i18n';
 import { useTheme } from '../../../src/lib/use-theme';
 import { font, radius, space } from '../../../src/lib/theme';
 
-const FILTERS: InboxFilter[] = ['ALL', 'APPLICATION', 'HIRING', 'WORK'];
+const FILTERS: InboxFilter[] = ['ALL', 'DIRECT', 'APPLICATION', 'HIRING', 'WORK'];
 
 /**
  * Every conversation this account is part of.
@@ -20,11 +22,17 @@ const FILTERS: InboxFilter[] = ['ALL', 'APPLICATION', 'HIRING', 'WORK'];
  * separate mailboxes: a person who both works and hires has applications in
  * one hand and applicants in the other, and splitting the inbox by role
  * would mean checking two places for the same day's work.
+ *
+ * Direct messages sit alongside, started from "New chat" with someone's
+ * WorkFlex id. The chat socket keeps the list live — new messages move a
+ * thread to the top, and ticks, dots and "typing…" update as they happen.
  */
 export default function MessagesScreen() {
   const t = useT();
+  const router = useRouter();
   const { c } = useTheme();
   const errorMessage = useErrorMessage();
+  const connected = useChatLive((s) => s.connected);
 
   const [filter, setFilter] = useState<InboxFilter>('ALL');
   const [search, setSearch] = useState('');
@@ -32,8 +40,10 @@ export default function MessagesScreen() {
   const inbox = useQuery<Inbox>({
     queryKey: ['inbox', filter, search],
     queryFn: () => fetchInbox(filter, search.trim() || undefined),
-    // New messages should appear without the person pulling to refresh.
-    refetchInterval: 30_000,
+    // New messages should appear without the person pulling to refresh. The
+    // socket does that while it is connected; polling is the fallback, and
+    // still picks up the job updates other parts of the system post.
+    refetchInterval: connected ? 60_000 : 30_000,
   });
 
   const counts = inbox.data?.counts;
@@ -44,28 +54,42 @@ export default function MessagesScreen() {
       refreshing={inbox.isRefetching}
       onRefresh={() => void inbox.refetch()}
     >
-      <TextInput
-        value={search}
-        onChangeText={setSearch}
-        placeholder={t('messages.search')}
-        placeholderTextColor={c.textMuted}
-        style={[
-          s.search,
-          { backgroundColor: c.surface, borderColor: c.border, color: c.text },
-        ]}
-        accessibilityLabel={t('messages.search')}
-      />
+      <View style={s.searchRow}>
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder={t('messages.search')}
+          placeholderTextColor={c.textMuted}
+          style={[
+            s.search,
+            { backgroundColor: c.surface, borderColor: c.border, color: c.text },
+          ]}
+          accessibilityLabel={t('messages.search')}
+        />
+        <Pressable
+          onPress={() => router.push('/(app)/messages/new')}
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            s.newChat,
+            { backgroundColor: pressed ? c.primaryPressed : c.primary },
+          ]}
+        >
+          <Text style={[s.newChatText, { color: c.primaryText }]}>+ {t('messages.newChat')}</Text>
+        </Pressable>
+      </View>
 
       <View style={s.filters}>
         {FILTERS.map((option) => {
           const count =
             option === 'ALL'
               ? counts?.all
-              : option === 'APPLICATION'
-                ? counts?.application
-                : option === 'HIRING'
-                  ? counts?.hiring
-                  : counts?.work;
+              : option === 'DIRECT'
+                ? counts?.direct
+                : option === 'APPLICATION'
+                  ? counts?.application
+                  : option === 'HIRING'
+                    ? counts?.hiring
+                    : counts?.work;
 
           return (
             <Pressable
@@ -116,6 +140,9 @@ function Row({ row, first }: { row: Conversation; first: boolean }) {
 
   const name = row.correspondent.company ?? row.correspondent.name;
   const initials = name.slice(0, 1).toUpperCase();
+  const online = useOnline(row.correspondent.id, row.correspondent.online);
+  const typing = useTyping(row.id);
+  const last = row.lastMessage;
 
   return (
     <Pressable
@@ -129,8 +156,13 @@ function Row({ row, first }: { row: Conversation; first: boolean }) {
         pressed && { backgroundColor: c.surfaceAlt },
       ]}
     >
-      <View style={[s.avatar, { backgroundColor: SECTION_TINT(row.section, c) }]}>
-        <Text style={[s.avatarText, { color: c.primaryText }]}>{initials}</Text>
+      <View>
+        <View style={[s.avatar, { backgroundColor: SECTION_TINT(row.section, c) }]}>
+          <Text style={[s.avatarText, { color: c.primaryText }]}>{initials}</Text>
+        </View>
+        {online ? (
+          <View style={[s.onlineDot, { backgroundColor: c.success, borderColor: c.surface }]} />
+        ) : null}
       </View>
 
       <View style={s.body}>
@@ -145,14 +177,26 @@ function Row({ row, first }: { row: Conversation; first: boolean }) {
         </View>
 
         <Text style={[s.job, { color: c.textMuted }]} numberOfLines={1}>
-          {row.job.title}
+          {row.job ? row.job.title : `${t('messages.direct')} · ${row.correspondent.publicId}`}
         </Text>
 
         <View style={s.bottomLine}>
-          <Text style={[s.preview, { color: c.text }]} numberOfLines={1}>
-            {row.blocked
-              ? t('messages.blocked')
-              : (row.lastMessage?.body ?? t('messages.noMessages'))}
+          {!typing && !row.blocked && last?.mine ? (
+            <MessageTicks
+              state={last.status}
+              color={c.textMuted}
+              label={last.status === 'SEEN' ? t('messages.seen') : t('messages.sent')}
+            />
+          ) : null}
+          <Text
+            style={[s.preview, { color: typing ? c.primary : c.text }]}
+            numberOfLines={1}
+          >
+            {typing
+              ? t('messages.typing')
+              : row.blocked
+                ? t('messages.blocked')
+                : (last?.body ?? t('messages.noMessages'))}
           </Text>
           {row.unread > 0 ? (
             <View style={[s.badge, { backgroundColor: c.primary }]}>
@@ -175,6 +219,8 @@ export function SECTION_TINT(
       return c.primary;
     case 'HIRING':
       return c.accent;
+    case 'DIRECT':
+      return c.primary;
     default:
       return c.ai;
   }
@@ -197,14 +243,21 @@ export function ago(
 }
 
 const s = StyleSheet.create({
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.sm },
   search: {
+    flex: 1,
     borderWidth: 1,
     borderRadius: radius.pill,
     paddingHorizontal: space.md,
     paddingVertical: 10,
     fontSize: font.sm,
-    marginTop: space.sm,
   },
+  newChat: {
+    borderRadius: radius.pill,
+    paddingHorizontal: space.md,
+    paddingVertical: 11,
+  },
+  newChatText: { fontSize: font.xs, fontWeight: '800' },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.md },
   filter: {
     borderWidth: 1,
@@ -227,6 +280,15 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: { fontSize: font.md, fontWeight: '800' },
+  onlineDot: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    borderWidth: 2,
+  },
   body: { flex: 1, gap: 2 },
   topLine: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   name: { flex: 1, fontSize: font.sm + 1, fontWeight: '800' },

@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchOnboardingStatus } from '../../src/api/onboarding';
 import { useLaunchStore } from '../../src/store/launch-store';
 import { BottomNav, PostJobFab } from '../../src/components/BottomNav';
+import { useChatConnection } from '../../src/lib/chat-socket';
 import { usePaletteSetStore } from '../../src/lib/palette-set';
 import { useTheme } from '../../src/lib/use-theme';
 
@@ -25,6 +26,10 @@ import { useTheme } from '../../src/lib/use-theme';
 export default function AppLayout() {
   const gateOpen = useLaunchStore((s) => s.gateOpen);
   const { c } = useTheme();
+
+  // One live chat connection for the whole signed-in app: new messages,
+  // read ticks and "online" reach whichever screen is showing them.
+  useChatConnection();
 
   /**
    * Everything from here on wears the terracotta palette.

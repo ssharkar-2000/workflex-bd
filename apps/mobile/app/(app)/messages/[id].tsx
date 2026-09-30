@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -12,27 +12,67 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ConversationThread, Message } from '@workflex/shared';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { Message } from '@workflex/shared';
 import { blockConversation, fetchThread, sendMessage } from '../../../src/api/messaging';
 import { ErrorBanner } from '../../../src/components/ErrorBanner';
+import { MessageTicks, type TickState } from '../../../src/components/chat/MessageTicks';
+import {
+  markRead,
+  sendTyping,
+  setActiveConversation,
+  threadKey,
+  upsertMessage,
+  useChatLive,
+  useOnline,
+  useTyping,
+} from '../../../src/lib/chat-socket';
 import { useErrorMessage } from '../../../src/lib/error-message';
 import { useT, type TranslationKey } from '../../../src/i18n';
 import { useTheme } from '../../../src/lib/use-theme';
 import { font, radius, space } from '../../../src/lib/theme';
-import { ago } from './index';
+import { SECTION_TINT } from './index';
+
+/** A message typed here that the server has not confirmed yet. */
+interface Outgoing {
+  clientId: string;
+  body: string;
+  createdAt: string;
+  failed: boolean;
+}
+
+/** One bubble, whichever of the two it came from. */
+interface Item {
+  key: string;
+  kind: Message['kind'];
+  body: string | null;
+  createdAt: string;
+  mine: boolean;
+  tick: TickState;
+  outgoing?: Outgoing;
+}
+
+/** Sent again after this long without a keystroke, while still typing. */
+const TYPING_REPEAT_MS = 3_000;
+/** "Stopped typing" after this long without one. */
+const TYPING_IDLE_MS = 4_000;
 
 /**
- * One conversation, with the job it is about pinned to the top.
+ * One conversation, live.
  *
- * The context header is the point: somebody juggling four applications and
- * two shifts cannot tell from "can you come at 3?" which job is being
- * discussed, and a chat that makes them guess is worse than no chat.
+ * For a job thread the job is pinned to the top: somebody juggling four
+ * applications and two shifts cannot tell from "can you come at 3?" which
+ * job is being discussed. The actions under it change with the relationship
+ * — an applicant can open the job, a hired worker can open the shift — so
+ * the thread is part of the work rather than a place to talk about it. A
+ * direct message has no job, and shows the other person's WorkFlex id
+ * instead.
  *
- * The actions under it change with the relationship — an applicant can open
- * the job, a hired worker can open the shift — so the thread is part of the
- * work rather than a place to talk about it.
+ * New messages, "typing…", "online" and the second tick on what you sent all
+ * arrive over the chat socket (see lib/chat-socket.ts). What you send
+ * appears at once with a clock, gets one tick when the server has it and two
+ * once they have read it.
  */
 export default function ConversationScreen() {
   const t = useT();
@@ -43,33 +83,181 @@ export default function ConversationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [draft, setDraft] = useState('');
+  const [outbox, setOutbox] = useState<Outgoing[]>([]);
 
-  const thread = useQuery<ConversationThread>({
-    queryKey: ['thread', id],
-    queryFn: () => fetchThread(id!),
+  const connected = useChatLive((s) => s.connected);
+
+  const thread = useInfiniteQuery({
+    queryKey: threadKey(id ?? ''),
+    queryFn: ({ pageParam }) => fetchThread(id!, pageParam),
+    initialPageParam: undefined as string | undefined,
+    // Older pages are fetched from before the oldest message already held.
+    getNextPageParam: (page) => (page.hasMore ? page.messages[0]?.createdAt : undefined),
     enabled: Boolean(id),
-    refetchInterval: 15_000,
+    // The socket keeps this current. Polling is the fallback for when it
+    // cannot connect, and — slowly — for the job updates other parts of the
+    // system post into a thread without going through the socket.
+    refetchInterval: connected ? 60_000 : 15_000,
   });
 
-  const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ['thread', id] });
-    void queryClient.invalidateQueries({ queryKey: ['inbox'] });
+  const conversation = thread.data?.pages[0]?.conversation;
+  const online = useOnline(conversation?.correspondent.id, conversation?.correspondent.online ?? false);
+  const typing = useTyping(id);
+
+  // On screen: incoming messages are read as they land, and the thread is
+  // read again whenever you come back to it.
+  useFocusEffect(
+    useCallback(() => {
+      if (!id) return undefined;
+      setActiveConversation(id);
+      markRead(id);
+      return () => setActiveConversation(null);
+    }, [id]),
+  );
+
+  // --- typing ---
+
+  const typingState = useRef<{ sentAt: number; idle: ReturnType<typeof setTimeout> | null }>({
+    sentAt: 0,
+    idle: null,
+  });
+
+  const stopTyping = useCallback(() => {
+    const state = typingState.current;
+    if (state.idle) clearTimeout(state.idle);
+    state.idle = null;
+    if (state.sentAt && id) sendTyping(id, false);
+    state.sentAt = 0;
+  }, [id]);
+
+  useEffect(() => stopTyping, [stopTyping]);
+
+  const onDraftChange = (text: string) => {
+    setDraft(text);
+    if (!id) return;
+    if (!text.trim()) {
+      stopTyping();
+      return;
+    }
+    const state = typingState.current;
+    if (Date.now() - state.sentAt > TYPING_REPEAT_MS) {
+      sendTyping(id, true);
+      state.sentAt = Date.now();
+    }
+    if (state.idle) clearTimeout(state.idle);
+    state.idle = setTimeout(stopTyping, TYPING_IDLE_MS);
   };
 
+  // --- sending ---
+
   const send = useMutation({
-    mutationFn: (body: string) => sendMessage(id!, { body }),
-    onSuccess: () => {
-      setDraft('');
-      refresh();
+    mutationFn: (out: Outgoing) => sendMessage(id!, { body: out.body, clientId: out.clientId }),
+    onSuccess: (message, out) => {
+      upsertMessage(queryClient, message);
+      setOutbox((list) => list.filter((item) => item.clientId !== out.clientId));
+      // With the socket up, its echo has already moved this thread to the
+      // top of the list.
+      if (!useChatLive.getState().connected) {
+        void queryClient.invalidateQueries({ queryKey: ['inbox'] });
+      }
     },
+    onError: (_error, out) =>
+      setOutbox((list) =>
+        list.map((item) => (item.clientId === out.clientId ? { ...item, failed: true } : item)),
+      ),
   });
+
+  const submit = () => {
+    const body = draft.trim();
+    if (!body || !id) return;
+    const out: Outgoing = {
+      clientId: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+      body,
+      createdAt: new Date().toISOString(),
+      failed: false,
+    };
+    setOutbox((list) => [...list, out]);
+    setDraft('');
+    stopTyping();
+    send.mutate(out);
+  };
+
+  const retry = (out: Outgoing) => {
+    setOutbox((list) =>
+      list.map((item) => (item.clientId === out.clientId ? { ...item, failed: false } : item)),
+    );
+    send.mutate({ ...out, failed: false });
+  };
 
   const block = useMutation({
     mutationFn: (on: boolean) => blockConversation(id!, on),
-    onSuccess: refresh,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: threadKey(id!) });
+      void queryClient.invalidateQueries({ queryKey: ['inbox'] });
+    },
   });
 
-  const conversation = thread.data?.conversation;
+  // --- what the list shows, newest first ---
+
+  const items = useMemo<Item[]>(() => {
+    const pages = thread.data?.pages ?? [];
+    const seen = new Set<string>();
+    const confirmed = new Set<string>();
+    const stored: Item[] = [];
+
+    // pages[0] is the newest page; each page runs oldest to newest.
+    for (const page of pages) {
+      for (let i = page.messages.length - 1; i >= 0; i--) {
+        const message = page.messages[i]!;
+        if (seen.has(message.id)) continue;
+        seen.add(message.id);
+        if (message.clientId) confirmed.add(message.clientId);
+        stored.push({
+          key: message.id,
+          kind: message.kind,
+          body: message.body,
+          createdAt: message.createdAt,
+          mine: message.mine,
+          tick: message.status,
+        });
+      }
+    }
+
+    // A bubble whose real copy has already arrived over the socket is shown
+    // once, as the real one.
+    const pending: Item[] = outbox
+      .filter((out) => !confirmed.has(out.clientId))
+      .reverse()
+      .map((out) => ({
+        key: out.clientId,
+        kind: 'TEXT',
+        body: out.body,
+        createdAt: out.createdAt,
+        mine: true,
+        tick: out.failed ? 'FAILED' : 'PENDING',
+        outgoing: out,
+      }));
+
+    return [...pending, ...stored];
+  }, [thread.data, outbox]);
+
+  const subtitle = [
+    typing ? t('messages.typing') : online ? t('messages.online') : null,
+    conversation?.job
+      ? conversation.job.title +
+        (conversation.applicationStatus
+          ? ` · ${t(`messages.application.${conversation.applicationStatus}` as TranslationKey)}`
+          : '')
+      : conversation
+        ? `${t('messages.direct')} · ${conversation.correspondent.publicId}`
+        : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  const name = conversation
+    ? (conversation.correspondent.company ?? conversation.correspondent.name)
+    : '';
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: c.bg }]}>
@@ -78,28 +266,40 @@ export default function ConversationScreen() {
       {/* Who, and about what */}
       <View style={[s.header, { borderBottomColor: c.border }]}>
         <Pressable
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/(app)/messages/index'))}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/(app)/messages'))}
           hitSlop={12}
           accessibilityRole="button"
+          accessibilityLabel={t('common.back')}
         >
           <Text style={[s.back, { color: c.primary }]}>←</Text>
         </Pressable>
 
+        {conversation ? (
+          <View>
+            <View style={[s.avatar, { backgroundColor: SECTION_TINT(conversation.section, c) }]}>
+              <Text style={[s.avatarText, { color: c.primaryText }]}>
+                {name.slice(0, 1).toUpperCase()}
+              </Text>
+            </View>
+            {online ? (
+              <View style={[s.onlineDot, { backgroundColor: c.success, borderColor: c.bg }]} />
+            ) : null}
+          </View>
+        ) : null}
+
         <View style={s.headerBody}>
           <Text style={[s.headerName, { color: c.text }]} numberOfLines={1}>
-            {conversation
-              ? (conversation.correspondent.company ?? conversation.correspondent.name)
-              : ''}
+            {name}
             {conversation?.correspondent.verified ? (
               <Text style={{ color: c.success }}> ✓</Text>
             ) : null}
           </Text>
-          {conversation ? (
-            <Text style={[s.headerJob, { color: c.textMuted }]} numberOfLines={1}>
-              {conversation.job.title}
-              {conversation.applicationStatus
-                ? ` · ${t(`messages.application.${conversation.applicationStatus}` as TranslationKey)}`
-                : ''}
+          {subtitle ? (
+            <Text
+              style={[s.headerSub, { color: typing ? c.primary : c.textMuted }]}
+              numberOfLines={1}
+            >
+              {subtitle}
             </Text>
           ) : null}
         </View>
@@ -120,13 +320,13 @@ export default function ConversationScreen() {
         ) : null}
       </View>
 
-      {/* What this thread lets you do */}
-      {conversation ? (
+      {/* What a job thread lets you do */}
+      {conversation?.job ? (
         <View style={[s.actions, { borderBottomColor: c.border }]}>
           <Action
             label={t('messages.viewJob')}
             onPress={() =>
-              router.push({ pathname: '/(app)/job/[id]', params: { id: conversation.job.id } })
+              router.push({ pathname: '/(app)/job/[id]', params: { id: conversation.job!.id } })
             }
           />
           {conversation.shift ? (
@@ -146,7 +346,7 @@ export default function ConversationScreen() {
               onPress={() =>
                 router.push({
                   pathname: '/(app)/applicants/[jobId]',
-                  params: { jobId: conversation.job.id },
+                  params: { jobId: conversation.job!.id },
                 })
               }
             />
@@ -158,27 +358,47 @@ export default function ConversationScreen() {
         style={s.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView
-          contentContainerStyle={s.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {thread.error ? (
+        {thread.error ? (
+          <View style={s.banner}>
             <ErrorBanner message={errorMessage(thread.error)} tone="onSurface" />
-          ) : null}
+          </View>
+        ) : null}
 
-          {thread.isLoading ? (
-            <ActivityIndicator color={c.primary} style={s.loading} />
-          ) : (thread.data?.messages.length ?? 0) === 0 ? (
+        {thread.isLoading ? (
+          <ActivityIndicator color={c.primary} style={s.loading} />
+        ) : items.length === 0 ? (
+          <View style={s.flex}>
             <Text style={[s.empty, { color: c.textMuted }]}>{t('messages.startHere')}</Text>
-          ) : (
-            thread.data!.messages.map((message) => (
-              <Bubble key={message.id} message={message} />
-            ))
-          )}
-
-          {send.error ? <ErrorBanner message={errorMessage(send.error)} tone="onSurface" /> : null}
-        </ScrollView>
+          </View>
+        ) : (
+          // Inverted: the newest message sits at the bottom and the list
+          // stays pinned there as new ones arrive, as in any chat.
+          <FlatList
+            inverted
+            data={items}
+            keyExtractor={(item) => item.key}
+            renderItem={({ item, index }) => (
+              <Bubble
+                item={item}
+                // The first of its day — the next item is the one above it.
+                dayChange={!sameDay(item.createdAt, items[index + 1]?.createdAt)}
+                onRetry={retry}
+              />
+            )}
+            contentContainerStyle={s.scroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            onEndReached={() => {
+              if (thread.hasNextPage && !thread.isFetchingNextPage) void thread.fetchNextPage();
+            }}
+            onEndReachedThreshold={0.3}
+            ListFooterComponent={
+              thread.isFetchingNextPage ? (
+                <ActivityIndicator color={c.primary} style={s.older} />
+              ) : null
+            }
+          />
+        )}
 
         {/* Writing */}
         {conversation?.blocked ? (
@@ -191,10 +411,12 @@ export default function ConversationScreen() {
           <View style={[s.composer, { borderTopColor: c.border, backgroundColor: c.bg }]}>
             <TextInput
               value={draft}
-              onChangeText={setDraft}
+              onChangeText={onDraftChange}
+              onBlur={stopTyping}
               placeholder={t('messages.write')}
               placeholderTextColor={c.textMuted}
               multiline
+              maxLength={4000}
               style={[
                 s.input,
                 { backgroundColor: c.surface, borderColor: c.border, color: c.text },
@@ -202,8 +424,8 @@ export default function ConversationScreen() {
               accessibilityLabel={t('messages.write')}
             />
             <Pressable
-              onPress={() => send.mutate(draft)}
-              disabled={!draft.trim() || send.isPending}
+              onPress={submit}
+              disabled={!draft.trim() || !conversation}
               accessibilityRole="button"
               accessibilityLabel={t('messages.send')}
               style={({ pressed }) => [
@@ -223,42 +445,96 @@ export default function ConversationScreen() {
   );
 }
 
-function Bubble({ message }: { message: Message }) {
+function Bubble({
+  item,
+  dayChange,
+  onRetry,
+}: {
+  item: Item;
+  dayChange: boolean;
+  onRetry: (out: Outgoing) => void;
+}) {
+  const t = useT();
   const { c } = useTheme();
 
-  if (message.kind === 'SYSTEM') {
+  const day = dayChange ? (
+    <View style={s.dayRow}>
+      <Text style={[s.day, { color: c.textMuted, backgroundColor: c.surface, borderColor: c.border }]}>
+        {dayLabel(item.createdAt, t)}
+      </Text>
+    </View>
+  ) : null;
+
+  if (item.kind === 'SYSTEM') {
     return (
-      <Text style={[s.system, { color: c.textMuted }]}>{message.body}</Text>
+      <View>
+        {day}
+        <Text style={[s.system, { color: c.textMuted }]}>{item.body}</Text>
+      </View>
     );
   }
 
+  // The bubble's own text colour, faded: light on the filled bubble in
+  // either theme, since primaryText is what the palette pairs with primary.
+  const metaColor = item.mine ? c.primaryText : c.textMuted;
+  const failed = item.tick === 'FAILED';
+
   return (
-    <View
-      style={[
-        s.bubble,
-        message.mine
-          ? { alignSelf: 'flex-end', backgroundColor: c.primary }
-          : { alignSelf: 'flex-start', backgroundColor: c.surface, borderWidth: 1, borderColor: c.border },
-      ]}
-    >
-      <Text style={[s.bubbleText, { color: message.mine ? c.primaryText : c.text }]}>
-        {message.body}
-      </Text>
-      <Text
+    <View>
+      {day}
+      <Pressable
+        disabled={!failed}
+        onPress={() => item.outgoing && onRetry(item.outgoing)}
+        accessibilityRole={failed ? 'button' : undefined}
+        accessibilityHint={failed ? t('messages.failed') : undefined}
         style={[
-          s.bubbleTime,
-          { color: message.mine ? 'rgba(255,255,255,0.75)' : c.textMuted },
+          s.bubble,
+          item.mine
+            ? { alignSelf: 'flex-end', backgroundColor: c.primary }
+            : {
+                alignSelf: 'flex-start',
+                backgroundColor: c.surface,
+                borderWidth: 1,
+                borderColor: c.border,
+              },
+          failed && { opacity: 0.7 },
         ]}
       >
-        {new Date(message.createdAt).toLocaleTimeString('en-GB', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true,
-        })}
-      </Text>
+        <Text style={[s.bubbleText, { color: item.mine ? c.primaryText : c.text }]}>
+          {item.body}
+        </Text>
+        <View style={s.meta}>
+          <Text style={[s.bubbleTime, { color: metaColor }]}>
+            {new Date(item.createdAt).toLocaleTimeString('en-GB', {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            })}
+          </Text>
+          {item.mine ? (
+            <View style={s.tick}>
+              <MessageTicks
+                state={item.tick}
+                color={metaColor}
+                label={t(TICK_LABEL[item.tick])}
+              />
+            </View>
+          ) : null}
+        </View>
+      </Pressable>
+      {failed ? (
+        <Text style={[s.failed, { color: c.danger }]}>{t('messages.failed')}</Text>
+      ) : null}
     </View>
   );
 }
+
+const TICK_LABEL: Record<TickState, TranslationKey> = {
+  PENDING: 'messages.sending',
+  FAILED: 'messages.failed',
+  SENT: 'messages.sent',
+  SEEN: 'messages.seen',
+};
 
 function Action({ label, onPress }: { label: string; onPress: () => void }) {
   const { c } = useTheme();
@@ -279,6 +555,23 @@ function Action({ label, onPress }: { label: string; onPress: () => void }) {
   );
 }
 
+function sameDay(a: string, b: string | undefined): boolean {
+  if (!b) return false;
+  return new Date(a).toDateString() === new Date(b).toDateString();
+}
+
+/** "Today", "Yesterday", then "20 September 2026". */
+function dayLabel(iso: string, t: (key: TranslationKey) => string): string {
+  const date = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) return t('messages.today');
+  if (date.toDateString() === yesterday.toDateString()) return t('messages.yesterday');
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
 const s = StyleSheet.create({
   safe: { flex: 1 },
   flex: { flex: 1 },
@@ -292,9 +585,26 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
   },
   back: { fontSize: font.xl, fontWeight: '800' },
+  avatar: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: { fontSize: font.md, fontWeight: '800' },
+  onlineDot: {
+    position: 'absolute',
+    right: -1,
+    bottom: -1,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+  },
   headerBody: { flex: 1 },
   headerName: { fontSize: font.md, fontWeight: '800' },
-  headerJob: { fontSize: font.xs },
+  headerSub: { fontSize: font.xs },
   more: { fontSize: font.lg, fontWeight: '800' },
 
   actions: {
@@ -313,13 +623,35 @@ const s = StyleSheet.create({
   },
   actionText: { fontSize: font.xs, fontWeight: '800' },
 
+  banner: { paddingHorizontal: space.md, paddingTop: space.sm },
   scroll: { padding: space.md, gap: space.sm },
   loading: { marginTop: space.lg },
+  older: { marginVertical: space.sm },
   empty: { fontSize: font.sm, lineHeight: 20, textAlign: 'center', marginTop: space.xl },
 
-  bubble: { maxWidth: '82%', borderRadius: radius.lg, paddingHorizontal: space.md, paddingVertical: 10 },
+  dayRow: { alignItems: 'center', marginVertical: space.sm },
+  day: {
+    fontSize: font.xs,
+    fontWeight: '700',
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.md,
+    paddingVertical: 4,
+    overflow: 'hidden',
+  },
+
+  bubble: { maxWidth: '82%', borderRadius: radius.lg, paddingHorizontal: space.md, paddingVertical: 8 },
   bubbleText: { fontSize: font.sm, lineHeight: 20 },
-  bubbleTime: { fontSize: 10, marginTop: 3, alignSelf: 'flex-end' },
+  meta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    gap: 4,
+    marginTop: 2,
+  },
+  bubbleTime: { fontSize: 10, opacity: 0.75 },
+  tick: { opacity: 0.85 },
+  failed: { fontSize: font.xs, alignSelf: 'flex-end', marginTop: 2 },
   system: { fontSize: font.xs, textAlign: 'center', paddingVertical: space.sm },
 
   composer: {

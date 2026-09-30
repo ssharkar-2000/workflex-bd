@@ -1,10 +1,13 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 import {
+  directLookupSchema,
   inboxFilterSchema,
   sendMessageSchema,
   startConversationSchema,
+  type DirectLookupDto,
   type SendMessageDto,
   type StartConversationDto,
 } from '@workflex/shared';
@@ -39,6 +42,31 @@ export class MessagingController {
     return this.messaging.inbox(userId, query.filter, query.search);
   }
 
+  /**
+   * Two path segments, so it can never be mistaken for `:id` below. Throttled
+   * harder than the rest: an exact-id lookup is only a directory if it can
+   * be asked fast enough to guess ids.
+   */
+  @Get('people/:publicId')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Who a WorkFlex id belongs to, before messaging them (exact match)' })
+  async lookup(
+    @CurrentUser('userId') userId: string,
+    @Param(new ZodValidationPipe(directLookupSchema)) params: DirectLookupDto,
+  ) {
+    return this.messaging.lookup(userId, params.publicId);
+  }
+
+  @Post('direct')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Open the direct thread with the owner of a WorkFlex id, or reopen it' })
+  async startDirect(
+    @CurrentUser('userId') userId: string,
+    @Body(new ZodValidationPipe(directLookupSchema)) dto: DirectLookupDto,
+  ) {
+    return this.messaging.startDirect(userId, dto.publicId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'One thread. Opening it marks it read.' })
   async thread(
@@ -66,6 +94,17 @@ export class MessagingController {
     @Body(new ZodValidationPipe(sendMessageSchema)) dto: SendMessageDto,
   ) {
     return this.messaging.send(userId, id, dto);
+  }
+
+  /** For when the chat socket is down: the socket's `conversation:read` does the same. */
+  @Post(':id/read')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Mark a thread read up to its newest message' })
+  async read(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    await this.messaging.markRead(userId, id);
   }
 
   @Post(':id/mute')

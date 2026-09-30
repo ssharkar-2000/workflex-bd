@@ -45,6 +45,18 @@ async function refreshTokens(): Promise<AuthTokens> {
   return data;
 }
 
+/**
+ * A fresh access token for a connection that does not go through axios —
+ * the chat socket, whose handshake is refused once the token has expired.
+ * Shares the single-flight refresh above, so it can never race a request.
+ */
+export async function refreshAccessToken(): Promise<string> {
+  refreshInFlight ??= refreshTokens().finally(() => {
+    refreshInFlight = null;
+  });
+  return (await refreshInFlight).accessToken;
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<ApiError>) => {
