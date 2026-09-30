@@ -309,10 +309,13 @@ function ApplicationList({
         >
           <View style={styles.statusRow}>
             <View
-              style={[styles.statusDot, { backgroundColor: statusColour(item.status, c) }]}
+              style={[
+                styles.statusDot,
+                { backgroundColor: item.replaced ? c.textMuted : statusColour(item.status, c) },
+              ]}
             />
             <Text style={[styles.status, { color: c.textMuted }]}>
-              {t(STATUS_KEYS[item.status])}
+              {item.replaced ? t('applications.replaced') : t(STATUS_KEYS[item.status])}
             </Text>
           </View>
           <Text style={[styles.rowTitle, { color: c.text }]} numberOfLines={1}>
@@ -360,6 +363,42 @@ function JobList({
           <Text style={[styles.status, { color: job.isOpen ? c.success : c.textMuted }]}>
             {t(job.isOpen ? 'myJobs.live' : 'myJobs.closed')}
           </Text>
+          {/* Who is on the job: filled, part filled, or a hired worker has
+              dropped out and needs somebody in their place. Silent while
+              nobody has been hired. */}
+          {job.staffing !== 'RECRUITING' ? (
+            <View
+              style={[
+                styles.staffing,
+                {
+                  backgroundColor:
+                    job.staffing === 'NEEDS_REPLACEMENT'
+                      ? c.dangerSoft
+                      : job.staffing === 'FILLED'
+                        ? c.successSoft
+                        : c.warningSoft,
+                },
+              ]}
+              testID={`job-staffing-${job.id}`}
+            >
+              <Text
+                style={[
+                  styles.staffingText,
+                  {
+                    color:
+                      job.staffing === 'NEEDS_REPLACEMENT'
+                        ? c.danger
+                        : job.staffing === 'FILLED'
+                          ? c.success
+                          : c.warning,
+                  },
+                ]}
+              >
+                {t(`staffing.${job.staffing}` as TranslationKey)}
+                {job.staffing === 'NEEDS_REPLACEMENT' ? ` · ${job.needsReplacementCount}` : ''}
+              </Text>
+            </View>
+          ) : null}
           <Text style={[styles.rowTitle, { color: c.text }]} numberOfLines={1}>
             {job.title}
           </Text>
@@ -401,6 +440,14 @@ function Empty({
 }
 
 const styles = StyleSheet.create({
+  staffing: {
+    alignSelf: 'flex-start',
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    marginTop: 4,
+  },
+  staffingText: { fontSize: font.xs, fontWeight: '800' },
   safe: { flex: 1 },
   header: { paddingHorizontal: space.md, paddingTop: space.sm },
   back: { fontSize: font.sm, fontWeight: '700' },

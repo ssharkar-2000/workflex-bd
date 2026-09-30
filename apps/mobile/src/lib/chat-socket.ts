@@ -223,6 +223,12 @@ function connect(queryClient: QueryClient): ChatSocket {
     void queryClient.invalidateQueries({ queryKey: ['inbox'] });
     void queryClient.invalidateQueries({ queryKey: threadKey(conversationId) });
   });
+  // A meeting was scheduled, answered, joined or cancelled: whoever is
+  // looking at the list or the details refetches, so both sides stay in step.
+  chat.on('meeting:changed', ({ meetingId }) => {
+    void queryClient.invalidateQueries({ queryKey: ['meetings'] });
+    void queryClient.invalidateQueries({ queryKey: ['meeting', meetingId] });
+  });
   chat.on('typing', onTyping);
   chat.on('presence', ({ userId, online }) =>
     useChatLive.setState((s) => ({ online: { ...s.online, [userId]: online } })),
@@ -233,6 +239,17 @@ function connect(queryClient: QueryClient): ChatSocket {
 
 function onMessage(queryClient: QueryClient, message: Message): void {
   upsertMessage(queryClient, message);
+
+  // A line written by the platform is often news about the work itself — a
+  // worker who can't continue, a replacement chosen — so whoever is looking at
+  // the hired lists or the Replacement Matcher sees it without asking. Not for
+  // the lines this account caused itself: it is already looking at the result.
+  if (message.kind === 'SYSTEM' && !message.mine) {
+    void queryClient.invalidateQueries({ queryKey: ['hires'] });
+    void queryClient.invalidateQueries({ queryKey: ['my-jobs'] });
+    void queryClient.invalidateQueries({ queryKey: ['my-applications'] });
+    void queryClient.invalidateQueries({ queryKey: ['replacement'] });
+  }
 
   const onScreen =
     useChatLive.getState().activeConversationId === message.conversationId &&

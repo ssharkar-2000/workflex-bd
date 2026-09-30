@@ -51,6 +51,8 @@ interface Item {
   mine: boolean;
   tick: TickState;
   outgoing?: Outgoing;
+  /** What the message carries besides text: a meeting invitation names its meeting here. */
+  payload?: Message['payload'];
 }
 
 /** Sent again after this long without a keystroke, while still typing. */
@@ -219,6 +221,7 @@ export default function ConversationScreen() {
           createdAt: message.createdAt,
           mine: message.mine,
           tick: message.status,
+          payload: message.payload,
         });
       }
     }
@@ -455,7 +458,13 @@ function Bubble({
   onRetry: (out: Outgoing) => void;
 }) {
   const t = useT();
+  const router = useRouter();
   const { c } = useTheme();
+  // A meeting invitation (or an update to one) points at its meeting.
+  const meetingId =
+    item.kind === 'INTERVIEW' && typeof item.payload?.meetingId === 'string'
+      ? item.payload.meetingId
+      : null;
 
   const day = dayChange ? (
     <View style={s.dayRow}>
@@ -466,10 +475,28 @@ function Bubble({
   ) : null;
 
   if (item.kind === 'SYSTEM') {
+    // "X can no longer do the job" comes with a way to choose somebody else —
+    // for the person it was written to, not for the worker who wrote it.
+    const replacement = replacementTarget(item.payload);
     return (
       <View>
         {day}
         <Text style={[s.system, { color: c.textMuted }]}>{item.body}</Text>
+        {replacement && !item.mine ? (
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/cover/job/[jobId]',
+                params: { jobId: replacement.jobId, workerId: replacement.workerId },
+              })
+            }
+            accessibilityRole="button"
+            testID="btn-open-matcher-message"
+            style={[s.systemLink, { borderColor: c.primary }]}
+          >
+            <Text style={[s.actionText, { color: c.primary }]}>{t('cover.findReplacement')}</Text>
+          </Pressable>
+        ) : null}
       </View>
     );
   }
@@ -479,49 +506,73 @@ function Bubble({
   const metaColor = item.mine ? c.primaryText : c.textMuted;
   const failed = item.tick === 'FAILED';
 
+  const bubbleStyle = [
+    s.bubble,
+    item.mine
+      ? { alignSelf: 'flex-end' as const, backgroundColor: c.primary }
+      : {
+          alignSelf: 'flex-start' as const,
+          backgroundColor: c.surface,
+          borderWidth: 1,
+          borderColor: c.border,
+        },
+    failed && { opacity: 0.7 },
+  ];
+  const content = (
+    <>
+      <Text style={[s.bubbleText, { color: item.mine ? c.primaryText : c.text }]}>
+        {item.body}
+      </Text>
+      {meetingId ? (
+        <Pressable
+          onPress={() =>
+            router.push({ pathname: '/(app)/meetings/[id]', params: { id: meetingId } })
+          }
+          accessibilityRole="button"
+          testID="btn-open-meeting"
+          style={[s.meetingLink, { borderColor: item.mine ? c.primaryText : c.primary }]}
+        >
+          <Text style={[s.actionText, { color: item.mine ? c.primaryText : c.primary }]}>
+            {t('meetings.openMeeting')}
+          </Text>
+        </Pressable>
+      ) : null}
+      <View style={s.meta}>
+        <Text style={[s.bubbleTime, { color: metaColor }]}>
+          {new Date(item.createdAt).toLocaleTimeString('en-GB', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+          })}
+        </Text>
+        {item.mine ? (
+          <View style={s.tick}>
+            <MessageTicks
+              state={item.tick}
+              color={metaColor}
+              label={t(TICK_LABEL[item.tick])}
+            />
+          </View>
+        ) : null}
+      </View>
+    </>
+  );
+
   return (
     <View>
       {day}
-      <Pressable
-        disabled={!failed}
-        onPress={() => item.outgoing && onRetry(item.outgoing)}
-        accessibilityRole={failed ? 'button' : undefined}
-        accessibilityHint={failed ? t('messages.failed') : undefined}
-        style={[
-          s.bubble,
-          item.mine
-            ? { alignSelf: 'flex-end', backgroundColor: c.primary }
-            : {
-                alignSelf: 'flex-start',
-                backgroundColor: c.surface,
-                borderWidth: 1,
-                borderColor: c.border,
-              },
-          failed && { opacity: 0.7 },
-        ]}
-      >
-        <Text style={[s.bubbleText, { color: item.mine ? c.primaryText : c.text }]}>
-          {item.body}
-        </Text>
-        <View style={s.meta}>
-          <Text style={[s.bubbleTime, { color: metaColor }]}>
-            {new Date(item.createdAt).toLocaleTimeString('en-GB', {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true,
-            })}
-          </Text>
-          {item.mine ? (
-            <View style={s.tick}>
-              <MessageTicks
-                state={item.tick}
-                color={metaColor}
-                label={t(TICK_LABEL[item.tick])}
-              />
-            </View>
-          ) : null}
-        </View>
-      </Pressable>
+      {failed ? (
+        <Pressable
+          onPress={() => item.outgoing && onRetry(item.outgoing)}
+          accessibilityRole="button"
+          accessibilityHint={t('messages.failed')}
+          style={bubbleStyle}
+        >
+          {content}
+        </Pressable>
+      ) : (
+        <View style={bubbleStyle}>{content}</View>
+      )}
       {failed ? (
         <Text style={[s.failed, { color: c.danger }]}>{t('messages.failed')}</Text>
       ) : null}
@@ -553,6 +604,16 @@ function Action({ label, onPress }: { label: string; onPress: () => void }) {
       <Text style={[s.actionText, { color: c.primary }]}>{label}</Text>
     </Pressable>
   );
+}
+
+/** Where a "replace this worker" message points, when it says. */
+function replacementTarget(
+  payload: Message['payload'] | undefined,
+): { jobId: string; workerId: string } | null {
+  const target = payload?.replacement as { jobId?: unknown; workerId?: unknown } | undefined;
+  return typeof target?.jobId === 'string' && typeof target?.workerId === 'string'
+    ? { jobId: target.jobId, workerId: target.workerId }
+    : null;
 }
 
 function sameDay(a: string, b: string | undefined): boolean {
@@ -642,6 +703,14 @@ const s = StyleSheet.create({
 
   bubble: { maxWidth: '82%', borderRadius: radius.lg, paddingHorizontal: space.md, paddingVertical: 8 },
   bubbleText: { fontSize: font.sm, lineHeight: 20 },
+  meetingLink: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.md,
+    paddingVertical: 5,
+    marginTop: 6,
+  },
   meta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -653,6 +722,14 @@ const s = StyleSheet.create({
   tick: { opacity: 0.85 },
   failed: { fontSize: font.xs, alignSelf: 'flex-end', marginTop: 2 },
   system: { fontSize: font.xs, textAlign: 'center', paddingVertical: space.sm },
+  systemLink: {
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.md,
+    paddingVertical: 6,
+    marginBottom: space.sm,
+  },
 
   composer: {
     flexDirection: 'row',

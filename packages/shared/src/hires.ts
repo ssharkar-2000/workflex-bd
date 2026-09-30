@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { jobCategorySchema } from './job-categories';
 import { jobTypeSchema, paymentTypeSchema, workplaceTypeSchema } from './jobs';
 import { reviewRoleSchema } from './reviews';
+import { hireUnavailableSchema, jobStaffingSchema } from './hire-replacement';
 
 /**
  * Hires, grouped by job — the two lists that close the loop on a job.
@@ -46,11 +47,21 @@ export const hirePersonSchema = z.object({
   myReview: z
     .object({ rating: z.number().int().min(1).max(5), comment: z.string().nullable() })
     .nullable(),
+  /** Set while this hire cannot do the job and nobody has taken their place. */
+  unavailable: hireUnavailableSchema.nullable().default(null),
+  /** Set once somebody took this person's place; `completedAt` is set with it. */
+  replacedAt: z.string().nullable().default(null),
+  /** Who took this person's place. */
+  replacedBy: z.object({ userId: z.string().uuid(), name: z.string() }).nullable().default(null),
+  /** Whose place this person took. */
+  replaces: z.object({ userId: z.string().uuid(), name: z.string() }).nullable().default(null),
 });
 export type HirePerson = z.infer<typeof hirePersonSchema>;
 
 export const hireGroupSchema = z.object({
   job: hireJobSchema,
+  /** How full the job is, from the poster's side: see staffingOf. */
+  staffing: jobStaffingSchema.default('RECRUITING'),
   people: z.array(hirePersonSchema),
 });
 export type HireGroup = z.infer<typeof hireGroupSchema>;

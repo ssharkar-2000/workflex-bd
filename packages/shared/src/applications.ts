@@ -79,6 +79,12 @@ export const jobApplicationSchema = z.object({
    * applicant is entitled to know they applied.
    */
   jobIsOpen: z.boolean(),
+  /**
+   * True once the employer gave this person's place to a replacement. The
+   * status stays ACCEPTED — what they were paid and rated still counts — so
+   * the list needs this to say the work is no longer theirs.
+   */
+  replaced: z.boolean().default(false),
 });
 export type JobApplication = z.infer<typeof jobApplicationSchema>;
 

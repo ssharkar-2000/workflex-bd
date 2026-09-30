@@ -44,6 +44,10 @@ function useAuthRouting(): void {
     if (status === 'loading') return;
 
     const group = segments[0];
+    // A meeting link opens the room itself, signed in or not: a phone hands
+    // its browser a pass that needs no session, and a pasted link explains
+    // what to do when there is none. Neither may be bounced to the landing page.
+    if (group === 'meeting-room') return;
     // Registration now starts before there is a session — the SMS check lives
     // inside the form — so (onboarding) is part of the pre-sign-in flow and
     // must not be bounced back to the landing page.

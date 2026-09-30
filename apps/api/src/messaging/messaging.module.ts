@@ -11,5 +11,8 @@ import { MessagingService } from './messaging.service';
 @Module({
   controllers: [MessagingController],
   providers: [MessagingService, ChatRealtime, MessagingGateway],
+  // Meetings send their invitations through the same threads, and tell the
+  // people concerned over the same socket.
+  exports: [MessagingService, ChatRealtime],
 })
 export class MessagingModule {}

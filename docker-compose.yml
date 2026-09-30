@@ -55,6 +55,20 @@ services:
       timeout: 5s
       retries: 10
 
+  # Video meetings. Development only: the dev keys below are public knowledge.
+  # In production use LiveKit Cloud (or your own server) with real keys.
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: workflex-livekit
+    restart: unless-stopped
+    command: --dev --bind 0.0.0.0 --node-ip 127.0.0.1
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    environment:
+      LIVEKIT_KEYS: "devkey: secret"
+
 volumes:
   postgres-data:
   redis-data:

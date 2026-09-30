@@ -1,4 +1,5 @@
-# Render Blueprint: the whole of WorkFlex BD on free plans.
+# Render Blueprint: the whole of WorkFlex BD. The API is on a paid, always-on
+# plan; the two web apps are free static sites.
 #
 #   workflex-bd-api    the API (NestJS + Prisma)   https://workflex-bd-api.onrender.com
 #   workflex-bd        the user app, on the web    https://workflex-bd.onrender.com
@@ -13,22 +14,28 @@
 # Render ever reports one of the names as taken, it adds a suffix — change
 # the three addresses below to match and push again.
 #
-# Everything here is on a free plan. What that costs in behaviour:
-#   - the API sleeps after 15 idle minutes and takes about a minute to wake;
-#     a free uptime pinger on /api/v1/health/live every 10 minutes keeps it
-#     awake (that endpoint never touches the database, so Neon still sleeps);
-#   - its disk is wiped on every restart, so uploads go to object storage
-#     (Backblaze B2's free 10 GB, or Cloudflare R2) — the API refuses to
-#     start without it rather than lose people's documents.
-# To move to an always-on paid instance later, pick a paid instance type in
-# the API's Render settings (Settings → Instance Type). Nothing else changes.
+# The two web apps are static sites: free, and they never sleep. The API is on
+# the Standard plan (2 GB, always on), and that is deliberate:
+#   - it never sleeps, so nobody waits a minute for a cold start;
+#   - it needs the memory. Analysing one phone photo of an ID card (OpenCV and
+#     Tesseract OCR run inside the API) took the process to about 1.2 GB when
+#     measured, and the free and Starter plans have 512 MB: the host kills the
+#     process and every app sees "server down". Standard's 2 GB holds it.
+# Change the plan here, not only in the dashboard: a Blueprint sync puts back
+# whatever this file says.
+# Its disk is wiped on every restart, so uploads go to object storage
+# (Backblaze B2's free 10 GB, or Cloudflare R2) — the API refuses to
+# start without it rather than lose people's documents.
+# /api/v1/health/live is the health check and never touches the database, so
+# Neon's free compute can still sleep. .github/workflows/keepalive.yml calls
+# it every 10 minutes and emails the repository owner if it stops answering.
 
 services:
   # --- the API --------------------------------------------------------------
   - type: web
     name: workflex-bd-api
     runtime: node
-    plan: free
+    plan: standard
     region: singapore # next to the Neon database in ap-southeast-1
     # Dev dependencies are needed to build (TypeScript, the Nest CLI, the
     # Prisma CLI) even though NODE_ENV is production.
@@ -116,6 +123,20 @@ services:
       # CV_PARSER=claude and ANTHROPIC_API_KEY.
       - key: CV_PARSER
         value: 'off'
+
+      # --- Video meetings (LiveKit) ---
+      # Runs on LiveKit Cloud (https://cloud.livekit.io, free tier). Paste the
+      # project's wss:// URL and an API key pair; the app's "Video calls are not
+      # set up yet" notice disappears once all three are set. WEB_APP_URL is the
+      # user web app's own address: where meeting links open.
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: WEB_APP_URL
+        sync: false
 
       # --- Google Meet (optional) ---
       # Leave both blank and video interviews use Jitsi rooms. To use Meet,

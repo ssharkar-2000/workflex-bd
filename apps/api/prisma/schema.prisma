@@ -166,6 +166,10 @@ model User {
   conversationsAsWorker    Conversation[] @relation("ConversationWorker")
   conversationsAsRecruiter Conversation[] @relation("ConversationRecruiter")
   messagesSent             Message[]
+  meetingsHosted           Meeting[]            @relation("MeetingHost")
+  meetingParticipations    MeetingParticipant[] @relation("MeetingParticipations")
+  meetingTemplates         MeetingTemplate[]
+  physicalRooms            PhysicalRoom[]
   reviewsWritten           Review[]       @relation("ReviewAuthor")
   reviewsReceived          Review[]       @relation("ReviewSubject")
 
@@ -832,6 +836,25 @@ model JobApplication {
   /// recruiter's hired list.
   completedAt DateTime?
 
+  /// A hired worker who can no longer do the job, and what was said about it.
+  /// Set by the worker ("I can't continue") or by the recruiter, and cleared if
+  /// they turn out to be available after all. The status stays ACCEPTED, so
+  /// payments, reviews and trust keep counting the hire; the Replacement
+  /// Matcher lists everyone flagged here who has not been replaced yet.
+  unavailableAt     DateTime?
+  unavailableReason HireUnavailableReason?
+  unavailableNote   String?
+  /// Which side reported it.
+  unavailableBy     ReviewRole?
+
+  /// On the hire that ended because somebody took over: when, and who. The row
+  /// also gets `completedAt`, so the person leaves the working lists the same
+  /// way a finished hire does — their payments and reviews stay counted.
+  replacedAt       DateTime?
+  replacedByUserId String?   @db.Uuid
+  /// On the replacement's own row: whose place they took.
+  replacesUserId   String?   @db.Uuid
+
   job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -839,6 +862,15 @@ model JobApplication {
   @@index([userId, appliedAt])
   @@index([jobId, status])
   @@map("job_applications")
+}
+
+/// Why a hired worker cannot do the job any more. A short list rather than
+/// free text so it can be shown in either language; the note carries the rest.
+enum HireUnavailableReason {
+  DROPPED_OUT
+  SICK
+  NO_SHOW
+  OTHER
 }
 
 // --- reports ---
@@ -1803,4 +1835,152 @@ model GoogleConnection {
   updatedAt   DateTime @updatedAt
 
   @@map("google_connections")
+}
+
+/// How a meeting takes place.
+enum MeetingKind {
+  /// A video call in a LiveKit room.
+  VIDEO
+  /// Somebody turns up somewhere; a physical room can be booked for it.
+  IN_PERSON
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  /// The host ended it for everybody.
+  ENDED
+  CANCELLED
+}
+
+enum MeetingRecurrence {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum MeetingResponse {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum MeetingRole {
+  HOST
+  GUEST
+}
+
+/// A scheduled meeting — built for interviews, but not tied to one.
+///
+/// A repeating schedule is stored as separate rows that share a `seriesId`,
+/// rather than as a rule that is expanded on read: each occurrence then has
+/// its own room, its own guest responses and can be cancelled on its own, and
+/// nothing has to be recomputed when somebody looks at the list.
+model Meeting {
+  id String @id @default(uuid()) @db.Uuid
+
+  title String
+  kind  MeetingKind @default(VIDEO)
+
+  startsAt DateTime
+  endsAt   DateTime
+
+  agenda String?
+  notes  String?
+
+  status     MeetingStatus     @default(SCHEDULED)
+  recurrence MeetingRecurrence @default(NONE)
+
+  /// Shared by every occurrence of a repeating meeting.
+  seriesId String? @db.Uuid
+
+  hostId String @db.Uuid
+  host   User   @relation("MeetingHost", fields: [hostId], references: [id], onDelete: Cascade)
+
+  /// The LiveKit room, fixed when the meeting is made so both ends always
+  /// name the same one.
+  roomName String @unique
+
+  physicalRoomId String?       @db.Uuid
+  physicalRoom   PhysicalRoom? @relation(fields: [physicalRoomId], references: [id], onDelete: SetNull)
+
+  participants MeetingParticipant[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([hostId, startsAt])
+  @@index([seriesId])
+  @@index([physicalRoomId, startsAt])
+  @@map("meetings")
+}
+
+/// One person on a meeting's list — the host included.
+model MeetingParticipant {
+  id String @id @default(uuid()) @db.Uuid
+
+  meetingId String  @db.Uuid
+  meeting   Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  userId String @db.Uuid
+  user   User   @relation("MeetingParticipations", fields: [userId], references: [id], onDelete: Cascade)
+
+  role     MeetingRole     @default(GUEST)
+  response MeetingResponse @default(PENDING)
+
+  /// The last time they went into the call, and the last time they left it.
+  /// In the call right now means joined and not left since.
+  joinedAt DateTime?
+  leftAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([meetingId, userId])
+  @@index([userId])
+  @@map("meeting_participants")
+}
+
+/// Settings somebody saved to fill the schedule form in one tap. The guests
+/// are kept as account ids, and looked up again when the template is used, so
+/// a guest whose account has since gone is dropped rather than shown stale.
+model MeetingTemplate {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerId String @db.Uuid
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name            String
+  title           String
+  kind            MeetingKind       @default(VIDEO)
+  durationMinutes Int
+  agenda          String?
+  notes           String?
+  recurrence      MeetingRecurrence @default(NONE)
+  repeatCount     Int               @default(1)
+  participantIds  String[]          @db.Uuid
+  physicalRoomId  String?           @db.Uuid
+
+  createdAt DateTime @default(now())
+
+  @@index([ownerId])
+  @@map("meeting_templates")
+}
+
+/// A room somebody can book for an in-person meeting.
+model PhysicalRoom {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerId String @db.Uuid
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name     String
+  location String?
+  capacity Int?
+
+  meetings Meeting[]
+
+  createdAt DateTime @default(now())
+
+  @@index([ownerId])
+  @@map("physical_rooms")
 }

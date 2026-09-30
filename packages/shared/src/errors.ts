@@ -49,6 +49,13 @@ export const ApiErrorCode = {
   /** Posting as a company needs an approved trade licence (level 2). */
   COMPANY_VERIFICATION_REQUIRED: 'COMPANY_VERIFICATION_REQUIRED',
 
+  /** The meeting is cancelled, over, not a video meeting, or its door is not open yet. */
+  MEETING_NOT_JOINABLE: 'MEETING_NOT_JOINABLE',
+  /** Video calls are not set up on this server (no LiveKit credentials). */
+  CALLS_UNAVAILABLE: 'CALLS_UNAVAILABLE',
+  /** The room is already booked for part of that time. */
+  ROOM_BUSY: 'ROOM_BUSY',
+
   /** The posting was closed or its deadline passed before applying. */
   JOB_CLOSED: 'JOB_CLOSED',
   /** You cannot apply to a posting you created. */
@@ -70,6 +77,11 @@ export const ApiErrorCode = {
   PAYMENT_GATEWAY_UNAVAILABLE: 'PAYMENT_GATEWAY_UNAVAILABLE',
   /** Someone got there first — the withdrawal or top-up was already dealt with. */
   ALREADY_PROCESSED: 'ALREADY_PROCESSED',
+
+  /** The hired worker has not been marked unavailable, so there is nobody to replace. */
+  HIRE_NOT_UNAVAILABLE: 'HIRE_NOT_UNAVAILABLE',
+  /** That shortlisted person cannot take the place: busy, not a fit, or no longer shortlisted. */
+  REPLACEMENT_NOT_ELIGIBLE: 'REPLACEMENT_NOT_ELIGIBLE',
 
   ACCOUNT_SUSPENDED: 'ACCOUNT_SUSPENDED',
   /** Action needs a higher verification level; `details.required` says which. */
