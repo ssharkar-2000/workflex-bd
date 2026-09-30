@@ -1,12 +1,31 @@
 import 'reflect-metadata';
-import { Logger } from '@nestjs/common';
+import { Logger, type INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import helmet from 'helmet';
+import type { ServerOptions } from 'socket.io';
 import { AppModule } from './app.module';
 import type { Env } from './config/env.schema';
+
+/**
+ * The chat socket answers the same browser origins as the HTTP API. Phones
+ * send no origin, so this only matters for the app on the web.
+ */
+class ChatIoAdapter extends IoAdapter {
+  constructor(
+    app: INestApplicationContext,
+    private readonly cors: ServerOptions['cors'],
+  ) {
+    super(app);
+  }
+
+  override createIOServer(port: number, options?: ServerOptions) {
+    return super.createIOServer(port, { ...options, cors: this.cors } as ServerOptions);
+  }
+}
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -37,6 +56,9 @@ async function bootstrap(): Promise<void> {
     origin: isDev ? true : webOrigins,
     credentials: true,
   });
+  app.useWebSocketAdapter(
+    new ChatIoAdapter(app, { origin: isDev ? true : webOrigins, credentials: true }),
+  );
 
   if (!isDev && webOrigins.length === 0) {
     new Logger('Bootstrap').warn(

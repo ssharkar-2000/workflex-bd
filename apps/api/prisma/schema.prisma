@@ -1343,17 +1343,30 @@ enum AttendanceMethod {
 /// read, not stored: the same row is "an application" to the worker and
 /// "hiring" to the recruiter, and becomes "work" for both once a shift
 /// exists.
+///
+/// A direct message is the one exception: a thread between two accounts that
+/// is not about a job, started by typing the other person's WorkFlex id. It
+/// has no job, and `directKey` holds the pair so two people only ever have
+/// one direct thread. The two seats keep their column names — `workerId` is
+/// whoever started it, `recruiterId` whoever they wrote to — so read times,
+/// muting and blocking work exactly as they do for a job thread.
 model Conversation {
   id String @id @default(uuid()) @db.Uuid
 
-  jobId String @db.Uuid
-  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  /// Null for a direct message.
+  jobId String? @db.Uuid
+  job   Job?    @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
-  /// The person who applied or was hired.
+  /// Both account ids, sorted and joined with ":". Set on direct messages
+  /// only, where it makes the pair unique whichever of them started it.
+  directKey String? @unique
+
+  /// The person who applied or was hired. In a direct message, whoever
+  /// started the thread.
   workerId String @db.Uuid
   worker   User   @relation("ConversationWorker", fields: [workerId], references: [id], onDelete: Cascade)
 
-  /// The person who posted the job.
+  /// The person who posted the job. In a direct message, the person written to.
   recruiterId String @db.Uuid
   recruiter   User   @relation("ConversationRecruiter", fields: [recruiterId], references: [id], onDelete: Cascade)
 
