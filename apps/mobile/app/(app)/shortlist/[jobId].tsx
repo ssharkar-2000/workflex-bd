@@ -3,7 +3,9 @@ import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'r
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  applyShortlistResultSchema,
   shortlistSchema,
+  type ApplyShortlistResult,
   type MatchAxis,
   type Shortlist,
   type ShortlistCandidate,
@@ -25,14 +27,20 @@ async function fetchShortlist(jobId: string): Promise<Shortlist> {
   return shortlistSchema.parse(data);
 }
 
+async function applyShortlist(jobId: string, userIds: string[]): Promise<ApplyShortlistResult> {
+  const { data } = await api.post(`/jobs/${jobId}/shortlist/apply`, { userIds });
+  return applyShortlistResultSchema.parse(data);
+}
+
 /**
  * The AI shortlist for one posting.
  *
- * Six candidates out of however many applied, each with the percentage, the
+ * Four or five candidates when the job is for one person, seven or eight when
+ * it is for more, out of however many applied — each with the percentage, the
  * five bars it is made of, a line for and a line against, and the CV and
- * intro video to open. The recruiter still decides — the Shortlist button
- * here is the same call the applicants screen makes, so a decision taken on
- * this screen shows up on that one and the other way round.
+ * intro video to open. "Shortlist all" puts every one of them on the
+ * shortlist in one tap; the per-candidate button is the same call the
+ * applicants screen makes, so a decision taken here shows up there.
  *
  * The reservation is shown as prominently as the reason. That is deliberate:
  * a ranked list that only argues in favour trains a reader to stop checking
@@ -64,7 +72,18 @@ export default function ShortlistScreen() {
     },
   });
 
+  const applyAll = useMutation({
+    mutationFn: (userIds: string[]) => applyShortlist(jobId, userIds),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['shortlist', jobId] });
+      void queryClient.invalidateQueries({ queryKey: ['applicants', jobId] });
+    },
+  });
+
   const data = shortlist.data;
+  // Still waiting on a decision: the ones "Shortlist all" would move.
+  const pending =
+    data?.candidates.filter((p) => p.status === 'SUBMITTED' || p.status === 'VIEWED') ?? [];
 
   return (
     <MoneyScreen title={t('shortlist.title')} subtitle={data?.jobTitle ?? ''}>
@@ -73,6 +92,9 @@ export default function ShortlistScreen() {
       ) : null}
       {decide.error ? (
         <ErrorBanner message={errorMessage(decide.error)} tone="onSurface" />
+      ) : null}
+      {applyAll.error ? (
+        <ErrorBanner message={errorMessage(applyAll.error)} tone="onSurface" />
       ) : null}
 
       {shortlist.isLoading ? (
@@ -90,6 +112,36 @@ export default function ShortlistScreen() {
               considered: data.considered,
             })}
           </Text>
+          <Text style={[s.rule, { color: c.textMuted }]}>
+            {(data.vacancies ?? 1) <= 1
+              ? t('shortlist.ruleOne')
+              : t('shortlist.ruleMany', { n: data.vacancies ?? 2 })}
+          </Text>
+
+          {pending.length > 0 ? (
+            <Pressable
+              onPress={() => applyAll.mutate(pending.map((p) => p.userId))}
+              disabled={applyAll.isPending}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                s.applyAll,
+                { backgroundColor: pressed ? c.primaryPressed : c.primary },
+              ]}
+            >
+              {applyAll.isPending ? (
+                <ActivityIndicator color={c.primaryText} />
+              ) : (
+                <Text style={[s.applyAllText, { color: c.primaryText }]}>
+                  ✓ {t('shortlist.applyAll', { n: pending.length })}
+                </Text>
+              )}
+            </Pressable>
+          ) : (
+            <Text style={[s.allDone, { color: c.success }]}>
+              ✓ {t('shortlist.allOnList', { n: data.candidates.length })}
+            </Text>
+          )}
+
           <Notice tone="info" body={data.summary} />
 
           {data.withoutCv > 0 ? (
@@ -305,6 +357,18 @@ const s = StyleSheet.create({
   loading: { marginTop: space.lg },
   note: { fontSize: font.xs, lineHeight: 17, marginTop: space.xs },
   count: { fontSize: font.sm, fontWeight: '800', marginTop: space.sm, marginBottom: space.xs },
+  rule: { fontSize: font.xs + 1, lineHeight: 18 },
+  applyAll: {
+    borderRadius: radius.md,
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 46,
+    marginTop: space.sm,
+    marginBottom: space.xs,
+  },
+  applyAllText: { fontSize: font.sm, fontWeight: '800' },
+  allDone: { fontSize: font.sm, fontWeight: '800', marginTop: space.sm, marginBottom: space.xs },
 
   card: {
     borderWidth: 1,

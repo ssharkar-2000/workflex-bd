@@ -67,6 +67,11 @@ export class StorageService {
             // providers, and accepted by R2 and S3, so one setting works for
             // every store this might be pointed at.
             forcePathStyle: true,
+            // Checksums only where the operation needs one. The SDK's newer
+            // default adds CRC headers to every upload, which Backblaze B2
+            // and some other S3-compatible stores reject.
+            requestChecksumCalculation: 'WHEN_REQUIRED',
+            responseChecksumValidation: 'WHEN_REQUIRED',
           })
         : null;
 

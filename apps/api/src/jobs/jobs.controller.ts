@@ -14,7 +14,9 @@ import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
 import {
   applyToJobSchema,
   createJobSchema,
+  applyShortlistSchema,
   decideApplicationSchema,
+  type ApplyShortlistDto,
   jobDraftRequestSchema,
   jobQuerySchema,
   nearbyQuerySchema,
@@ -306,6 +308,16 @@ export class JobsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.shortlist.build(userId, id);
+  }
+
+  @Post(':id/shortlist/apply')
+  @ApiOperation({ summary: 'Put the AI shortlist on the shortlist in one tap' })
+  async applyShortlist(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(applyShortlistSchema)) dto: ApplyShortlistDto,
+  ) {
+    return this.shortlist.apply(userId, id, dto.userIds);
   }
 
   @Patch(':id/applicants/:userId')

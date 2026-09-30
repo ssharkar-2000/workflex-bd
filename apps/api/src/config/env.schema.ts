@@ -54,6 +54,17 @@ export const envSchema = z.object({
   SMS_PROVIDER: z
     .enum(['file', 'console', 'bulksmsbd', 'twilio'])
     .default('file'),
+  /**
+   * Lets production run with SMS_PROVIDER=console: sign-up and reset codes
+   * are written to the server log, which only the owner of the hosting
+   * account can read, instead of being sent. For a demo deployment with no
+   * SMS gateway yet — password sign-in works as normal, and the owner reads
+   * a new user's code from the log. Never exposes a code to the caller.
+   */
+  ALLOW_OTP_IN_LOGS: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
   SMS_LOG_FILE: z.string().default('./logs/sms.log'),
   SMS_API_KEY: z.string().optional(),
   SMS_SENDER_ID: z.string().optional(),
@@ -243,10 +254,17 @@ export function validateEnv(raw: Record<string, unknown>): Env {
         `Refusing to start in production with dev placeholder secrets: ${placeholders.join(', ')}`,
       );
     }
-    if (parsed.data.SMS_PROVIDER === 'console' || parsed.data.SMS_PROVIDER === 'file') {
+    const logged = parsed.data.SMS_PROVIDER === 'console' && parsed.data.ALLOW_OTP_IN_LOGS;
+    if ((parsed.data.SMS_PROVIDER === 'console' || parsed.data.SMS_PROVIDER === 'file') && !logged) {
       throw new Error(
         `Refusing to start in production with SMS_PROVIDER=${parsed.data.SMS_PROVIDER} — ` +
-          'codes would be written to a log instead of delivered. Set SMS_PROVIDER=bulksmsbd.',
+          'codes would be written to a log instead of delivered. Set SMS_PROVIDER=bulksmsbd, ' +
+          'or for a demo set SMS_PROVIDER=console with ALLOW_OTP_IN_LOGS=true.',
+      );
+    }
+    if (logged) {
+      console.warn(
+        'SMS_PROVIDER=console with ALLOW_OTP_IN_LOGS=true: sign-up codes go to this log, not by SMS. Demo use only.',
       );
     }
     if (parsed.data.OTP_EXPOSE_DEV_CODE) {

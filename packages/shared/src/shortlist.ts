@@ -76,9 +76,35 @@ export const shortlistSchema = z.object({
    * score can mean "did not upload a CV" rather than "not suitable".
    */
   withoutCv: z.number().int().nonnegative(),
+  /** People the posting wants; null when the poster did not say (read as one). */
+  vacancies: z.number().int().nullable(),
+  /**
+   * How long the list is allowed to be: four or five for one person, seven or
+   * eight for more. The AI takes the minimum and adds the last place only for
+   * a candidate as strong as the one before.
+   */
+  sizeMin: z.number().int().positive(),
+  sizeMax: z.number().int().positive(),
   candidates: z.array(shortlistCandidateSchema),
   /** Two or three sentences over the whole field. */
   summary: z.string(),
   source: z.enum(['written', 'assembled']),
 });
 export type Shortlist = z.infer<typeof shortlistSchema>;
+
+/** The shortlist size rule, in one place for the API and the screen. */
+export function shortlistRange(vacancies: number | null): { min: number; max: number } {
+  return (vacancies ?? 1) <= 1 ? { min: 4, max: 5 } : { min: 7, max: 8 };
+}
+
+/** One tap: put the AI's picks on the shortlist. */
+export const applyShortlistSchema = z.object({
+  userIds: z.array(z.string().uuid()).min(1).max(8),
+});
+export type ApplyShortlistDto = z.infer<typeof applyShortlistSchema>;
+
+export const applyShortlistResultSchema = z.object({
+  /** How many moved to SHORTLISTED — people already decided are left alone. */
+  shortlisted: z.number().int().nonnegative(),
+});
+export type ApplyShortlistResult = z.infer<typeof applyShortlistResultSchema>;

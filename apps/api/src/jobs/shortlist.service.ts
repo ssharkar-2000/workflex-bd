@@ -5,10 +5,12 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 // zod/v4, not the package root — see the note in cv-writer.service.ts.
 import * as z from 'zod/v4';
 import type { CvProfile, Job } from '@prisma/client';
-import type {
-  MatchAxis,
-  Shortlist,
-  ShortlistCandidate,
+import {
+  shortlistRange,
+  type ApplyShortlistResult,
+  type MatchAxis,
+  type Shortlist,
+  type ShortlistCandidate,
 } from '@workflex/shared';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AppException } from '../common/exceptions/app.exception';
@@ -26,8 +28,20 @@ import { AppException } from '../common/exceptions/app.exception';
  */
 const WEIGHTS = { skills: 45, experience: 20, cv: 15, intro: 10, standing: 10 } as const;
 
-/** The recruiter asked for five or six. Six, so there is something to cut. */
-const SHORTLIST = 6;
+/**
+ * Where the list stops, inside the range the vacancies allow.
+ *
+ * The minimum is always taken when that many applied. The one extra place
+ * goes to the next candidate only when they are as strong as the last one in
+ * — within five points — so the list ends at a natural gap in the scores
+ * rather than at a fixed count that cuts between two equals.
+ */
+function cutAt(scores: number[], range: { min: number; max: number }): number {
+  if (scores.length <= range.min) return scores.length;
+  const last = scores[range.min - 1]!;
+  const next = scores[range.min]!;
+  return next >= last - 5 ? Math.min(range.max, scores.length) : range.min;
+}
 
 /** Years each experience band implies at its midpoint. */
 const LEVEL_YEARS: Record<Job['experienceLevel'], number> = {
@@ -80,16 +94,17 @@ Write in the language asked for.`;
  * The AI Shortlist Assistant.
  *
  * Ranks everyone who applied against what the posting asks for, and hands
- * back the strongest six with the reasoning attached.
+ * back the strongest few with the reasoning attached: four or five when the
+ * job is for one person, seven or eight when it is for more.
  *
  *     every live application
  *         -> score each against the posting's requirements
- *         -> order, take six
+ *         -> order, cut at 4–5 or 7–8
  *         -> a line for and a line against each
  *
- * It does not shortlist anybody. The recruiter presses the button on the
- * applicants screen, as they did before — what changes is that they now do it
- * after reading six ranked candidates instead of forty unsorted ones.
+ * Nobody is shortlisted until the recruiter says so — one tap on "Shortlist
+ * all" (apply) or one per candidate — so the AI does the reading and the
+ * sorting, and the decision stays with the person who has to live with it.
  */
 @Injectable()
 export class ShortlistService {
@@ -214,8 +229,10 @@ export class ShortlistService {
       })
       // Applied earlier breaks a tie: two equal candidates, and the one who
       // answered first has waited longer for a reply.
-      .sort((a, b) => b.score - a.score || a.appliedAt.localeCompare(b.appliedAt))
-      .slice(0, SHORTLIST);
+      .sort((a, b) => b.score - a.score || a.appliedAt.localeCompare(b.appliedAt));
+
+    const range = shortlistRange(job.vacancies);
+    scored.splice(cutAt(scored.map((person) => person.score), range));
 
     const language = (await this.languageOf(ownerId)) === 'en' ? 'en' : 'bn';
     const written = scored.length > 0 ? await this.read(job, scored, language) : null;
@@ -226,6 +243,9 @@ export class ShortlistService {
       considered: live.length,
       excluded: rows.length - live.length,
       withoutCv: live.filter((row) => !hasCv.has(row.userId)).length,
+      vacancies: job.vacancies,
+      sizeMin: range.min,
+      sizeMax: range.max,
       candidates: scored.map((person) => {
         const lines = written?.lines.get(person.userId);
         return {
@@ -239,6 +259,32 @@ export class ShortlistService {
         assembleSummary(scored, live.length, language),
       source: written ? 'written' : 'assembled',
     };
+  }
+
+  /**
+   * "Shortlist all": the recruiter accepts the AI's picks in one tap.
+   *
+   * Takes the ids the recruiter was shown rather than re-ranking, so what
+   * lands on the shortlist is exactly the list they read even if someone
+   * applied in between. Only people still waiting on a decision move — a
+   * hire, a turned-down or a withdrawn application is never overwritten.
+   */
+  async apply(ownerId: string, jobId: string, userIds: string[]): Promise<ApplyShortlistResult> {
+    const job = await this.prisma.job.findUnique({
+      where: { id: jobId },
+      select: { postedBy: true },
+    });
+    if (!job || job.postedBy !== ownerId) {
+      throw AppException.notFound('That job is not yours to manage');
+    }
+
+    const { count } = await this.prisma.jobApplication.updateMany({
+      where: { jobId, userId: { in: userIds }, status: { in: ['SUBMITTED', 'VIEWED'] } },
+      data: { status: 'SHORTLISTED' },
+    });
+
+    this.logger.log(`Shortlist ${jobId}: ${count} shortlisted in one tap by ${ownerId}`);
+    return { shortlisted: count };
   }
 
   private async read(

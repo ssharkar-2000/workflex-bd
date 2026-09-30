@@ -10,7 +10,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://workflex-api.onrender.com/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://workflex-bd-api.onrender.com/api/v1"
       }
     },
     "production": {
@@ -19,7 +19,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://workflex-api.onrender.com/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://workflex-bd-api.onrender.com/api/v1"
       }
     }
   },

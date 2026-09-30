@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   formatTaka,
@@ -150,18 +150,26 @@ function PersonRow({
             value={formatTaka(person.paid)}
           />
 
-          <View style={s.actions}>
-            <SmallButton
-              label={t('hired.call')}
-              onPress={() => void Linking.openURL(`tel:${person.phone}`)}
-            />
-            {as === 'RECRUITER' && onPay ? (
+          {as === 'RECRUITER' && onPay ? (
+            <View style={s.actions}>
               <SmallButton primary label={`৳ ${t('hired.pay')}`} onPress={() => onPay(person)} />
-            ) : null}
-          </View>
+            </View>
+          ) : null}
 
-          <RateAndReview person={person} jobId={job.id} as={as} />
-          {as === 'RECRUITER' ? <FinishJob person={person} jobId={job.id} /> : null}
+          {/* The options, together in one box: rating, review, and — for the
+              recruiter — "Is the job fully completed?". */}
+          <View style={[s.block, { borderColor: c.border, backgroundColor: c.surface }]}>
+            <RateAndReview person={person} jobId={job.id} as={as} />
+            {as === 'RECRUITER' ? (
+              <FinishJob person={person} jobId={job.id} />
+            ) : (
+              <Text style={[s.workerNote, { color: person.completedAt ? c.success : c.textMuted }]}>
+                {person.completedAt
+                  ? t('hires.completedByRecruiter', { date: shortDate(person.completedAt, locale) })
+                  : t('hires.onlyRecruiter')}
+              </Text>
+            )}
+          </View>
         </View>
       ) : null}
     </View>
@@ -208,7 +216,7 @@ function RateAndReview({
 
   if (person.myReview) {
     return (
-      <View style={[s.block, { borderColor: c.border, backgroundColor: c.surface }]}>
+      <View>
         <Text style={[s.blockLabel, { color: c.textMuted }]}>{t('hires.yourRating')}</Text>
         <Text style={[s.starsDone, { color: c.accent }]}>
           {'★'.repeat(person.myReview.rating)}
@@ -225,7 +233,7 @@ function RateAndReview({
   const first = person.name.split(' ')[0] ?? person.name;
 
   return (
-    <View style={[s.block, { borderColor: c.border, backgroundColor: c.surface }]}>
+    <View>
       <Text style={[s.blockLabel, { color: c.textMuted }]}>{t('hires.rating')}</Text>
       <View style={s.starRow}>
         {[1, 2, 3, 4, 5].map((n) => (
@@ -312,7 +320,7 @@ function FinishJob({ person, jobId }: { person: HirePerson; jobId: string }) {
           { borderColor: c.success, backgroundColor: c.successSoft, opacity: pressed ? 0.8 : 1 },
         ]}
       >
-        <Text style={[s.finishText, { color: c.success }]}>✓ {t('hires.complete')}</Text>
+        <Text style={[s.finishText, { color: c.success }]}>{t('hires.complete')}</Text>
       </Pressable>
     );
   }
@@ -498,10 +506,11 @@ const s = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: 12,
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 12,
   },
   finishText: { fontSize: font.sm, fontWeight: '800' },
-  confirm: { borderWidth: 1, borderRadius: radius.md, padding: space.sm + 2, marginTop: 4, gap: 6 },
+  confirm: { borderWidth: 1, borderRadius: radius.md, padding: space.sm + 2, marginTop: 12, gap: 6 },
+  workerNote: { fontSize: font.xs + 1, lineHeight: 18, marginTop: 12, fontWeight: '700' },
   confirmTitle: { fontSize: font.md, fontWeight: '800' },
   confirmBody: { fontSize: font.sm, lineHeight: 20 },
 });
