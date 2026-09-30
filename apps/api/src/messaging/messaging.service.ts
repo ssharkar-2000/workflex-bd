@@ -198,13 +198,22 @@ export class MessagingService {
   /** Open the direct thread with the owner of a WorkFlex id, or reopen it. */
   async startDirect(userId: string, publicId: string): Promise<Conversation> {
     const person = await this.findByPublicId(userId, publicId);
-    const directKey = [userId, person.id].sort().join(':');
+    return this.openDirect(userId, person.id);
+  }
+
+  /**
+   * The direct thread between two accounts, made if it does not exist. For
+   * code that already knows who it means — an invitation goes to a person the
+   * host picked, so no ID has to be typed.
+   */
+  async openDirect(userId: string, otherId: string): Promise<Conversation> {
+    const directKey = [userId, otherId].sort().join(':');
 
     let conversation: ConversationRow;
     try {
       conversation = await this.prisma.conversation.upsert({
         where: { directKey },
-        create: { directKey, workerId: userId, recruiterId: person.id },
+        create: { directKey, workerId: userId, recruiterId: otherId },
         update: {},
         include: CONVERSATION_INCLUDE,
       });

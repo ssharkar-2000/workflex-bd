@@ -26,6 +26,7 @@ import {
 import { PrismaService } from '../common/prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { AppException } from '../common/exceptions/app.exception';
+import { loadStaffing } from '../reviews/job-staffing';
 import { MatchService } from '../matching/match.service';
 import { RecommendService } from '../matching/recommend.service';
 
@@ -494,6 +495,9 @@ export class JobsService {
     const shortlistedByJob = new Map(
       shortlisted.map((row) => [row.jobId, row._count._all]),
     );
+    // How full each posting is: who is hired and working, and who dropped out
+    // and is waiting for somebody to take their place.
+    const staffing = await loadStaffing(this.prisma, rows);
 
     return {
       jobs: rows.map((job) => ({
@@ -502,6 +506,9 @@ export class JobsService {
         savedByCount: job._count.savedBy,
         applicantCount: job._count.applications,
         shortlistedCount: shortlistedByJob.get(job.id) ?? 0,
+        hiredCount: staffing.get(job.id)?.working ?? 0,
+        needsReplacementCount: staffing.get(job.id)?.unavailable ?? 0,
+        staffing: staffing.get(job.id)?.staffing ?? 'RECRUITING',
       })),
     };
   }
@@ -531,6 +538,9 @@ export class JobsService {
       where: {
         userId,
         status: 'ACCEPTED',
+        // Somebody taken off the job in favour of a replacement is no longer
+        // expected there.
+        replacedAt: null,
         job: {
           OR: [{ startDate: null }, { startDate: { gte: startOfToday } }],
         },
@@ -967,6 +977,7 @@ export class JobsService {
         jobIsOpen:
           job.isOpen &&
           (!job.deadline || job.deadline.getTime() >= Date.now()),
+        replaced: row.replacedAt !== null,
       })),
     };
   }

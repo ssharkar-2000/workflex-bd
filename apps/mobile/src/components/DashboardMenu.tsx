@@ -89,6 +89,8 @@ const WORKER_ROWS: Row[] = [
   { label: 'menu.volunteer', hint: 'menu.volunteerHint', href: '/(app)/volunteering' },
   /** Conversations about a job, from either side — see app/(app)/messages. */
   { label: 'menu.messages', href: '/(app)/messages' },
+  /** Interviews and other scheduled calls, with the link to join — see app/(app)/meetings. */
+  { label: 'menu.meetings', href: '/(app)/meetings' },
 ];
 
 const RECRUITER_ROWS: Row[] = [
@@ -103,6 +105,9 @@ const RECRUITER_ROWS: Row[] = [
   // which opens its own applicants.
   { label: 'menu.applicants', href: '/(app)/activity?tab=jobs' },
   { label: 'menu.interviews', href: '/(app)/interviews' },
+  // Where an interview is held as a video call: schedule it, invite the
+  // candidate, and both sit in the same room.
+  { label: 'menu.meetings', href: '/(app)/meetings' },
   { label: 'menu.hiredWorkers', href: '/(app)/hired' },
   /**
    * Last in Hire people, because it is the row somebody opens when something

@@ -22,6 +22,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { ShiftsModule } from './shifts/shifts.module';
 import { MessagingModule } from './messaging/messaging.module';
+import { MeetingsModule } from './meetings/meetings.module';
 import { InterviewsModule } from './interviews/interviews.module';
 import { LearningModule } from './learning/learning.module';
 import { CredentialsModule } from './credentials/credentials.module';
@@ -76,6 +77,7 @@ import { WalletModule } from './wallet/wallet.module';
     ReviewsModule,
     ShiftsModule,
     MessagingModule,
+    MeetingsModule,
     InterviewsModule,
     LearningModule,
     CredentialsModule,

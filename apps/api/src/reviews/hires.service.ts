@@ -8,6 +8,7 @@ import {
 } from '@workflex/shared';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AppException } from '../common/exceptions/app.exception';
+import { loadStaffing } from './job-staffing';
 
 /** Far past anyone's real number of hires; keeps one bad query bounded. */
 const LIMIT = 300;
@@ -33,6 +34,7 @@ const JOB = {
   salaryMax: true,
   startDate: true,
   postedBy: true,
+  vacancies: true,
 } as const;
 
 /**
@@ -65,6 +67,13 @@ export class HiresService {
         jobId: true,
         updatedAt: true,
         completedAt: true,
+        unavailableAt: true,
+        unavailableReason: true,
+        unavailableNote: true,
+        unavailableBy: true,
+        replacedAt: true,
+        replacedByUserId: true,
+        replacesUserId: true,
         user: { select: PERSON },
         job: { select: JOB },
       },
@@ -89,6 +98,27 @@ export class HiresService {
             ).map((user) => [user.id, user]),
           )
         : null;
+
+    // Who took whose place, by name — for the employer's list only. The person
+    // who was replaced is told they were, not who by.
+    const linked =
+      as === 'RECRUITER'
+        ? [
+            ...new Set(
+              rows.flatMap((row) => [row.replacedByUserId, row.replacesUserId]).filter((id): id is string => id !== null),
+            ),
+          ]
+        : [];
+    const [staffing, linkedPeople] = await Promise.all([
+      loadStaffing(
+        this.prisma,
+        [...new Map(rows.map((row) => [row.jobId, { id: row.jobId, vacancies: row.job.vacancies }])).values()],
+      ),
+      linked.length
+        ? this.prisma.user.findMany({ where: { id: { in: linked } }, select: PERSON })
+        : Promise.resolve([]),
+    ]);
+    const linkedName = new Map(linkedPeople.map((user) => [user.id, nameOf(user)]));
 
     const [payments, reviews] = await Promise.all([
       this.prisma.walletPayment.groupBy({
@@ -125,8 +155,12 @@ export class HiresService {
 
       let group = groups.get(row.jobId);
       if (!group) {
-        const { postedBy: _postedBy, startDate, ...job } = row.job;
-        group = { job: { ...job, startDate: startDate?.toISOString() ?? null }, people: [] };
+        const { postedBy: _postedBy, vacancies: _vacancies, startDate, ...job } = row.job;
+        group = {
+          job: { ...job, startDate: startDate?.toISOString() ?? null },
+          staffing: staffing.get(row.jobId)?.staffing ?? 'RECRUITING',
+          people: [],
+        };
         groups.set(row.jobId, group);
       }
 
@@ -140,6 +174,25 @@ export class HiresService {
         completedAt: row.completedAt?.toISOString() ?? null,
         paid: paid.get(`${row.jobId}:${other.id}`) ?? 0,
         myReview: review ? { rating: review.rating, comment: review.comment } : null,
+        // The hire's own flag, whichever side is reading: the worker's row is
+        // the one that carries it.
+        unavailable: row.unavailableAt
+          ? {
+              at: row.unavailableAt.toISOString(),
+              reason: row.unavailableReason ?? 'OTHER',
+              note: row.unavailableNote,
+              by: row.unavailableBy ?? 'RECRUITER',
+            }
+          : null,
+        replacedAt: row.replacedAt?.toISOString() ?? null,
+        replacedBy:
+          row.replacedByUserId && linkedName.has(row.replacedByUserId)
+            ? { userId: row.replacedByUserId, name: linkedName.get(row.replacedByUserId)! }
+            : null,
+        replaces:
+          row.replacesUserId && linkedName.has(row.replacesUserId)
+            ? { userId: row.replacesUserId, name: linkedName.get(row.replacesUserId)! }
+            : null,
       });
     }
 

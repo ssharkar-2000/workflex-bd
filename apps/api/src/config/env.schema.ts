@@ -142,6 +142,22 @@ export const envSchema = z.object({
   /// /google/callback under API_PUBLIC_URL (or localhost in development).
   GOOGLE_REDIRECT_URI: z.string().url().optional(),
 
+  /// Video meetings run on LiveKit (https://livekit.io). LIVEKIT_URL is the
+  /// address the apps connect to: wss://<project>.livekit.cloud, or
+  /// ws://localhost:7880 for the server in docker-compose. Leave all three
+  /// blank and meetings can still be scheduled; joining a video call then
+  /// says that calls are not set up yet.
+  LIVEKIT_URL: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.string().regex(/^wss?:\/\//, 'LIVEKIT_URL must start with ws:// or wss://').optional(),
+  ),
+  LIVEKIT_API_KEY: z.string().optional(),
+  LIVEKIT_API_SECRET: z.string().optional(),
+  /// Where the web app is served, for meeting links, e.g.
+  /// https://workflex-bd.onrender.com. Defaults to the first APP_WEB_ORIGINS
+  /// entry, then to http://localhost:8081.
+  WEB_APP_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
+
   /// Where uploads go. Unset means disk in development and S3 in production.
   /// Development deliberately ignores the S3 variables unless asked: the
   /// .env.example ships MinIO values most machines are not running, and

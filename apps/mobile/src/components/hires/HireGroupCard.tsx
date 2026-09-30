@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   formatTaka,
@@ -7,10 +8,14 @@ import {
   type HireGroup,
   type HireJob,
   type HirePerson,
+  type JobStaffing,
   type ReviewRole,
 } from '@workflex/shared';
 import { completeHire } from '../../api/hires';
+import { markAvailable } from '../../api/replacement';
 import { createReview } from '../../api/reviews';
+import { useAuthStore } from '../../store/auth-store';
+import { UnavailableForm } from './UnavailableForm';
 import { useErrorMessage } from '../../lib/error-message';
 import { useLocale, useT, type TranslationKey } from '../../i18n';
 import { useTheme } from '../../lib/use-theme';
@@ -68,6 +73,10 @@ export function HireGroupCard({
         ))}
       </View>
 
+      {as === 'RECRUITER' && group.staffing !== 'RECRUITING' ? (
+        <StaffingChip staffing={group.staffing} />
+      ) : null}
+
       <Text style={[s.section, { color: c.text }]}>
         {as === 'RECRUITER'
           ? t('hires.hiredPeople', { count: group.people.length })
@@ -110,9 +119,37 @@ function PersonRow({
   const t = useT();
   const [locale] = useLocale();
   const { c } = useTheme();
+  const router = useRouter();
+  const client = useQueryClient();
+  const me = useAuthStore((state) => state.user?.id);
+  const [asking, setAsking] = useState(false);
+
+  // Unavailable and not yet replaced; and replaced, which ends the hire.
+  const flagged = person.unavailable !== null && person.completedAt === null;
+  const replaced = person.replacedAt !== null;
+  // Whose hire this is: the listed person for an employer, the reader for a worker.
+  const workerId = as === 'RECRUITER' ? person.userId : me;
+  const reasonText = person.unavailable
+    ? t(`repl.reason.${person.unavailable.reason}` as TranslationKey)
+    : '';
+
+  const undo = useMutation({
+    mutationFn: () => markAvailable(job.id, workerId!),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['hires'] });
+      void client.invalidateQueries({ queryKey: ['my-jobs'] });
+      void client.invalidateQueries({ queryKey: ['replacement'] });
+    },
+  });
+
+  const openMatcher = () =>
+    router.push({
+      pathname: '/(app)/cover/job/[jobId]',
+      params: { jobId: job.id, workerId: person.userId, name: person.name },
+    });
 
   return (
-    <View style={[s.person, { borderTopColor: c.border }]}>
+    <View style={[s.person, { borderTopColor: c.border }]} testID={`hire-${person.publicId}`}>
       <Pressable
         onPress={onToggle}
         accessibilityRole="button"
@@ -127,15 +164,26 @@ function PersonRow({
             {person.name}
           </Text>
           <Text style={[s.meta, { color: c.textMuted }]} numberOfLines={1}>
-            {person.completedAt
-              ? t('hires.completedOn', { date: shortDate(person.completedAt, locale) })
-              : t('hires.hiredOn', { date: shortDate(person.hiredAt, locale) })}
+            {replaced
+              ? `${t('repl.replacedBadge')} · ${shortDate(person.replacedAt!, locale)}`
+              : person.completedAt
+                ? t('hires.completedOn', { date: shortDate(person.completedAt, locale) })
+                : t('hires.hiredOn', { date: shortDate(person.hiredAt, locale) })}
+            {person.replaces ? `  ·  ${t('repl.replaced', { name: person.replaces.name })}` : ''}
             {person.myReview ? `  ·  ${'★'.repeat(person.myReview.rating)}` : ''}
           </Text>
         </View>
-        {person.completedAt ? (
+        {replaced ? (
+          <View style={[s.badge, { backgroundColor: c.surfaceAlt }]}>
+            <Text style={[s.badgeText, { color: c.textMuted }]}>{t('repl.replacedBadge')}</Text>
+          </View>
+        ) : person.completedAt ? (
           <View style={[s.badge, { backgroundColor: c.successSoft }]}>
             <Text style={[s.badgeText, { color: c.success }]}>{t('hires.completedBadge')}</Text>
+          </View>
+        ) : flagged ? (
+          <View style={[s.badge, { backgroundColor: c.dangerSoft }]} testID="badge-unavailable">
+            <Text style={[s.badgeText, { color: c.danger }]}>{t('repl.unavailableBadge')}</Text>
           </View>
         ) : null}
         <Text style={[s.chevron, { color: c.textMuted }]}>{open ? '▴' : '▾'}</Text>
@@ -156,6 +204,95 @@ function PersonRow({
             </View>
           ) : null}
 
+          {/* The employer's side of a worker who cannot continue: say so, or
+              — once said — go and choose somebody. */}
+          {as === 'RECRUITER' && flagged ? (
+            <View
+              style={[s.flag, { borderColor: c.dangerBorder, backgroundColor: c.dangerSoft }]}
+              testID="flag-box"
+            >
+              <Text style={[s.flagTitle, { color: c.danger }]}>
+                {t('repl.flagged', { reason: reasonText })}
+              </Text>
+              <Text style={[s.flagMeta, { color: c.text }]}>
+                {t(`repl.flaggedBy${person.unavailable!.by}` as TranslationKey)}
+                {person.unavailable!.note ? ` · “${person.unavailable!.note}”` : ''}
+              </Text>
+              <View style={s.actions}>
+                <SmallButton
+                  primary
+                  label={t('cover.findReplacement')}
+                  onPress={openMatcher}
+                  testID="btn-open-matcher"
+                />
+                <SmallButton
+                  label={t('repl.availableAgain')}
+                  onPress={() => undo.mutate()}
+                  busy={undo.isPending}
+                />
+              </View>
+            </View>
+          ) : null}
+          {as === 'RECRUITER' && !flagged && !person.completedAt ? (
+            asking ? (
+              <UnavailableForm
+                jobId={job.id}
+                workerId={person.userId}
+                workerName={person.name}
+                side="RECRUITER"
+                onCancel={() => setAsking(false)}
+                onDone={() => {
+                  setAsking(false);
+                  openMatcher();
+                }}
+              />
+            ) : (
+              <SmallButton
+                label={t('repl.markUnavailable')}
+                onPress={() => setAsking(true)}
+                testID="btn-mark-unavailable"
+              />
+            )
+          ) : null}
+
+          {/* The worker's side: "I can't continue", and taking it back. */}
+          {as === 'WORKER' && flagged && workerId ? (
+            <View
+              style={[s.flag, { borderColor: c.dangerBorder, backgroundColor: c.dangerSoft }]}
+              testID="flag-box"
+            >
+              <Text style={[s.flagTitle, { color: c.danger }]}>
+                {t('repl.flaggedSelf', { reason: reasonText })}
+              </Text>
+              <View style={s.actions}>
+                <SmallButton
+                  label={t('repl.availableAgainSelf')}
+                  onPress={() => undo.mutate()}
+                  busy={undo.isPending}
+                  testID="btn-available-again"
+                />
+              </View>
+            </View>
+          ) : null}
+          {as === 'WORKER' && !flagged && !person.completedAt && workerId ? (
+            asking ? (
+              <UnavailableForm
+                jobId={job.id}
+                workerId={workerId}
+                workerName={person.name}
+                side="WORKER"
+                onCancel={() => setAsking(false)}
+                onDone={() => setAsking(false)}
+              />
+            ) : (
+              <SmallButton
+                label={t('repl.markSelf')}
+                onPress={() => setAsking(true)}
+                testID="btn-mark-self"
+              />
+            )
+          ) : null}
+
           {/* The options, together in one box: rating, review, and — for the
               recruiter — "Is the job fully completed?". */}
           <View style={[s.block, { borderColor: c.border, backgroundColor: c.surface }]}>
@@ -163,10 +300,12 @@ function PersonRow({
             {as === 'RECRUITER' ? (
               <FinishJob person={person} jobId={job.id} />
             ) : (
-              <Text style={[s.workerNote, { color: person.completedAt ? c.success : c.textMuted }]}>
-                {person.completedAt
-                  ? t('hires.completedByRecruiter', { date: shortDate(person.completedAt, locale) })
-                  : t('hires.onlyRecruiter')}
+              <Text style={[s.workerNote, { color: person.completedAt && !replaced ? c.success : c.textMuted }]}>
+                {replaced
+                  ? t('repl.replacedNote')
+                  : person.completedAt
+                    ? t('hires.completedByRecruiter', { date: shortDate(person.completedAt, locale) })
+                    : t('hires.onlyRecruiter')}
               </Text>
             )}
           </View>
@@ -354,6 +493,25 @@ function FinishJob({ person, jobId }: { person: HirePerson; jobId: string }) {
   );
 }
 
+/** How full the job is: a colour and a word, since the words alone are easy to skim past. */
+function StaffingChip({ staffing }: { staffing: JobStaffing }) {
+  const t = useT();
+  const { c } = useTheme();
+  const [bg, fg] =
+    staffing === 'NEEDS_REPLACEMENT'
+      ? [c.dangerSoft, c.danger]
+      : staffing === 'FILLED'
+        ? [c.successSoft, c.success]
+        : [c.warningSoft, c.warning];
+  return (
+    <View style={[s.staffing, { backgroundColor: bg }]} testID="job-staffing">
+      <Text style={[s.staffingText, { color: fg }]}>
+        {t(`staffing.${staffing}` as TranslationKey)}
+      </Text>
+    </View>
+  );
+}
+
 function Detail({ label, value }: { label: string; value: string }) {
   const { c } = useTheme();
   return (
@@ -371,17 +529,20 @@ function SmallButton({
   onPress,
   primary,
   busy,
+  testID,
 }: {
   label: string;
   onPress: () => void;
   primary?: boolean;
   busy?: boolean;
+  testID?: string;
 }) {
   const { c } = useTheme();
   return (
     <Pressable
       onPress={onPress}
       disabled={busy}
+      testID={testID}
       accessibilityRole="button"
       style={({ pressed }) => [
         s.small,
@@ -442,6 +603,18 @@ const s = StyleSheet.create({
   facts: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   fact: { borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
   factText: { fontSize: font.xs, fontWeight: '700' },
+
+  staffing: {
+    alignSelf: 'flex-start',
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginTop: 10,
+  },
+  staffingText: { fontSize: font.xs, fontWeight: '800' },
+  flag: { borderWidth: 1, borderRadius: radius.md, padding: space.sm + 2, gap: 4 },
+  flagTitle: { fontSize: font.sm, fontWeight: '800' },
+  flagMeta: { fontSize: font.xs, lineHeight: 17 },
 
   section: { fontSize: font.md, fontWeight: '800', marginTop: space.md },
   tapHint: { fontSize: font.xs, marginTop: 2, marginBottom: 4 },

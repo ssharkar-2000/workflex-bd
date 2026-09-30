@@ -232,6 +232,8 @@ export interface ChatServerEvents {
   'conversation:changed': (event: { conversationId: string }) => void;
   typing: (event: ChatTypingEvent) => void;
   presence: (event: ChatPresenceEvent) => void;
+  /** A meeting you host or are invited to was created, changed, joined or left. */
+  'meeting:changed': (event: { meetingId: string }) => void;
 }
 
 /** What the phone sends. */

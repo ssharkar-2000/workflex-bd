@@ -43,6 +43,7 @@
     "@workflex/shared": "*",
     "helmet": "^8.1.0",
     "jimp": "^1.6.1",
+    "livekit-server-sdk": "^2.19.1",
     "nestjs-pino": "^4.4.0",
     "nodemailer": "^7.0.13",
     "pdf-parse": "^2.4.5",

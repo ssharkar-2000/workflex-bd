@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { jobCategorySchema } from './job-categories';
 import { divisionSchema } from './bd-geography';
 import { jobMatchSchema } from './matching';
+import { jobStaffingSchema } from './hire-replacement';
 
 /**
  * Job listings and the filters over them.
@@ -385,6 +386,12 @@ export const myJobSchema = jobListingSchema.extend({
    * ten and six is one that is nearly decided.
    */
   shortlistedCount: z.number().int().nonnegative(),
+  /** People hired who are still on the job and available. */
+  hiredCount: z.number().int().nonnegative().default(0),
+  /** Hires who cannot do the job any more and have not been replaced. */
+  needsReplacementCount: z.number().int().nonnegative().default(0),
+  /** The two counts and the vacancies, as one word. See staffingOf. */
+  staffing: jobStaffingSchema.default('RECRUITING'),
 });
 export type MyJob = z.infer<typeof myJobSchema>;
 
