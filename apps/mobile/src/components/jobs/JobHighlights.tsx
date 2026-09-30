@@ -191,7 +191,7 @@ function HighlightCard({
           ]}
         >
           <Text style={[styles.badgeText, { color: c.danger }]}>
-            🔥 {t(URGENCY_KEYS[job.urgency])}
+            {t(URGENCY_KEYS[job.urgency])}
           </Text>
         </View>
         <Text style={[styles.place, { color: c.textMuted }]} numberOfLines={1}>

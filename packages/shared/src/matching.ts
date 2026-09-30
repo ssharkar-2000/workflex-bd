@@ -34,6 +34,20 @@ export const cvStatusSchema = z.object({
    * "you are a bad fit for everything".
    */
   parsingEnabled: z.boolean(),
+  /**
+   * The one-minute video introduction, when one has been uploaded.
+   *
+   * Beside the CV rather than inside it: a recruiter with thirty applicants
+   * reads none of the CVs and watches two of the videos, so this is the part
+   * of an application that gets looked at first.
+   */
+  intro: z
+    .object({
+      mimeType: z.string(),
+      sizeBytes: z.number().int().nonnegative(),
+      uploadedAt: z.string(),
+    })
+    .nullable(),
 });
 export type CvStatus = z.infer<typeof cvStatusSchema>;
 

@@ -14,6 +14,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   jobCategoryName,
+  type ApplyDraft,
   type JobListing,
   type PaymentType,
 } from '@workflex/shared';
@@ -24,6 +25,9 @@ import {
   withdrawApplication,
 } from '../../../src/api/jobs';
 import { ErrorBanner } from '../../../src/components/ErrorBanner';
+import { Field } from '../../../src/components/wallet/WalletUi';
+import { draftApplication } from '../../../src/api/apply-draft';
+import { BookmarkIcon } from '../../../src/components/home/HomeIcons';
 import { ShimmerButton } from '../../../src/components/ShimmerButton';
 import { MatchBadge } from '../../../src/components/jobs/MatchBadge';
 import { useErrorMessage } from '../../../src/lib/error-message';
@@ -132,9 +136,32 @@ export default function JobDetailScreen() {
     void queryClient.invalidateQueries({ queryKey: ['my-applications'] });
   };
 
+  const [note, setNote] = useState('');
+  const [draft, setDraft] = useState<ApplyDraft | null>(null);
+
   const apply = useMutation({
-    mutationFn: () => applyToJob(id),
-    onSuccess: refreshAfterApply,
+    mutationFn: () => applyToJob(id, note.trim() || undefined),
+    onSuccess: () => {
+      setNote('');
+      setDraft(null);
+      refreshAfterApply();
+    },
+  });
+
+  /**
+   * One-Click Apply: the note, written from this account's CV and profile.
+   *
+   * It does not apply. Most people send an application with nothing on it
+   * because writing a note means opening a keyboard and finding something to
+   * say about yourself — so this writes a first version from their own
+   * record, and they send it, edit it, or clear it and apply without one.
+   */
+  const oneClick = useMutation({
+    mutationFn: () => draftApplication(id),
+    onSuccess: (result) => {
+      setDraft(result);
+      setNote(result.message);
+    },
   });
 
   const withdraw = useMutation({
@@ -218,10 +245,10 @@ export default function JobDetailScreen() {
 
         {/* Facts that decide whether the job is worth reading further. */}
         <View style={styles.pills}>
-          <Pill icon="📍" text={job.location} />
-          <Pill icon="🕐" text={t(JOB_TYPE_KEYS[job.jobType])} />
-          <Pill icon="🏢" text={t(WORKPLACE_KEYS[job.workplaceType])} />
-          <Pill icon="📅" text={t('jobs.postedOn', { date: date(job.postedAt) })} />
+          <Pill text={job.location} />
+          <Pill text={t(JOB_TYPE_KEYS[job.jobType])} />
+          <Pill text={t(WORKPLACE_KEYS[job.workplaceType])} />
+          <Pill text={t('jobs.postedOn', { date: date(job.postedAt) })} />
         </View>
 
         {/* Fit before urgency: whether the job suits you decides whether its
@@ -285,7 +312,7 @@ export default function JobDetailScreen() {
             ]}
           >
             <Text style={[styles.urgentText, { color: c.danger }]}>
-              🔥 {t('jobs.urgentHiring')} · {t(URGENCY_KEYS[job.urgency])}
+              {t('jobs.urgentHiring')} · {t(URGENCY_KEYS[job.urgency])}
             </Text>
           </View>
         ) : null}
@@ -314,22 +341,18 @@ export default function JobDetailScreen() {
             <Section title={t('job.tab.overview')}>
               <View style={styles.grid}>
                 <Fact
-                  icon="👤"
                   label={t('job.experience')}
                   value={t(EXPERIENCE_KEYS[job.experienceLevel])}
                 />
                 <Fact
-                  icon="💳"
                   label={t(PAYMENT_KEYS[job.paymentType])}
                   value={payLabel(job)}
                 />
                 <Fact
-                  icon="⏱"
                   label={t('job.applyBy')}
                   value={job.deadline ? date(job.deadline) : t('job.noDeadline')}
                 />
                 <Fact
-                  icon="👥"
                   label={t('job.vacancies')}
                   value={
                     job.vacancies !== null
@@ -338,17 +361,14 @@ export default function JobDetailScreen() {
                   }
                 />
                 <Fact
-                  icon="📅"
                   label={t('filter.duration')}
                   value={t(DURATION_KEYS[job.duration])}
                 />
                 <Fact
-                  icon="🕒"
                   label={t('filter.workingTime')}
                   value={t(WORKING_TIME_KEYS[job.workingTime])}
                 />
                 <Fact
-                  icon="🚀"
                   label={t('job.startDate')}
                   value={
                     job.startDate
@@ -357,7 +377,6 @@ export default function JobDetailScreen() {
                   }
                 />
                 <Fact
-                  icon="🗂"
                   label={t('filter.category')}
                   value={jobCategoryName(job.category, locale)}
                 />
@@ -396,13 +415,61 @@ export default function JobDetailScreen() {
           accessibilityRole="button"
         >
           <Text style={[styles.reportText, { color: c.danger }]}>
-            🚩 {t('job.report')}
+            {t('job.report')}
           </Text>
         </Pressable>
       </ScrollView>
 
       <View style={[styles.foot, { borderTopColor: c.border, backgroundColor: c.bg }]}>
         {apply.error ? <ErrorBanner message={errorMessage(apply.error)} /> : null}
+        {oneClick.error ? (
+          <ErrorBanner message={errorMessage(oneClick.error)} />
+        ) : null}
+
+        {!closed && !job.applied ? (
+          <View style={styles.oneClick}>
+            <Pressable
+              onPress={() => oneClick.mutate()}
+              disabled={oneClick.isPending}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.oneClickBtn,
+                {
+                  borderColor: c.aiSoftBorder,
+                  backgroundColor: pressed ? c.aiSoft : 'transparent',
+                  opacity: oneClick.isPending ? 0.6 : 1,
+                },
+              ]}
+            >
+              {oneClick.isPending ? (
+                <ActivityIndicator color={c.ai} size="small" />
+              ) : (
+                <Text style={[styles.oneClickText, { color: c.ai }]}>
+                  {t(draft ? 'apply.ai.again' : 'apply.ai.write')}
+                </Text>
+              )}
+            </Pressable>
+
+            {draft ? (
+              <>
+                <Field
+                  label={t('apply.ai.note')}
+                  value={note}
+                  onChange={setNote}
+                  autoCapitalize="sentences"
+                />
+                <Text style={[styles.oneClickFrom, { color: c.textMuted }]}>
+                  {draft.from.length > 0
+                    ? t('apply.ai.from', { facts: draft.from.join(' · ') })
+                    : t('apply.ai.nothing')}
+                </Text>
+                <Text style={[styles.oneClickFrom, { color: c.textMuted }]}>
+                  {t(draft.source === 'written' ? 'apply.ai.written' : 'apply.ai.assembled')}
+                </Text>
+              </>
+            ) : null}
+          </View>
+        ) : null}
 
         {job.isMine ? (
           // Your own posting. Applying is refused server-side, so the button
@@ -459,7 +526,11 @@ export default function JobDetailScreen() {
                 { borderColor: job.saved ? c.primary : c.border },
               ]}
             >
-              <Text style={styles.saveIcon}>{job.saved ? '🔖' : '📑'}</Text>
+              <BookmarkIcon
+                size={16}
+                color={job.saved ? c.primary : c.textMuted}
+                filled={job.saved}
+              />
               <Text
                 style={[
                   styles.saveLabelText,
@@ -575,11 +646,9 @@ function Section({
 }
 
 function Fact({
-  icon,
   label,
   value,
 }: {
-  icon: string;
   label: string;
   value: string;
 }) {
@@ -589,7 +658,6 @@ function Fact({
       style={[styles.fact, { backgroundColor: c.surface, borderColor: c.border }]}
     >
       <View style={styles.factHead}>
-        <Text style={styles.factIcon}>{icon}</Text>
         <Text style={[styles.factLabel, { color: c.textMuted }]} numberOfLines={1}>
           {label}
         </Text>
@@ -611,13 +679,12 @@ function Body({ text, empty }: { text: string | null; empty?: string }) {
   return <Text style={[styles.body, { color: c.text }]}>{text}</Text>;
 }
 
-function Pill({ icon, text }: { icon: string; text: string }) {
+function Pill({ text }: { text: string }) {
   const { c } = useTheme();
   return (
     <View
       style={[styles.pill, { backgroundColor: c.surface, borderColor: c.border }]}
     >
-      <Text style={styles.pillIcon}>{icon}</Text>
       <Text style={[styles.pillText, { color: c.text }]} numberOfLines={1}>
         {text}
       </Text>
@@ -626,6 +693,16 @@ function Pill({ icon, text }: { icon: string; text: string }) {
 }
 
 const styles = StyleSheet.create({
+  oneClick: { gap: 6, marginBottom: space.sm },
+  oneClickBtn: {
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  oneClickText: { fontSize: font.sm, fontWeight: '800' },
+  oneClickFrom: { fontSize: font.xs, lineHeight: 16 },
+
   safe: { flex: 1 },
   centered: { alignItems: 'center', justifyContent: 'center' },
   pad: { paddingHorizontal: space.md },
@@ -677,7 +754,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 6,
   },
-  pillIcon: { fontSize: 11 },
   pillText: { fontSize: font.xs, fontWeight: '600', maxWidth: 190 },
 
   matchCard: {
@@ -722,7 +798,6 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   factHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  factIcon: { fontSize: 12 },
   factLabel: { flex: 1, fontSize: font.xs, fontWeight: '600' },
   factValue: { fontSize: font.sm, fontWeight: '800', marginTop: 6 },
 
@@ -744,7 +819,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 2,
   },
-  saveIcon: { fontSize: 16 },
   saveLabelText: { fontSize: font.xs, fontWeight: '700' },
   applyBtn: { flex: 1 },
 

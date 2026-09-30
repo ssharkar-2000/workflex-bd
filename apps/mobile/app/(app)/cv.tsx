@@ -16,6 +16,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { jobCategoryName, type CvStatus } from '@workflex/shared';
 import { fetchCvStatus, removeCv, uploadCv } from '../../src/api/cv';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
+import { IntroVideoCard } from '../../src/components/IntroVideoCard';
 import { ShimmerButton } from '../../src/components/ShimmerButton';
 import { useErrorMessage } from '../../src/lib/error-message';
 import { useLocale, useT } from '../../src/i18n';
@@ -141,6 +142,19 @@ export default function CvScreen() {
                 loading={upload.isPending}
               />
             </View>
+
+            {/*
+              The minute of video that goes with the paper, directly under
+              the CV button rather than below the parsed skills: a feature at
+              the bottom of a long screen is one nobody finds.
+
+              Rendered whether or not the status call succeeded. It used to
+              be gated on `data`, which meant that when GET /cv failed the
+              upload button vanished while the CV button stayed — so the
+              screen looked as though the feature had never been built. An
+              affordance should not depend on a read succeeding.
+            */}
+            <IntroVideoCard status={data ?? null} />
 
             {upload.isPending ? (
               <Text style={[styles.working, { color: c.textMuted }]}>

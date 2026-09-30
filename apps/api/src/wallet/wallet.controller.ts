@@ -9,16 +9,22 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { Request } from 'express';
 import { z } from 'zod';
+import type { Request } from 'express';
 import {
-  createPaymentSchema, createDepositSchema, createTransferSchema, receiptQuerySchema,
-  type CreateDepositDto, type CreateTransferDto, type ReceiptQuery,
+  createDepositSchema,
   createTopUpSchema,
+  createPaymentSchema,
+  createTransferSchema,
   createWithdrawalSchema,
+  insightsRangeSchema,
+  payForJobSchema,
+  type CreateDepositDto,
   type CreatePaymentDto,
-  type CreateTopUpDto,
+  type CreateTransferDto,
   type CreateWithdrawalDto,
+  type CreateTopUpDto,
+  type PayForJobDto,
 } from '@workflex/shared';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
@@ -28,6 +34,16 @@ import { WalletService } from './wallet.service';
 
 const statementQuerySchema = z.object({ cursor: z.string().uuid().optional() });
 type StatementQuery = z.output<typeof statementQuerySchema>;
+
+const resolveQuerySchema = z.object({ code: z.string().trim().min(6).max(200) });
+type ResolveQuery = z.output<typeof resolveQuerySchema>;
+
+const insightsQuerySchema = z.object({ range: insightsRangeSchema.default('M') });
+type InsightsQuery = z.output<typeof insightsQuerySchema>;
+
+/** Payments arriving after the moment the app last announced one. */
+const receiptsQuerySchema = z.object({ since: z.string().datetime().optional() });
+type ReceiptsQuery = z.output<typeof receiptsQuerySchema>;
 
 @ApiTags('wallet')
 @ApiBearerAuth()
@@ -73,6 +89,89 @@ export class WalletController {
     return this.topUps.get(userId, id);
   }
 
+  @Get('deposit-accounts')
+  @ApiOperation({ summary: 'Where to send money to add it to the wallet' })
+  depositAccounts() {
+    return this.deposits.instructions();
+  }
+
+  @Post('deposits')
+  @ApiOperation({ summary: 'Declare money already sent to one of those accounts' })
+  async declareDeposit(
+    @CurrentUser('userId') userId: string,
+    @Body(new ZodValidationPipe(createDepositSchema)) dto: CreateDepositDto,
+  ) {
+    return this.deposits.declare(userId, dto);
+  }
+
+  @Get('deposits')
+  @ApiOperation({ summary: 'Deposits declared by this account, newest first' })
+  async myDeposits(@CurrentUser('userId') userId: string) {
+    return { deposits: await this.deposits.list(userId) };
+  }
+
+  @Get('deposits/:id')
+  @ApiOperation({ summary: 'Where one declared deposit has got to' })
+  async deposit(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.deposits.one(userId, id);
+  }
+
+  @Get('code')
+  @ApiOperation({ summary: 'This wallet as a QR payload and a short code' })
+  async code(@CurrentUser('userId') userId: string) {
+    return this.wallet.code(userId);
+  }
+
+  @Get('resolve')
+  @ApiOperation({ summary: 'Who a scanned code, account id or phone number belongs to' })
+  async resolve(@Query(new ZodValidationPipe(resolveQuerySchema)) query: ResolveQuery) {
+    return this.wallet.resolve(query.code);
+  }
+
+  @Get('insights')
+  @ApiOperation({ summary: 'Income, spending and top-ups over a day, week, month or year' })
+  async insights(
+    @CurrentUser('userId') userId: string,
+    @Query(new ZodValidationPipe(insightsQuerySchema)) query: InsightsQuery,
+  ) {
+    return this.wallet.insights(userId, query.range);
+  }
+
+  @Post('job-payments')
+  @ApiOperation({ summary: 'Pay someone for a job, by their id, number and job id' })
+  async payForJob(
+    @CurrentUser('userId') userId: string,
+    @Body(new ZodValidationPipe(payForJobSchema)) dto: PayForJobDto,
+  ) {
+    return this.wallet.payForJob(userId, dto);
+  }
+
+  @Get('receipts')
+  @ApiOperation({ summary: 'Money paid in since a moment, for the app to announce' })
+  async receipts(
+    @CurrentUser('userId') userId: string,
+    @Query(new ZodValidationPipe(receiptsQuerySchema)) query: ReceiptsQuery,
+  ) {
+    // No `since` means the app has never announced anything on this device;
+    // the last day is enough to catch a payment made while it was closed.
+    const since = query.since
+      ? new Date(query.since)
+      : new Date(Date.now() - 24 * 60 * 60 * 1000);
+    return { payments: await this.wallet.receivedSince(userId, since) };
+  }
+
+  @Post('transfers')
+  @ApiOperation({ summary: 'Send money to another account, by scanned code or number' })
+  async transfer(
+    @CurrentUser('userId') userId: string,
+    @Body(new ZodValidationPipe(createTransferSchema)) dto: CreateTransferDto,
+  ) {
+    return this.wallet.transfer(userId, dto);
+  }
+
   @Get('payees')
   @ApiOperation({ summary: 'People hired on your postings, and what each has been paid' })
   async payees(@CurrentUser('userId') userId: string) {
@@ -105,24 +204,4 @@ export class WalletController {
   ) {
     return this.wallet.cancelWithdrawal(userId, id);
   }
-  @Get('deposit-accounts')
-  depositAccounts() { return this.deposits.instructions(); }
-
-  @Post('deposits')
-  declareDeposit(@CurrentUser('userId') userId: string, @Body(new ZodValidationPipe(createDepositSchema)) dto: CreateDepositDto) {
-    return this.deposits.declare(userId, dto);
-  }
-  @Get('deposits')
-  async depositsList(@CurrentUser('userId') userId: string) { return {deposits: await this.deposits.list(userId)}; }
-  @Get('deposits/:id')
-  deposit(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) { return this.deposits.one(userId, id); }
-  @Get('code')
-  code(@CurrentUser('userId') userId: string) { return this.wallet.code(userId); }
-  @Get('resolve')
-  resolve(@Query(new ZodValidationPipe(z.object({code: z.string().trim().min(6).max(200)}))) query: {code: string}) { return this.wallet.resolve(query.code); }
-  @Post('transfers')
-  transfer(@CurrentUser('userId') userId: string, @Body(new ZodValidationPipe(createTransferSchema)) dto: CreateTransferDto) { return this.wallet.transfer(userId, dto); }
-  @Get('receipts')
-  receipts(@CurrentUser('userId') userId: string, @Query(new ZodValidationPipe(receiptQuerySchema)) query: ReceiptQuery) { return this.wallet.receipts(userId, query); }
-
 }

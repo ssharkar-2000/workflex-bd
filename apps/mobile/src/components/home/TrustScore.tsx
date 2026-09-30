@@ -43,10 +43,11 @@ const BAND_LABELS: Record<TrustBand, TranslationKey> = {
  * application, an attendance row — and a factor with nothing behind it says
  * so rather than showing a zero that reads like a failure.
  *
- * There is deliberately no star rating. Nobody can rate anyone on this
- * platform yet, so the figure would have to be invented, and the single line
- * on a trust card that must never be invented is the one people read as
- * "other people vouch for this person".
+ * Ratings are deliberately not on this card either. They exist now — see the
+ * reviews screen — but they answer a different question: this score is what
+ * the platform can check about an account, while a rating is what people
+ * thought of the work. Mixing the two would let an opinion move a number
+ * that is supposed to be evidence.
  */
 export function TrustScore() {
   const t = useT();
@@ -79,7 +80,7 @@ export function TrustScore() {
         ]}
       >
         <Text style={[styles.title, { color: c.text }]}>
-          ⭐ {t('trust.title')}
+          {t('trust.title')}
         </Text>
 
         <View style={styles.scoreRow}>

@@ -18,6 +18,15 @@ import { ReportsModule } from './reports/reports.module';
 import { SupportModule } from './support/support.module';
 import { AdminModule } from './admin/admin.module';
 import { ConsoleModule } from './console/console.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { ShiftsModule } from './shifts/shifts.module';
+import { MessagingModule } from './messaging/messaging.module';
+import { InterviewsModule } from './interviews/interviews.module';
+import { LearningModule } from './learning/learning.module';
+import { CredentialsModule } from './credentials/credentials.module';
+import { MockTestsModule } from './mock-tests/mock-tests.module';
+import { GoogleModule } from './google/google.module';
 import { MailModule } from './mail/mail.module';
 import { StorageModule } from './storage/storage.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
@@ -63,6 +72,15 @@ import { WalletModule } from './wallet/wallet.module';
     MatchingModule,
     AdminModule,
     ConsoleModule,
+    SubscriptionsModule,
+    ReviewsModule,
+    ShiftsModule,
+    MessagingModule,
+    InterviewsModule,
+    LearningModule,
+    CredentialsModule,
+    MockTestsModule,
+    GoogleModule,
     WalletModule,
   ],
   providers: [

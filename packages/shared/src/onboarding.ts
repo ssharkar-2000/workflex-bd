@@ -233,6 +233,8 @@ export type ProfileUpdateDto = z.output<typeof profileUpdateSchema>;
 
 /** Current values plus what the server will actually let this account change. */
 export const myProfileSchema = z.object({
+  /** The id a person can read out: "WF-3A9C1B". */
+  publicId: z.string(),
   accountType: accountTypeSchema.nullable(),
   phone: z.string(),
   firstName: z.string().nullable(),

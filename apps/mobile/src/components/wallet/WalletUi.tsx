@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
+import { AppFooter } from '../AppFooter';
 import { useT } from '../../i18n';
 import { useTheme } from '../../lib/use-theme';
 import { font, radius, space } from '../../lib/theme';
@@ -87,6 +88,8 @@ export function MoneyScreen({
             <Text style={[styles.subtitle, { color: c.textMuted }]}>{subtitle}</Text>
           ) : null}
           {children}
+
+          <AppFooter style={styles.pushDown} />
         </ScrollView>
 
         {footer ? (
@@ -233,7 +236,7 @@ export function Chip({
   );
 }
 
-/** A boxed message. warning for things to know, danger for problems. */
+/** A boxed message. `warning` for things to know, `danger` for problems. */
 export function Notice({
   tone,
   title,
@@ -301,7 +304,11 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { paddingHorizontal: space.md, paddingTop: space.sm },
   back: { fontSize: font.sm, fontWeight: '700' },
-  scroll: { padding: space.md, paddingBottom: space.xl },
+  // flexGrow lets the content container fill the screen when the page is
+  // short, which is what gives `pushDown` something to push against.
+  scroll: { padding: space.md, paddingBottom: space.md, flexGrow: 1 },
+  /** Sends the footer to the bottom edge on a page too short to fill it. */
+  pushDown: { marginTop: 'auto' },
   title: { fontSize: font.xl, fontWeight: '800', letterSpacing: -0.4 },
   subtitle: { fontSize: font.sm, lineHeight: 20, marginTop: 6 },
   footer: { paddingHorizontal: space.md, paddingTop: 10, paddingBottom: 12, borderTopWidth: 1 },

@@ -2,6 +2,10 @@
 // of these is needed. Kept as a copy rather than a shared helper because Expo
 // resolves this file relative to the app, and a require() out of the app
 // directory breaks `expo start` in a monorepo.
+//
+// Unlike the panel this replaced, no web shim for expo-secure-store is wired
+// here: this app ships tokenStorage.web.ts beside tokenStorage.ts, and Metro
+// picks the web file itself when bundling for a browser.
 const { getDefaultConfig } = require('expo/metro-config');
 const { FileStore } = require('metro-cache');
 const path = require('node:path');
@@ -30,29 +34,5 @@ config.cacheStores = [
 
 // 5. Fewer workers than cores — this machine swaps under six of them.
 config.maxWorkers = 3;
-
-// 6. expo-secure-store has no web implementation — it wraps the iOS Keychain
-// and the Android Keystore, and every call throws in a browser. This file
-// claimed to mirror the worker app's config but was missing this step, so
-// signing in to the console on web authenticated successfully and then died
-// storing the token. Swap the whole module for a localStorage-backed stand-in
-// when bundling for web; native builds never see this branch.
-const secureStoreWebShim = path.resolve(
-  projectRoot,
-  'src/lib/secure-store.web.ts',
-);
-
-const defaultResolveRequest = config.resolver.resolveRequest;
-
-config.resolver.resolveRequest = (context, moduleName, platform) => {
-  if (platform === 'web' && moduleName === 'expo-secure-store') {
-    return { type: 'sourceFile', filePath: secureStoreWebShim };
-  }
-  return (defaultResolveRequest ?? context.resolveRequest)(
-    context,
-    moduleName,
-    platform,
-  );
-};
 
 module.exports = config;

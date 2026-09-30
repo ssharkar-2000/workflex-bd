@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { fetchUnreadCount } from '../api/notifications';
+import { BellIcon } from './home/HomeIcons';
 import { useT } from '../i18n';
 import { useTheme } from '../lib/use-theme';
 import { font, radius } from '../lib/theme';
@@ -40,12 +41,18 @@ export function NotificationBell() {
       hitSlop={10}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={[
+      // The same hover as the search beside it: a pointer over any of the
+      // three header buttons picks out its edge, so on a desktop they read
+      // as one row of controls rather than one control and two decorations.
+      style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [
         styles.button,
-        { backgroundColor: c.surfaceAlt, borderColor: c.border },
+        {
+          backgroundColor: c.surfaceAlt,
+          borderColor: hovered ? c.primary : c.border,
+        },
       ]}
     >
-      <Text style={styles.icon}>🔔</Text>
+      <BellIcon size={20} color={c.text} />
 
       {unread > 0 ? (
         <View

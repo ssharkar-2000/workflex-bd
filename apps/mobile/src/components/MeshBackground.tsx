@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
+import { usePaletteSetStore } from '../lib/palette-set';
 import { useTheme } from '../lib/use-theme';
 
 /**
@@ -52,6 +53,21 @@ interface Blob {
 
 export function MeshBackground() {
   const { c } = useTheme();
+
+  /**
+   * The scattered icons belong to the sign-in flow only.
+   *
+   * They were drawn for the landing sequence, where a page is mostly empty
+   * and a drifting layer gives it life. Behind the signed-in app that page is
+   * full of somebody's own shifts, money and messages, and an emoji floating
+   * over a wage is decoration competing with information. The wash and the
+   * soft blobs stay — it is the icons that go.
+   *
+   * Keyed to the palette set rather than the route, because this component is
+   * mounted once at the root, above both, and the palette set is the thing
+   * that already knows which half of the app is on screen.
+   */
+  const icons = usePaletteSetStore((s) => s.set) === 'classic';
 
   const blobs = useMemo<Blob[]>(
     () => [
@@ -116,7 +132,7 @@ export function MeshBackground() {
         <DriftingBlob key={i} blob={blob} index={i} />
       ))}
 
-      <DoodleLayer opacity={c.doodleOpacity} />
+      {icons ? <DoodleLayer opacity={c.doodleOpacity} /> : null}
     </View>
   );
 }

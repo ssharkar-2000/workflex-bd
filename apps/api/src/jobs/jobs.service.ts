@@ -24,6 +24,7 @@ import {
   type Recommendations,
 } from '@workflex/shared';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { AppException } from '../common/exceptions/app.exception';
 import { MatchService } from '../matching/match.service';
 import { RecommendService } from '../matching/recommend.service';
@@ -54,7 +55,45 @@ export class JobsService {
     private readonly prisma: PrismaService,
     private readonly matcher: MatchService,
     private readonly recommender: RecommendService,
+    private readonly storage: StorageService,
   ) {}
+
+  /**
+   * An applicant's CV or video introduction, for the person who posted the job.
+   *
+   * Three things have to be true before a file is handed over, and all three
+   * are checked here rather than trusted from the route: the job belongs to
+   * the caller, the person whose file this is applied to that job, and the
+   * document exists. A CV is somebody's address, their history and their
+   * phone number; it is not public because a uuid is hard to guess.
+   */
+  async applicantDocument(
+    ownerId: string,
+    jobId: string,
+    applicantId: string,
+    kind: 'CV' | 'INTRO_VIDEO',
+  ): Promise<{ data: Buffer; mimeType: string }> {
+    const job = await this.prisma.job.findUnique({
+      where: { id: jobId },
+      select: { postedBy: true },
+    });
+    if (!job || job.postedBy !== ownerId) {
+      throw AppException.notFound('Job not found');
+    }
+
+    const applied = await this.prisma.jobApplication.findFirst({
+      where: { jobId, userId: applicantId },
+      select: { userId: true },
+    });
+    if (!applied) throw AppException.notFound('No application from that person');
+
+    const doc = await this.prisma.document.findUnique({
+      where: { userId_kind: { userId: applicantId, kind } },
+    });
+    if (!doc) throw AppException.notFound('Nothing uploaded');
+
+    return { data: await this.storage.read(doc.storageKey), mimeType: doc.mimeType };
+  }
 
   /**
    * The account's parsed CV, or null.
@@ -804,6 +843,20 @@ export class JobsService {
     ]);
     const paidTo = new Map(paid.map((row) => [row.payeeId, row._sum.amount ?? 0]));
 
+    // What each applicant has attached. One query for the whole list rather
+    // than one per row: a popular posting has forty applicants.
+    const docs = await this.prisma.document.findMany({
+      where: {
+        userId: { in: rows.map((row) => row.userId) },
+        kind: { in: ['CV', 'INTRO_VIDEO'] },
+      },
+      select: { userId: true, kind: true },
+    });
+    const hasCv = new Set(docs.filter((d) => d.kind === 'CV').map((d) => d.userId));
+    const hasIntro = new Set(
+      docs.filter((d) => d.kind === 'INTRO_VIDEO').map((d) => d.userId),
+    );
+
     const rank: Record<ApplicationStatus, number> = {
       ACCEPTED: 0,
       SHORTLISTED: 1,
@@ -832,6 +885,8 @@ export class JobsService {
         appliedAt: row.appliedAt.toISOString(),
         phone: row.status === 'ACCEPTED' ? row.user.phone : null,
         paidSoFar: paidTo.get(row.userId) ?? 0,
+        hasCv: hasCv.has(row.userId),
+        hasIntro: hasIntro.has(row.userId),
       })),
     };
   }

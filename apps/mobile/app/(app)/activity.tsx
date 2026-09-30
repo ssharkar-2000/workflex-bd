@@ -25,7 +25,7 @@ import { useErrorMessage } from '../../src/lib/error-message';
 import { useLocale, useT, type TranslationKey } from '../../src/i18n';
 import { useScrollDirectionHandler } from '../../src/lib/scroll-direction';
 import { useTheme } from '../../src/lib/use-theme';
-import { font, radius, space } from '../../src/lib/theme';
+import { font, radius, space, type Palette } from '../../src/lib/theme';
 
 /**
  * Everything this account has in flight, on one screen.
@@ -54,14 +54,20 @@ const STATUS_KEYS: Record<ApplicationStatus, TranslationKey> = {
  * Emoji rather than a tinted view because the colours have to survive both
  * themes unchanged, and a green circle means the same thing in either.
  */
-const STATUS_DOTS: Record<ApplicationStatus, string> = {
-  SUBMITTED: '🔵',
-  VIEWED: '🟡',
-  SHORTLISTED: '🟢',
-  ACCEPTED: '🟢',
-  REJECTED: '⚪',
-  WITHDRAWN: '⚪',
+const STATUS_TONE: Record<ApplicationStatus, 'info' | 'warn' | 'good' | 'mute'> = {
+  SUBMITTED: 'info',
+  VIEWED: 'warn',
+  SHORTLISTED: 'good',
+  ACCEPTED: 'good',
+  REJECTED: 'mute',
+  WITHDRAWN: 'mute',
 };
+
+/** The dot's colour, from the theme rather than from a font. */
+function statusColour(status: ApplicationStatus, c: Palette): string {
+  const tone = STATUS_TONE[status];
+  return tone === 'good' ? c.success : tone === 'warn' ? c.warning : tone === 'info' ? c.primary : c.textMuted;
+}
 
 export default function ActivityScreen() {
   const t = useT();
@@ -115,28 +121,24 @@ export default function ActivityScreen() {
                 {
                   label: 'act.stat.applications',
                   value: summary.seeking.applications,
-                  icon: '📄',
                   tint: 0,
                   goes: 'applications',
                 },
                 {
                   label: 'act.stat.posted',
                   value: summary.hiring.jobsPosted,
-                  icon: '📢',
                   tint: 2,
                   goes: 'jobs',
                 },
                 {
                   label: 'act.stat.shortlisted',
                   value: summary.seeking.shortlisted,
-                  icon: '⭐',
                   tint: 1,
                   goes: 'applications',
                 },
                 {
                   label: 'act.stat.active',
                   value: summary.hiring.openJobs,
-                  icon: '🟢',
                   tint: 3,
                   goes: 'jobs',
                 },
@@ -146,7 +148,6 @@ export default function ActivityScreen() {
                 key={s.label}
                 label={s.label}
                 value={s.value}
-                icon={s.icon}
                 tint={s.tint}
                 selected={tab === s.goes}
                 onPress={() => setTab(s.goes)}
@@ -221,14 +222,12 @@ export default function ActivityScreen() {
 function Stat({
   label,
   value,
-  icon,
   tint,
   selected,
   onPress,
 }: {
   label: TranslationKey;
   value: number;
-  icon: string;
   tint: 0 | 1 | 2 | 3;
   selected: boolean;
   onPress: () => void;
@@ -273,7 +272,6 @@ function Stat({
         ]}
       >
         <View style={styles.statTop}>
-          <Text style={styles.statIcon}>{icon}</Text>
           <Text style={[styles.statValue, { color: c.text }]}>{value}</Text>
         </View>
         <Text style={[styles.statLabel, { color: c.textMuted }]} numberOfLines={1}>
@@ -296,7 +294,7 @@ function ApplicationList({
   const [locale] = useLocale();
 
   if (items.length === 0) {
-    return <Empty icon="📄" title="app.emptyTitle" body="app.emptyBody" />;
+    return <Empty title="app.emptyTitle" body="app.emptyBody" />;
   }
 
   return (
@@ -309,9 +307,14 @@ function ApplicationList({
           accessibilityLabel={item.jobTitle}
           style={[styles.row, { backgroundColor: c.surface, borderColor: c.border }]}
         >
-          <Text style={[styles.status, { color: c.textMuted }]}>
-            {STATUS_DOTS[item.status]} {t(STATUS_KEYS[item.status])}
-          </Text>
+          <View style={styles.statusRow}>
+            <View
+              style={[styles.statusDot, { backgroundColor: statusColour(item.status, c) }]}
+            />
+            <Text style={[styles.status, { color: c.textMuted }]}>
+              {t(STATUS_KEYS[item.status])}
+            </Text>
+          </View>
           <Text style={[styles.rowTitle, { color: c.text }]} numberOfLines={1}>
             {item.jobTitle}
           </Text>
@@ -341,7 +344,7 @@ function JobList({
   const [locale] = useLocale();
 
   if (items.length === 0) {
-    return <Empty icon="📋" title="myJobs.emptyTitle" body="myJobs.emptyBody" />;
+    return <Empty title="myJobs.emptyTitle" body="myJobs.emptyBody" />;
   }
 
   return (
@@ -355,7 +358,7 @@ function JobList({
           style={[styles.row, { backgroundColor: c.surface, borderColor: c.border }]}
         >
           <Text style={[styles.status, { color: job.isOpen ? c.success : c.textMuted }]}>
-            📢 {t(job.isOpen ? 'myJobs.live' : 'myJobs.closed')}
+            {t(job.isOpen ? 'myJobs.live' : 'myJobs.closed')}
           </Text>
           <Text style={[styles.rowTitle, { color: c.text }]} numberOfLines={1}>
             {job.title}
@@ -371,7 +374,7 @@ function JobList({
               { color: job.applicantCount > 0 ? c.primary : c.textMuted },
             ]}
           >
-            👤 {t('myJobs.applicants', { count: job.applicantCount })}
+            {t('myJobs.applicants', { count: job.applicantCount })}
           </Text>
         </Pressable>
       ))}
@@ -380,11 +383,9 @@ function JobList({
 }
 
 function Empty({
-  icon,
   title,
   body,
 }: {
-  icon: string;
   title: TranslationKey;
   body: TranslationKey;
 }) {
@@ -393,7 +394,6 @@ function Empty({
 
   return (
     <View style={styles.empty}>
-      <Text style={styles.emptyIcon}>{icon}</Text>
       <Text style={[styles.emptyTitle, { color: c.text }]}>{t(title)}</Text>
       <Text style={[styles.emptyBody, { color: c.textMuted }]}>{t(body)}</Text>
     </View>
@@ -423,7 +423,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  statIcon: { fontSize: 18 },
   statValue: { fontSize: font.xl, fontWeight: '800', letterSpacing: -0.5 },
   statLabel: { fontSize: font.xs, marginTop: 2, fontWeight: '600' },
 
@@ -446,6 +445,8 @@ const styles = StyleSheet.create({
   loading: { marginTop: space.lg },
   list: { marginTop: space.md, gap: 10 },
   row: { borderWidth: 1, borderRadius: radius.lg, padding: 14, gap: 4 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statusDot: { width: 8, height: 8, borderRadius: radius.pill },
   status: { fontSize: font.xs, fontWeight: '800' },
   rowTitle: { fontSize: font.md, fontWeight: '800' },
   rowMeta: { fontSize: font.xs },
@@ -453,7 +454,6 @@ const styles = StyleSheet.create({
   closed: { fontSize: font.xs, fontWeight: '700', marginTop: 4 },
 
   empty: { alignItems: 'center', paddingTop: space.xl },
-  emptyIcon: { fontSize: 44, marginBottom: 12 },
   emptyTitle: { fontSize: font.lg, fontWeight: '800' },
   emptyBody: {
     fontSize: font.sm,

@@ -17,8 +17,9 @@ import { isValidBdPhone, normalizeBdPhone } from './phone';
 
 export const WALLET_LIMITS = {
   /**
-   * SSLCommerz's own range for a single payment. The gateway refuses anything
-   * outside it, so it is refused here first, with a message that says why.
+   * One declared deposit. The floor keeps the review queue free of amounts
+   * not worth a person's time; the ceiling is a typo guard, not a rule about
+   * how much anyone may hold.
    */
   topUpMin: 10,
   topUpMax: 500_000,
@@ -91,8 +92,17 @@ export type WithdrawalStatus = z.infer<typeof withdrawalStatusSchema>;
  * the API refuses to start with it in production; the app labels it plainly
  * so nobody takes a simulated payment for a real one.
  */
+/** Which gateway is taking payments, if any. */
 export const paymentGatewaySchema = z.enum(['sslcommerz', 'simulator']);
 export type PaymentGateway = z.infer<typeof paymentGatewaySchema>;
+
+/** How many of the platform's receiving accounts are configured. */
+export const depositAvailabilitySchema = z.object({
+  bkash: z.boolean(),
+  nagad: z.boolean(),
+  bank: z.boolean(),
+});
+export type DepositAvailability = z.infer<typeof depositAvailabilitySchema>;
 
 /**
  * How a top-up was paid, from the gateway's `card_type`.
@@ -145,7 +155,8 @@ export const createDepositSchema = z.object({
   /**
    * The transaction id their app gave them — "TrxID" on bKash, "TrxID" on
    * Nagad, the reference on a bank transfer. Rejected if it has been claimed
-   * before, so one receipt cannot be used twice.
+   * before, so one receipt cannot be used twice — upper-cased first, or
+   * "tx1234" would slip past a "TX1234" already claimed.
    */
   reference: z
     .string()
@@ -200,7 +211,7 @@ export type DepositInstructions = z.infer<typeof depositInstructionsSchema>;
  * something a person can read, and so a scan can be told apart from any
  * other QR that happens to be in frame.
  */
-export const WALLET_QR_PREFIX = 'workflex://wallet/scan?u=';
+export const WALLET_QR_PREFIX = 'workflex://pay?u=';
 
 export const walletCodeSchema = z.object({
   /** Short and typable, for reading out when a camera will not focus. */
@@ -230,6 +241,79 @@ export const createTransferSchema = z.object({
 });
 export type CreateTransferDto = z.output<typeof createTransferSchema>;
 export type CreateTransferInput = z.input<typeof createTransferSchema>;
+
+/**
+ * Paying someone for a job without going through a list.
+ *
+ * All three identifiers are required and all three are checked against each
+ * other: the phone number and the public id must belong to the same account,
+ * and the job must exist. Any one of them alone could be a typo that pays a
+ * stranger; agreeing on all three is hard to do by accident.
+ */
+export const payForJobSchema = z.object({
+  /** Their WorkFlex id, as printed on their wallet card: "WF-3A9C1B". */
+  publicId: z.string().trim().min(4).max(20),
+  /** Their phone number, which must belong to that same account. */
+  phone: z.string().trim().min(6).max(20),
+  /** Which job the money is for. */
+  jobId: z.string().uuid(),
+  amount: takaAmount(WALLET_LIMITS.paymentMin, WALLET_LIMITS.transferMax),
+  note: z.string().trim().max(200).optional().or(z.literal('')),
+  requestId: z.string().uuid(),
+});
+export type PayForJobDto = z.output<typeof payForJobSchema>;
+export type PayForJobInput = z.input<typeof payForJobSchema>;
+
+/**
+ * A payment as the person who received it is told about it: enough to
+ * recognise the payer and the work, without opening anything.
+ */
+export const receivedPaymentSchema = z.object({
+  id: z.string().uuid(),
+  amount: z.number().int(),
+  jobId: z.string().uuid().nullable(),
+  jobTitle: z.string().nullable(),
+  senderName: z.string(),
+  senderPublicId: z.string(),
+  senderPhone: z.string(),
+  note: z.string().nullable(),
+  receivedAt: z.string(),
+});
+export type ReceivedPayment = z.infer<typeof receivedPaymentSchema>;
+
+export const receivedPaymentListSchema = z.object({
+  payments: z.array(receivedPaymentSchema),
+});
+export type ReceivedPaymentList = z.infer<typeof receivedPaymentListSchema>;
+
+// --- insights ---
+
+/** Day, week, month, year — the four spans the insights screen offers. */
+export const insightsRangeSchema = z.enum(['D', 'W', 'M', 'Y']);
+export type InsightsRange = z.infer<typeof insightsRangeSchema>;
+
+export const insightsSliceSchema = z.object({
+  type: walletEntryTypeSchema,
+  total: z.number().int().nonnegative(),
+});
+export type InsightsSlice = z.infer<typeof insightsSliceSchema>;
+
+/**
+ * What moved through the wallet over a span, split the way the screen shows
+ * it: money in, money out, and what the person added themselves — which is
+ * neither, since adding money is not income.
+ */
+export const walletInsightsSchema = z.object({
+  range: insightsRangeSchema,
+  /** The window this covers, so the screen can say what it is showing. */
+  since: z.string(),
+  income: z.number().int().nonnegative(),
+  expense: z.number().int().nonnegative(),
+  added: z.number().int().nonnegative(),
+  /** Per kind of movement, biggest first — the ring on the screen. */
+  slices: z.array(insightsSliceSchema),
+});
+export type WalletInsights = z.infer<typeof walletInsightsSchema>;
 
 export const createPaymentSchema = z.object({
   jobId: z.string().uuid(),
@@ -302,19 +386,26 @@ export type CreateWithdrawalInput = z.input<typeof createWithdrawalSchema>;
 export const walletSummarySchema = z.object({
   /** Everything in the wallet. */
   balance: z.number().int(),
-  /**
-   * The part of `balance` that was earned — paid in by someone who hired this
-   * account — and so can be withdrawn. Money added through the gateway is for
-   * paying people and stays in the wallet.
+/**
+   * How much may be withdrawn right now, which is the whole balance minus
+   * anything already on its way out.
    */
   withdrawable: z.number().int(),
   /** Asked for and not yet sent. Already taken out of `balance`. */
   pendingWithdrawals: z.number().int(),
+  /** Everything ever paid in by another account — the card's "income". */
+  income: z.number().int(),
+  /** Everything ever added by the person themselves — the card's "top-up". */
+  toppedUp: z.number().int(),
   /** Withdrawing needs a verified identity (level 1). */
   canWithdraw: z.boolean(),
-  /** Null when no gateway is configured, so money cannot be added right now. */
+/**
+   * False when the platform has published no account to receive deposits, so
+   * the add-money screen has nothing to show and says so.
+   */
+  canDeposit: z.boolean(),
+  /** Null when no gateway is configured, so nothing can be charged. */
   gateway: paymentGatewaySchema.nullable(),
-  canDeposit: z.boolean().default(false),
 });
 export type WalletSummary = z.infer<typeof walletSummarySchema>;
 
@@ -391,6 +482,9 @@ export const paymentReceiptSchema = z.object({
   id: z.string().uuid(),
   amount: z.number().int(),
   payeeName: z.string(),
+  /** Null for a transfer that is not about a job. */
+  jobId: z.string().uuid().nullable().optional(),
+  /** Null for a person-to-person transfer, which is not about a job. */
   jobTitle: z.string().nullable(),
   /** The payer's balance after paying. */
   balance: z.number().int(),
@@ -423,8 +517,7 @@ const countAndTotal = z.object({
 
 export const adminWalletSummarySchema = z.object({
   /** Null when no gateway is configured and top-ups are switched off. */
-  gateway: paymentGatewaySchema.nullable(),
-  canDeposit: z.boolean().default(false),
+  canDeposit: z.boolean(),
   /** Everything users hold, and how much of it they could ask to withdraw. */
   heldInWallets: z.number().int(),
   withdrawableInWallets: z.number().int(),
@@ -453,10 +546,6 @@ export const adminWithdrawalListSchema = z.object({
 export type AdminWithdrawalList = z.infer<typeof adminWithdrawalListSchema>;
 
 export const adminTopUpSchema = topUpSchema.extend({
-  gateway: z.string(),
-  depositMethod: payoutMethodSchema.nullable(),
-  senderAccount: z.string().nullable(),
-  reference: z.string().nullable(),
   userId: z.string().uuid(),
   userName: z.string().nullable(),
   userPhone: z.string(),
@@ -468,6 +557,12 @@ export const adminTopUpSchema = topUpSchema.extend({
   riskLevel: z.number().int().nullable(),
   riskTitle: z.string().nullable(),
   reviewNote: z.string().nullable(),
+  /** "manual" for a declared deposit, otherwise the gateway it went through. */
+  gateway: z.string(),
+  /** A declared deposit's details, for finding it on the receiving statement. */
+  depositMethod: payoutMethodSchema.nullable(),
+  senderAccount: z.string().nullable(),
+  reference: z.string().nullable(),
 });
 export type AdminTopUp = z.infer<typeof adminTopUpSchema>;
 
@@ -496,15 +591,3 @@ export const walletRejectSchema = z.object({
     .max(500),
 });
 export type WalletRejectDto = z.output<typeof walletRejectSchema>;
-
-/** Stable cursor: ties within the same timestamp are ordered by payment id. */
-export const receivedPaymentSchema = z.object({
-  id: z.string().uuid(), amount: z.number().int(), payerName: z.string(),
-  jobTitle: z.string().nullable(), note: z.string().nullable(), receivedAt: z.string().datetime(),
-});
-export type ReceivedPayment = z.infer<typeof receivedPaymentSchema>;
-export const receiptQuerySchema = z.object({
-  since: z.string().datetime(), afterId: z.string().uuid().optional(),
-});
-export type ReceiptQuery = z.infer<typeof receiptQuerySchema>;
-export const receivedPaymentsSchema = z.object({ receipts: z.array(receivedPaymentSchema) });

@@ -35,16 +35,16 @@ import { font, radius, space } from '../../src/lib/theme';
  * should not scroll past "app problem" to say so, and the order also matches
  * how urgently the console needs to act.
  */
-const CATEGORIES: { value: ReportCategory; icon: string; label: TranslationKey }[] = [
-  { value: 'FRAUD', icon: '🚫', label: 'report.cat.FRAUD' },
-  { value: 'NON_PAYMENT', icon: '💸', label: 'report.cat.NON_PAYMENT' },
-  { value: 'MISLEADING_PAY', icon: '⚖️', label: 'report.cat.MISLEADING_PAY' },
-  { value: 'FAKE_JOB', icon: '🎭', label: 'report.cat.FAKE_JOB' },
-  { value: 'HARASSMENT', icon: '🛑', label: 'report.cat.HARASSMENT' },
-  { value: 'UNSAFE_WORK', icon: '⚠️', label: 'report.cat.UNSAFE_WORK' },
-  { value: 'FAKE_PROFILE', icon: '👤', label: 'report.cat.FAKE_PROFILE' },
-  { value: 'TECHNICAL', icon: '🐞', label: 'report.cat.TECHNICAL' },
-  { value: 'OTHER', icon: '💬', label: 'report.cat.OTHER' },
+const CATEGORIES: { value: ReportCategory; label: TranslationKey }[] = [
+  { value: 'FRAUD', label: 'report.cat.FRAUD' },
+  { value: 'NON_PAYMENT', label: 'report.cat.NON_PAYMENT' },
+  { value: 'MISLEADING_PAY', label: 'report.cat.MISLEADING_PAY' },
+  { value: 'FAKE_JOB', label: 'report.cat.FAKE_JOB' },
+  { value: 'HARASSMENT', label: 'report.cat.HARASSMENT' },
+  { value: 'UNSAFE_WORK', label: 'report.cat.UNSAFE_WORK' },
+  { value: 'FAKE_PROFILE', label: 'report.cat.FAKE_PROFILE' },
+  { value: 'TECHNICAL', label: 'report.cat.TECHNICAL' },
+  { value: 'OTHER', label: 'report.cat.OTHER' },
 ];
 
 const TARGETS: { value: ReportTarget; label: TranslationKey }[] = [
@@ -173,7 +173,7 @@ export default function ReportScreen() {
               {CATEGORIES.map((option) => (
                 <Option
                   key={option.value}
-                  label={`${option.icon} ${t(option.label)}`}
+                  label={t(option.label)}
                   on={category === option.value}
                   onPress={() => {
                     setCategory(option.value);
@@ -196,7 +196,7 @@ export default function ReportScreen() {
                 ]}
               >
                 <Text style={[styles.fixedTargetText, { color: c.text }]} numberOfLines={2}>
-                  🎯 {jobTitle ?? t('report.target.JOB')}
+                  {jobTitle ?? t('report.target.JOB')}
                 </Text>
               </View>
             ) : (

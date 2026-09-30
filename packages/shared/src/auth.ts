@@ -64,6 +64,8 @@ export type OtpVerifyDto = z.output<typeof otpVerifySchema>;
 
 export const authUserSchema = z.object({
   id: z.string().uuid(),
+  /** The id a person can read out: "WF-3A9C1B". */
+  publicId: z.string(),
   phone: z.string(),
   /** Null until registration is filled in — the app falls back to the number. */
   firstName: z.string().nullable(),

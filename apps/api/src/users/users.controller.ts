@@ -17,6 +17,7 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { UsersService } from './users.service';
 import { EmailVerificationService } from './email-verification.service';
 import { ProfileService } from './profile.service';
+import { AchievementsService } from './achievements.service';
 import { DashboardService } from './dashboard.service';
 import { TrustService } from './trust.service';
 import { ActivityFeedService } from './activity-feed.service';
@@ -33,6 +34,7 @@ export class UsersController {
     private readonly emails: EmailVerificationService,
     private readonly profiles: ProfileService,
     private readonly dashboard: DashboardService,
+    private readonly achievements: AchievementsService,
     private readonly trust: TrustService,
     private readonly activity: ActivityFeedService,
   ) {}
@@ -41,6 +43,12 @@ export class UsersController {
    * The app calls this on launch to decide where to route: onboarding,
    * a verification prompt, or the main tabs.
    */
+  @Get('achievements')
+  @ApiOperation({ summary: 'Badges earned from the record, and what is next' })
+  async myAchievements(@CurrentUser('userId') userId: string) {
+    return this.achievements.of(userId);
+  }
+
   @Get('me')
   @ApiOperation({ summary: 'The signed-in user' })
   async me(@CurrentUser('userId') userId: string) {

@@ -171,3 +171,72 @@ export function divisionName(key: Division, locale: 'en' | 'bn'): string {
 export function districtsOf(key: Division): readonly { en: string; bn: string }[] {
   return DIVISION_BY_KEY[key].districts;
 }
+
+/**
+ * Where each division sits, for drawing it on a map.
+ *
+ * The administrative centre of each division, to roughly a kilometre. Precise
+ * enough to place a dot on a national map and nowhere near precise enough for
+ * anything else — nothing here should be used for distance, which is what
+ * `bd-places.ts` is for.
+ */
+export const DIVISION_POINTS: Record<Division, { lat: number; lng: number }> = {
+  BARISHAL: { lat: 22.701, lng: 90.353 },
+  CHATTOGRAM: { lat: 22.357, lng: 91.783 },
+  DHAKA: { lat: 23.81, lng: 90.412 },
+  KHULNA: { lat: 22.845, lng: 89.54 },
+  MYMENSINGH: { lat: 24.747, lng: 90.42 },
+  RAJSHAHI: { lat: 24.374, lng: 88.604 },
+  RANGPUR: { lat: 25.746, lng: 89.251 },
+  SYLHET: { lat: 24.895, lng: 91.87 },
+};
+
+/**
+ * Which division a piece of address or posting text names.
+ *
+ * Districts are tried before divisions, and both languages are tried, because
+ * the strings this reads are prose somebody typed: "Tongi, Gazipur" names no
+ * division at all but its district settles it, and "মিরপুর, ঢাকা" is as
+ * common as the Latin spelling. Returns null rather than guessing — a posting
+ * placed in the wrong division is worse for a map than one left off it, and
+ * the screen says how many it could not place.
+ */
+export function divisionOf(text: string | null | undefined): Division | null {
+  if (!text) return null;
+  const haystack = text.toLowerCase();
+
+  for (const source of ['districts', 'division'] as const) {
+    for (const division of DIVISIONS) {
+      const names =
+        source === 'districts'
+          ? division.districts.flatMap((d) => [d.en, d.bn])
+          : [division.en, division.bn];
+      for (const name of names) {
+        if (namedIn(haystack, name.toLowerCase())) return division.key;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * A whole-word match that also works in Bangla.
+ *
+ * The Latin side keeps "Feni" out of "Fenchuganj"; the Bangla side keeps
+ * "বগুড়া" from matching inside a longer word. Bangla has no letter case and
+ * no spaces inside words, so the test is simply that neither neighbour is a
+ * letter in either script.
+ */
+function namedIn(haystack: string, name: string): boolean {
+  let from = 0;
+  for (;;) {
+    const at = haystack.indexOf(name, from);
+    if (at === -1) return false;
+    const before = at === 0 ? ' ' : haystack[at - 1]!;
+    const after = haystack[at + name.length] ?? ' ';
+    if (!isLetter(before) && !isLetter(after)) return true;
+    from = at + 1;
+  }
+}
+
+const isLetter = (ch: string) => /[a-z0-9ঀ-৿]/.test(ch);

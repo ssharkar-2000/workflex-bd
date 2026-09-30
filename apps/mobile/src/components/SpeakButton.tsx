@@ -45,7 +45,6 @@ export function SpeakButton({
         },
       ]}
     >
-      <Text style={styles.icon}>{speaking ? '⏹' : '🔊'}</Text>
       <Text
         style={[
           styles.text,

@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { useColorScheme } from 'react-native';
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
-import { palettes, type Palette, type ThemeMode } from './theme';
+import { brandPalettes, palettes, type Palette, type ThemeMode } from './theme';
+import { usePaletteSetStore } from './palette-set';
 
 const STORAGE_KEY = 'workflex.themePreference';
 
@@ -68,6 +69,10 @@ export function useTheme(): ThemeValue {
   const preference = useThemeStore((s) => s.preference);
   const setPreference = useThemeStore((s) => s.setPreference);
   const system = useColorScheme();
+  // Which palette the screens are wearing — see palette-set.ts. Every screen
+  // already reads its colours through this hook, so switching sets here is
+  // what makes the whole signed-in app change at once.
+  const set = usePaletteSetStore((s) => s.set);
 
   // Falls back to the device only until the first explicit choice.
   const mode: ThemeMode = preference ?? (system === 'dark' ? 'dark' : 'light');
@@ -76,11 +81,11 @@ export function useTheme(): ThemeValue {
     () => ({
       mode,
       preference: mode,
-      c: palettes[mode],
+      c: (set === 'brand' ? brandPalettes : palettes)[mode],
       isDark: mode === 'dark',
       setPreference,
       toggle: () => setPreference(mode === 'dark' ? 'light' : 'dark'),
     }),
-    [mode, setPreference],
+    [mode, set, setPreference],
   );
 }

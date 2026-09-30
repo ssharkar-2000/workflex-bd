@@ -8,6 +8,7 @@ import { ActivityFeedService } from './activity-feed.service';
 import { EmailVerificationService } from './email-verification.service';
 import { PasswordService } from './password.service';
 import { ProfileService } from './profile.service';
+import { AchievementsService } from './achievements.service';
 
 @Module({
   imports: [MailModule],
@@ -15,7 +16,8 @@ import { ProfileService } from './profile.service';
   providers: [UsersService,
     EmailVerificationService,
     PasswordService,
-    ProfileService, DashboardService, TrustService, ActivityFeedService],
+    ProfileService, DashboardService, TrustService, ActivityFeedService,
+    AchievementsService],
   exports: [UsersService, EmailVerificationService, PasswordService],
 })
 export class UsersModule {}

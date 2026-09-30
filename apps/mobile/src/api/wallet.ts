@@ -1,20 +1,35 @@
-import { depositInstructionsSchema, depositListSchema, depositSchema, walletCodeSchema, resolvedWalletSchema, receivedPaymentsSchema,
-  type CreateDepositInput, type Deposit, type DepositInstructions, type WalletCode, type ResolvedWallet, type CreateTransferInput, type ReceiptQuery } from '@workflex/shared';
 import {
+  depositInstructionsSchema,
+  depositListSchema,
+  depositSchema,
   payeeListSchema,
   paymentReceiptSchema,
+  receivedPaymentListSchema,
   topUpSchema,
   topUpSessionSchema,
+  walletInsightsSchema,
+  resolvedWalletSchema,
+  walletCodeSchema,
   walletStatementSchema,
   walletSummarySchema,
   withdrawalSchema,
+  type CreateDepositInput,
   type CreatePaymentInput,
-  type CreateTopUpInput,
+  type CreateTransferInput,
   type CreateWithdrawalInput,
+  type Deposit,
+  type DepositInstructions,
   type PayeeList,
   type PaymentReceipt,
+  type PayForJobInput,
+  type ReceivedPayment,
+  type CreateTopUpInput,
+  type InsightsRange,
+  type ResolvedWallet,
   type TopUp,
   type TopUpSession,
+  type WalletInsights,
+  type WalletCode,
   type WalletStatement,
   type WalletSummary,
   type Withdrawal,
@@ -46,27 +61,6 @@ export async function createTopUp(input: CreateTopUpInput): Promise<TopUpSession
 export async function fetchTopUp(id: string): Promise<TopUp> {
   const { data } = await api.get(`/wallet/top-ups/${id}`);
   return topUpSchema.parse(data);
-}
-
-/** Everyone hired on this account's postings, and what each has been paid. */
-export async function fetchPayees(): Promise<PayeeList> {
-  const { data } = await api.get('/wallet/payees');
-  return payeeListSchema.parse(data);
-}
-
-export async function payHire(input: CreatePaymentInput): Promise<PaymentReceipt> {
-  const { data } = await api.post('/wallet/payments', input);
-  return paymentReceiptSchema.parse(data);
-}
-
-export async function requestWithdrawal(input: CreateWithdrawalInput): Promise<Withdrawal> {
-  const { data } = await api.post('/wallet/withdrawals', input);
-  return withdrawalSchema.parse(data);
-}
-
-export async function cancelWithdrawal(id: string): Promise<Withdrawal> {
-  const { data } = await api.post(`/wallet/withdrawals/${id}/cancel`);
-  return withdrawalSchema.parse(data);
 }
 
 /** The platform's own bKash, Nagad and bank accounts, for the add-money screen. */
@@ -107,11 +101,50 @@ export async function resolveWallet(code: string): Promise<ResolvedWallet> {
   return resolvedWalletSchema.parse(data);
 }
 
+/** Income, spending and top-ups over a day, week, month or year. */
+export async function fetchInsights(range: InsightsRange): Promise<WalletInsights> {
+  const { data } = await api.get('/wallet/insights', { params: { range } });
+  return walletInsightsSchema.parse(data);
+}
+
+/** Pay someone for a job: their WorkFlex id, their number, and the job's id. */
+export async function payForJob(input: PayForJobInput): Promise<PaymentReceipt> {
+  const { data } = await api.post('/wallet/job-payments', input);
+  return paymentReceiptSchema.parse(data);
+}
+
+/**
+ * Money paid in since a moment, for the app to announce. Pass what it last
+ * showed, so a payment is announced once per device.
+ */
+export async function fetchReceipts(since?: string): Promise<ReceivedPayment[]> {
+  const { data } = await api.get('/wallet/receipts', { params: { since } });
+  return receivedPaymentListSchema.parse(data).payments;
+}
+
 /** Send money to another account in the app. */
 export async function sendTransfer(input: CreateTransferInput): Promise<PaymentReceipt> {
   const { data } = await api.post('/wallet/transfers', input);
   return paymentReceiptSchema.parse(data);
 }
 
+/** Everyone hired on this account's postings, and what each has been paid. */
+export async function fetchPayees(): Promise<PayeeList> {
+  const { data } = await api.get('/wallet/payees');
+  return payeeListSchema.parse(data);
+}
 
-export async function fetchReceipts(query: ReceiptQuery) { const {data} = await api.get('/wallet/receipts', {params: query}); return receivedPaymentsSchema.parse(data).receipts; }
+export async function payHire(input: CreatePaymentInput): Promise<PaymentReceipt> {
+  const { data } = await api.post('/wallet/payments', input);
+  return paymentReceiptSchema.parse(data);
+}
+
+export async function requestWithdrawal(input: CreateWithdrawalInput): Promise<Withdrawal> {
+  const { data } = await api.post('/wallet/withdrawals', input);
+  return withdrawalSchema.parse(data);
+}
+
+export async function cancelWithdrawal(id: string): Promise<Withdrawal> {
+  const { data } = await api.post(`/wallet/withdrawals/${id}/cancel`);
+  return withdrawalSchema.parse(data);
+}

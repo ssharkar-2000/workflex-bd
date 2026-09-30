@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { createDepositSchema } from '@workflex/shared';
+import { createDepositSchema, WALLET_QR_PREFIX } from '@workflex/shared';
 import { DepositService } from './deposit.service';
 import { WalletService } from './wallet.service';
 import { WalletAdminService } from './wallet-admin.service';
@@ -40,14 +40,14 @@ describe('Manual deposits', () => {
   it('never approves an unverified pending gateway top-up', async () => {
     const prisma = {topUp: {findUnique: jest.fn().mockResolvedValue({gateway: 'sslcommerz'})}};
     const wallet = {creditTopUp: jest.fn().mockResolvedValue(true)};
-    const service = new WalletAdminService(prisma as any, wallet as any, config, null);
+    const service = new WalletAdminService(prisma as any, wallet as any, config as any);
     await service.approveTopUp(id, other);
     expect(wallet.creditTopUp.mock.calls[0][1]).toEqual(['HELD']);
   });
   it('allows manual pending deposits through the atomic approval path', async () => {
     const prisma = {topUp: {findUnique: jest.fn().mockResolvedValue({gateway: 'manual'})}};
     const wallet = {creditTopUp: jest.fn().mockResolvedValue(true)};
-    await new WalletAdminService(prisma as any, wallet as any, config, null).approveTopUp(id, other);
+    await new WalletAdminService(prisma as any, wallet as any, config as any).approveTopUp(id, other);
     expect(wallet.creditTopUp.mock.calls[0][1]).toEqual(['PENDING']);
   });
 });
@@ -58,7 +58,7 @@ describe('Wallet transfers', () => {
     const prisma = {$transaction: (fn: any) => fn(tx), user: {findUnique: jest.fn().mockResolvedValue({status: 'ACTIVE'})}};
     const service = new WalletService(prisma as any, config as any, null);
     jest.spyOn(service as any, 'paymentByRequest').mockResolvedValue(null);
-    jest.spyOn(service, 'resolve').mockResolvedValue({userId: other, code: 'WF-0000000002', name: 'Recipient', phone: 'masked'});
+    jest.spyOn(service, 'resolve').mockResolvedValue({userId: other, code: 'WF-222222', name: 'Recipient', phone: 'masked'});
     jest.spyOn(service as any, 'lock').mockImplementation(async (_tx, uid) => uid === id ? {id, balance, withdrawable} : {id: other, balance: 0, withdrawable: 0});
     const post = jest.spyOn(service as any, 'post').mockResolvedValue({balance: balance - 100});
     return {service, post, tx};
@@ -82,7 +82,7 @@ describe('Wallet transfers', () => {
   });
   it('rejects paying yourself', async () => {
     const {service, post} = setup(150, 0);
-    jest.spyOn(service, 'resolve').mockResolvedValue({userId: id, code: 'WF-0000000001', name: 'Me', phone: 'masked'});
+    jest.spyOn(service, 'resolve').mockResolvedValue({userId: id, code: 'WF-111111', name: 'Me', phone: 'masked'});
     await expect(service.transfer(id, {code: id, amount: 100, requestId})).rejects.toThrow('own wallet');
     expect(post).not.toHaveBeenCalled();
   });
@@ -95,21 +95,21 @@ describe('Wallet transfers', () => {
 });
 
 describe('Wallet identity and receipt isolation', () => {
-  it('uses the database wallet ID in both copied text and QR', async () => {
-    const prisma = {wallet: {upsert: jest.fn().mockResolvedValue({publicId: 'WF-0000000012', user: {firstName: 'Asif', lastName: null, phone: '01712345678'}})}};
+  it('puts the account id in the QR and only a short display code beside it', async () => {
+    const prisma = {user: {findUniqueOrThrow: jest.fn().mockResolvedValue({firstName: 'Asif', lastName: null, phone: '01712345678'})}};
     const result = await new WalletService(prisma as any, config as any, null).code(id);
-    expect(result.code).toBe('WF-0000000012');
-    expect(result.payload).toBe('workflex://wallet/scan?u=WF-0000000012');
+    expect(result.payload).toBe(`${WALLET_QR_PREFIX}${id}`);
+    expect(result.code).toBe('WF-111111');
   });
   it('only resolves active non-admin accounts', async () => {
     const prisma = {user: {findFirst: jest.fn().mockResolvedValue(null)}};
-    await expect(new WalletService(prisma as any, config as any, null).resolve('WF-0000000012')).rejects.toThrow();
-    expect(prisma.user.findFirst).toHaveBeenCalledWith(expect.objectContaining({where: {status: 'ACTIVE', isAdmin: false, wallet: {publicId: 'WF-0000000012'}}}));
+    await expect(new WalletService(prisma as any, config as any, null).resolve(id)).rejects.toThrow();
+    expect(prisma.user.findFirst).toHaveBeenCalledWith(expect.objectContaining({where: {id, status: 'ACTIVE', isAdmin: false}}));
   });
-  it('scopes receipts to the recipient and preserves same-timestamp pagination', async () => {
+  it('scopes receipts to the recipient', async () => {
     const prisma = {walletPayment: {findMany: jest.fn().mockResolvedValue([])}};
-    const query = {since: '2026-09-27T00:00:00.000Z', afterId: requestId};
-    await new WalletService(prisma as any, config as any, null).receipts(id, query);
-    expect(prisma.walletPayment.findMany).toHaveBeenCalledWith(expect.objectContaining({where: {payeeId: id, OR: [{createdAt: {gt: new Date(query.since)}}, {createdAt: new Date(query.since), id: {gt: requestId}}]}, orderBy: [{createdAt: 'asc'}, {id: 'asc'}]}));
+    const since = new Date('2026-09-27T00:00:00.000Z');
+    await new WalletService(prisma as any, config as any, null).receivedSince(id, since);
+    expect(prisma.walletPayment.findMany).toHaveBeenCalledWith(expect.objectContaining({where: {payeeId: id, createdAt: {gt: since}}}));
   });
 });

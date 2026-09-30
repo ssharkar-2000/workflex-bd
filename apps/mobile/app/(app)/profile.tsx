@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -30,8 +30,10 @@ import { removeEmail } from '../../src/api/email';
 import { useErrorMessage } from '../../src/lib/error-message';
 import { Avatar } from '../../src/components/Avatar';
 import { EmailCard } from '../../src/components/EmailCard';
+import { ProfileStats, ProfileSections } from '../../src/components/profile/ProfileOverview';
 import { KycStatusCard } from '../../src/components/KycStatusCard';
 import { VerificationCard } from '../../src/components/VerificationCard';
+import { TrustScore } from '../../src/components/home/TrustScore';
 import { useT } from '../../src/i18n';
 import { useScrollDirectionHandler } from '../../src/lib/scroll-direction';
 import { useTheme } from '../../src/lib/use-theme';
@@ -54,6 +56,17 @@ export default function ProfileScreen() {
   // Drives the verification card, which reads the account's level rather than
   // anything editable here.
   const { data: me } = useQuery({ queryKey: ['me'], queryFn: fetchMe });
+
+  /**
+   * Where the two on-page cards sit, measured as they lay out.
+   *
+   * The section rows at the top scroll here rather than navigating: moving
+   * the edit form and the verification cards onto routes of their own would
+   * make changing a phone number a three-tap job.
+   */
+  const scrollRef = useRef<ScrollView>(null);
+  const editY = useRef(0);
+  const verifyY = useRef(0);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
@@ -92,6 +105,7 @@ export default function ProfileScreen() {
         </View>
       ) : (
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
           onScroll={onScroll}
@@ -102,11 +116,34 @@ export default function ProfileScreen() {
               dashboard has already warmed this query. */}
           {me ? <ProfilePhoto user={me} profile={data} /> : null}
 
+          {/* Rating, trust and work done, then the four parts a profile is
+              made of — the overview somebody expects before the detail. */}
+          <ProfileStats />
+          <ProfileSections
+            onScrollTo={(key) =>
+              scrollRef.current?.scrollTo({
+                y: key === 'personal' ? editY.current : verifyY.current,
+                animated: true,
+              })
+            }
+          />
+
           <InformationCard profile={data} />
-          <UpdateSection profile={data} />
-          <EmailCard />
-          <KycStatusCard />
+          {/* The score belongs with the identity it is made of: the cards
+              under it are the records it counts. */}
+          <TrustScore />
+          {/* Verification sits directly under the score it drives, and ahead
+              of the rest, because this screen is now the only way to it —
+              the drawer used to list it and no longer does. At the bottom of
+              a long profile it would be moved in name only. */}
+          <View onLayout={(e) => (verifyY.current = e.nativeEvent.layout.y)}>
+            <KycStatusCard />
+          </View>
           {me ? <VerificationCard level={me.verificationLevel} /> : null}
+          <View onLayout={(e) => (editY.current = e.nativeEvent.layout.y)}>
+            <UpdateSection profile={data} />
+          </View>
+          <EmailCard />
         </ScrollView>
       )}
     </SafeAreaView>
@@ -180,6 +217,7 @@ function InformationCard({ profile }: { profile: MyProfile }) {
         {t('profile.info')}
       </Text>
 
+      <Row label={t('profile.workflexId')} value={profile.publicId} />
       <Row label={t('profile.phone')} value={maskPhone(profile.phone)} />
       <Row label={t('profile.name')} value={fullName} />
       <Row

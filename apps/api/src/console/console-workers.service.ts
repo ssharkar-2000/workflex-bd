@@ -106,6 +106,61 @@ export class ConsoleWorkersService {
     };
   }
 
+  /**
+   * The jobs this account has been hired for.
+   *
+   * Hires, not applications: the console's history screen is about work that
+   * happened, and an application that went nowhere is not history.
+   */
+  async jobHistory(id: string) {
+    const rows = await this.prisma.jobApplication.findMany({
+      where: { userId: id, status: 'ACCEPTED' },
+      orderBy: { appliedAt: 'desc' },
+      take: 50,
+      include: { job: { select: { id: true, title: true, companyName: true } } },
+    });
+
+    return rows.map((row) => ({
+      id: row.jobId,
+      company: row.job.companyName,
+      role: row.job.title,
+      startedAt: row.appliedAt.toISOString(),
+      // Nothing records when a hire ended; a shift is where that lives.
+      endedAt: null,
+    }));
+  }
+
+  /**
+   * Suspend an account, restore it, or mark its identity checked.
+   *
+   * Rejecting is deliberately not an action on the account: an identity
+   * check is rejected on the submission (see the verification endpoints),
+   * which keeps the reason with the evidence.
+   */
+  async decide(id: string, action: string) {
+    const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true } });
+    if (!user) throw new NotFoundException('No such account');
+
+    switch (action) {
+      case 'suspend':
+        await this.prisma.user.update({ where: { id }, data: { status: 'SUSPENDED' } });
+        break;
+      case 'activate':
+      case 'restore':
+      case 'unsuspend':
+        await this.prisma.user.update({ where: { id }, data: { status: 'ACTIVE' } });
+        break;
+      case 'approve':
+      case 'verify':
+        await this.prisma.user.update({ where: { id }, data: { verificationLevel: 1 } });
+        break;
+      default:
+        return { ok: true, changed: false };
+    }
+
+    return { ok: true, changed: true };
+  }
+
   private toWorker(row: WorkerRow) {
     const kyc = row.kycSubmissions[0]?.status ?? null;
     const name = displayName(row.firstName, row.lastName, row.phone);

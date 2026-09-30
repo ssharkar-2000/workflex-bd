@@ -85,6 +85,7 @@ export class ProfileService {
     const status = await this.kycStatus(userId);
 
     return {
+      publicId: user.publicId,
       accountType: user.accountType,
       phone: user.phone,
       firstName: user.firstName,

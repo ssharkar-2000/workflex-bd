@@ -1,6 +1,5 @@
-import { ConfigService } from '@nestjs/config';
-import type { Env } from '../config/env.schema';
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   Prisma,
   type TopUpStatus,
@@ -9,9 +8,17 @@ import {
 } from '@prisma/client';
 import {
   ApiErrorCode,
-  maskPhone, normalizeBdPhone, WALLET_QR_PREFIX,
-  type CreateTransferDto, type WalletCode, type ResolvedWallet, type ReceiptQuery,
+  maskPhone,
+  normalizeBdPhone,
+  type InsightsRange,
+  type PayForJobDto,
+  type ReceivedPayment,
+  type WalletInsights,
+  WALLET_QR_PREFIX,
   type CreatePaymentDto,
+  type CreateTransferDto,
+  type ResolvedWallet,
+  type WalletCode,
   type CreateWithdrawalDto,
   type PayeeList,
   type PaymentReceipt,
@@ -22,6 +29,7 @@ import {
 } from '@workflex/shared';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AppException } from '../common/exceptions/app.exception';
+import type { Env } from '../config/env.schema';
 import { PAYMENT_GATEWAY, type PaymentGateway } from './gateway/payment-gateway';
 
 type Tx = Prisma.TransactionClient;
@@ -100,13 +108,34 @@ export class WalletService {
     ]);
     if (!user) throw AppException.notFound('No such account');
 
+    // Lifetime totals, read from the ledger rather than kept as counters:
+    // every entry that ever moved money is still there, and a figure derived
+    // from them cannot drift out of step with the balance.
+    const [income, toppedUp] = wallet
+      ? await Promise.all([
+          this.prisma.walletEntry.aggregate({
+            where: { walletId: wallet.id, type: 'PAYMENT_RECEIVED' },
+            _sum: { amount: true },
+          }),
+          this.prisma.walletEntry.aggregate({
+            where: { walletId: wallet.id, type: 'TOP_UP' },
+            _sum: { amount: true },
+          }),
+        ])
+      : [null, null];
+
     return {
       balance: wallet?.balance ?? 0,
+      // Only money earned from work can leave the wallet — see withdraw().
+      // Money already asked for is out of both figures from the moment it is
+      // requested, so this needs no further subtraction.
       withdrawable: wallet?.withdrawable ?? 0,
       pendingWithdrawals: pending._sum.amount ?? 0,
+      income: income?._sum.amount ?? 0,
+      toppedUp: toppedUp?._sum.amount ?? 0,
       canWithdraw: user.verificationLevel >= 1,
+      canDeposit: this.hasDepositAccount(),
       gateway: this.gateway?.name ?? null,
-      canDeposit: (['WALLET_DEPOSIT_BKASH', 'WALLET_DEPOSIT_NAGAD', 'WALLET_DEPOSIT_BANK'] as const).some((key) => Boolean(this.config.get(key))),
     };
   }
 
@@ -244,6 +273,11 @@ export class WalletService {
         const payer = locks.get(payerId)!;
         const payee = locks.get(dto.payeeId)!;
 
+        // See transfer(): a first copy of this request may have committed
+        // while this one waited for the locks.
+        const retried = await this.paymentByRequest(payerId, dto.requestId);
+        if (retried) return retried;
+
         if (payer.balance < dto.amount) {
           throw new AppException(
             ApiErrorCode.INSUFFICIENT_BALANCE,
@@ -292,6 +326,7 @@ export class WalletService {
           id: payment.id,
           amount: payment.amount,
           payeeName: displayName(hire.user),
+          jobId: payment.jobId,
           jobTitle: payment.jobTitle,
           balance: after.balance,
           createdAt: payment.createdAt.toISOString(),
@@ -333,11 +368,15 @@ export class WalletService {
       return await this.prisma.$transaction(async (tx) => {
         const wallet = await this.lock(tx, userId);
 
+        // Only money earned from work may leave the platform. Money the
+        // person added can pay for work and move between wallets, but not
+        // come straight back out: topping up with someone else's money and
+        // withdrawing it to your own bKash would otherwise take one step.
         if (wallet.withdrawable < dto.amount) {
           if (wallet.balance >= dto.amount) {
             throw new AppException(
               ApiErrorCode.NOT_WITHDRAWABLE,
-              'Only earned money can be withdrawn',
+              'Only money earned from work can be withdrawn',
               HttpStatus.CONFLICT,
               { withdrawable: wallet.withdrawable },
             );
@@ -469,47 +508,384 @@ export class WalletService {
     });
   }
 
-  /** Database-issued, unique, stable ID; no truncated UUID collisions. */
+  /**
+   * What moved through this wallet over a span, for the insights screen.
+   *
+   * Grouped by kind of movement in SQL rather than in this process: a year of
+   * a busy wallet is thousands of rows, and none of them are needed here — the
+   * screen shows totals.
+   *
+   * Amounts are reported as magnitudes. The ledger signs them (money out is
+   * negative), but a chart of "what did I spend" wants the size of each
+   * slice, and the sign is already carried by which bucket it is in.
+   */
+  async insights(userId: string, range: InsightsRange): Promise<WalletInsights> {
+    const since = startOf(range);
+
+    const wallet = await this.prisma.wallet.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!wallet) {
+      return { range, since: since.toISOString(), income: 0, expense: 0, added: 0, slices: [] };
+    }
+
+    const grouped = await this.prisma.walletEntry.groupBy({
+      by: ['type'],
+      where: { walletId: wallet.id, createdAt: { gte: since } },
+      _sum: { amount: true },
+    });
+
+    const totals = new Map<string, number>();
+    for (const row of grouped) {
+      totals.set(row.type, Math.abs(row._sum.amount ?? 0));
+    }
+
+    const take = (type: string) => totals.get(type) ?? 0;
+
+    return {
+      range,
+      since: since.toISOString(),
+      // Money another account paid in, and money returned from a withdrawal
+      // that did not happen — both are the wallet gaining without the person
+      // putting anything in.
+      income: take('PAYMENT_RECEIVED') + take('WITHDRAWAL_RETURNED'),
+      expense: take('PAYMENT_SENT') + take('WITHDRAWAL'),
+      added: take('TOP_UP'),
+      slices: [...totals]
+        .filter(([, total]) => total > 0)
+        .map(([type, total]) => ({ type: type as InsightsSliceType, total }))
+        .sort((a, b) => b.total - a.total),
+    };
+  }
+
+  /**
+   * Money paid to the platform itself, not to another account — a
+   * subscription today, anything else the product sells later.
+   *
+   * One debit and one ledger row, no counterparty: the platform is not an
+   * account in this system, so there is nobody to credit. The row is typed
+   * PAYMENT_SENT because that is what it is from the wallet's point of view,
+   * and it carries no payment id, which is how a platform charge is told
+   * apart from a payment to a person.
+   */
+  async chargeToPlatform(
+    userId: string,
+    charge: { amount: number; reason: string },
+  ): Promise<{ id: string; balance: number }> {
+    return this.prisma.$transaction(async (tx) => {
+      const wallet = await this.lock(tx, userId);
+
+      if (wallet.balance < charge.amount) {
+        throw new AppException(
+          ApiErrorCode.INSUFFICIENT_BALANCE,
+          'Not enough money in the wallet',
+          HttpStatus.CONFLICT,
+          { balance: wallet.balance },
+        );
+      }
+
+      const remaining = wallet.balance - charge.amount;
+      const after = await this.post(
+        tx,
+        wallet,
+        {
+          balance: -charge.amount,
+          // Added money is spent before earned money, as everywhere else.
+          withdrawable: Math.min(wallet.withdrawable, remaining) - wallet.withdrawable,
+        },
+        { type: 'PAYMENT_SENT' },
+      );
+
+      const entry = await tx.walletEntry.findFirst({
+        where: { walletId: wallet.id },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+
+      this.logger.log(
+        `Platform charge: ${charge.amount} BDT from ${userId} — ${charge.reason}`,
+      );
+
+      return { id: entry!.id, balance: after.balance };
+    });
+  }
+
+  // --- paying for a job, by hand ---
+
+  /**
+   * Pay someone for a job, identified by what the payer can see and type:
+   * the other person's WorkFlex id, their phone number, and which job it is
+   * for.
+   *
+   * All three are checked, and the id and phone number must belong to the
+   * same account. One identifier alone is a single typo away from paying a
+   * stranger; three that have to agree is not something anyone does by
+   * accident.
+   *
+   * Unlike paying from the hired list, this does not require the recipient to
+   * have applied to the job — the work may have been agreed anywhere — but
+   * the job itself has to exist, so the receipt names something real.
+   */
+  async payForJob(payerId: string, dto: PayForJobDto): Promise<PaymentReceipt> {
+    const repeat = await this.paymentByRequest(payerId, dto.requestId);
+    if (repeat) return repeat;
+
+    const phone = (() => {
+      try {
+        return normalizeBdPhone(dto.phone);
+      } catch {
+        return null;
+      }
+    })();
+    if (!phone) {
+      throw new AppException(
+        ApiErrorCode.VALIDATION_FAILED,
+        'That does not look like a Bangladeshi phone number',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const payee = await this.prisma.user.findUnique({
+      where: { phone },
+      select: { id: true, publicId: true, ...NAME },
+    });
+    if (!payee || payee.publicId.toUpperCase() !== dto.publicId.trim().toUpperCase()) {
+      // Deliberately one message for both: telling a payer which half of the
+      // pair was wrong turns this into a way to test whether an id and a
+      // number belong together.
+      throw new AppException(
+        ApiErrorCode.NOT_FOUND,
+        'No account matches that WorkFlex id and phone number',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    if (payee.id === payerId) {
+      throw new AppException(
+        ApiErrorCode.VALIDATION_FAILED,
+        'That is your own account',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const job = await this.prisma.job.findUnique({
+      where: { id: dto.jobId },
+      select: { id: true, title: true },
+    });
+    if (!job) {
+      throw new AppException(
+        ApiErrorCode.NOT_FOUND,
+        'No job with that id',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const [first, second] = [payerId, payee.id].sort();
+        const locks = new Map<string, LockedWallet>();
+        locks.set(first!, await this.lock(tx, first!));
+        locks.set(second!, await this.lock(tx, second!));
+        const payer = locks.get(payerId)!;
+        const recipient = locks.get(payee.id)!;
+
+        if (payer.balance < dto.amount) {
+          throw new AppException(
+            ApiErrorCode.INSUFFICIENT_BALANCE,
+            'Not enough money in the wallet for this payment',
+            HttpStatus.CONFLICT,
+            { balance: payer.balance },
+          );
+        }
+
+        const payment = await tx.walletPayment.create({
+          data: {
+            payerId,
+            payeeId: payee.id,
+            jobId: job.id,
+            jobTitle: job.title,
+            amount: dto.amount,
+            note: dto.note && dto.note.trim() ? dto.note.trim() : null,
+            requestId: dto.requestId,
+          },
+        });
+
+        const remaining = payer.balance - dto.amount;
+        const after = await this.post(
+          tx,
+          payer,
+          {
+            balance: -dto.amount,
+            withdrawable: Math.min(payer.withdrawable, remaining) - payer.withdrawable,
+          },
+          { type: 'PAYMENT_SENT', paymentId: payment.id },
+        );
+        await this.post(
+          tx,
+          recipient,
+          { balance: dto.amount, withdrawable: dto.amount },
+          { type: 'PAYMENT_RECEIVED', paymentId: payment.id },
+        );
+
+        this.logger.log(
+          `Job payment ${payment.id}: ${dto.amount} BDT from ${payerId} to ${payee.id} for job ${job.id}`,
+        );
+
+        return {
+          id: payment.id,
+          amount: payment.amount,
+          payeeName: displayName(payee),
+          jobId: job.id,
+          jobTitle: job.title,
+          balance: after.balance,
+          createdAt: payment.createdAt.toISOString(),
+        };
+      });
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        const winner = await this.paymentByRequest(payerId, dto.requestId);
+        if (winner) return winner;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Money paid in since a given moment, for the app to announce.
+   *
+   * The app asks with the time it last showed something, so a payment is
+   * announced once per device and nothing has to be marked as seen on the
+   * server. Capped, because an app returning after a month should show the
+   * latest few rather than a month of modals.
+   */
+  async receivedSince(userId: string, since: Date): Promise<ReceivedPayment[]> {
+    const payments = await this.prisma.walletPayment.findMany({
+      where: { payeeId: userId, createdAt: { gt: since } },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      include: { payer: { select: { publicId: true, ...NAME } } },
+    });
+
+    return payments.map((payment) => ({
+      id: payment.id,
+      amount: payment.amount,
+      jobId: payment.jobId,
+      jobTitle: payment.jobTitle,
+      senderName: displayName(payment.payer),
+      senderPublicId: payment.payer.publicId,
+      senderPhone: payment.payer.phone,
+      note: payment.note,
+      receivedAt: payment.createdAt.toISOString(),
+    }));
+  }
+
+  // --- sending money to another account, including by QR ---
+
+  /**
+   * This wallet's own code, for someone else to scan or type.
+   *
+   * The QR carries a link rather than a bare id: a phone camera outside the
+   * app shows something a person can read, and a scan can be told apart from
+   * whatever other QR happens to be in frame. The short code beside it is for
+   * reading out when a camera will not focus — it is not resolvable on its
+   * own, which is deliberate: a six-character code that opened someone's
+   * wallet would be worth guessing.
+   */
   async code(userId: string): Promise<WalletCode> {
-    const wallet = await this.prisma.wallet.upsert({where: {userId}, create: {userId}, update: {}, include: {user: {select: NAME}}});
-    return {code: wallet.publicId, payload: `${WALLET_QR_PREFIX}${wallet.publicId}`, name: displayName(wallet.user)};
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: NAME,
+    });
+    return {
+      code: shortCode(userId),
+      payload: `${WALLET_QR_PREFIX}${userId}`,
+      name: displayName(user),
+    };
   }
 
+  /**
+   * Who a scanned code belongs to, so the sender sees a name before parting
+   * with money. Accepts what the camera read, an account id, or a phone
+   * number typed by hand.
+   */
   async resolve(code: string): Promise<ResolvedWallet> {
-    const value = code.trim();
-    const candidate = value.startsWith(WALLET_QR_PREFIX) ? value.slice(WALLET_QR_PREFIX.length) : value;
-    const publicId = /^WF-\d{10}$/i.test(candidate) ? candidate.toUpperCase() : null;
-    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidate) ? candidate : null;
-    let phone: string | null = null;
-    if (!publicId && !uuid) { try { phone = normalizeBdPhone(candidate); } catch {} }
-    const user = await this.prisma.user.findFirst({
-      where: {status: 'ACTIVE', isAdmin: false, ...(publicId ? {wallet: {publicId}} : uuid ? {id: uuid} : {phone: phone ?? ''})},
-      select: {id: true, ...NAME},
-    });
-    if (!user) throw AppException.notFound('No active wallet for that code');
-    const wallet = await this.code(user.id);
-    return {userId: user.id, code: wallet.code, name: displayName(user), phone: maskPhone(user.phone)};
+    const trimmed = code.trim();
+    const fromQr = trimmed.startsWith(WALLET_QR_PREFIX)
+      ? trimmed.slice(WALLET_QR_PREFIX.length).split('&')[0]
+      : null;
+    const id = fromQr ?? (UUID.test(trimmed) ? trimmed : null);
+
+    // Only an active member's wallet can be paid: not a suspended or deleted
+    // account, and never an admin's — whose name this would otherwise show
+    // to anyone who guessed the number.
+    const payable = { status: 'ACTIVE', isAdmin: false } as const;
+
+    let user = id
+      ? await this.prisma.user.findFirst({
+          where: { id, ...payable },
+          select: { id: true, ...NAME },
+        })
+      : null;
+
+    if (!user) {
+      // Not an id, so try it as a phone number — normalising first, because
+      // people write the same number a dozen ways.
+      let phone: string | null = null;
+      try {
+        phone = normalizeBdPhone(trimmed);
+      } catch {
+        phone = null;
+      }
+      if (phone) {
+        user = await this.prisma.user.findFirst({
+          where: { phone, ...payable },
+          select: { id: true, ...NAME },
+        });
+      }
+    }
+
+    if (!user) {
+      throw new AppException(
+        ApiErrorCode.NOT_FOUND,
+        'No WorkFlex account for that code',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return {
+      userId: user.id,
+      code: shortCode(user.id),
+      name: displayName(user),
+      phone: maskPhone(user.phone),
+    };
   }
 
-  async receipts(userId: string, query: ReceiptQuery) {
-    const since = new Date(query.since);
-    const rows = await this.prisma.walletPayment.findMany({
-      where: {payeeId: userId, OR: [
-        {createdAt: {gt: since}},
-        ...(query.afterId ? [{createdAt: since, id: {gt: query.afterId}}] : []),
-      ]},
-      orderBy: [{createdAt: 'asc'}, {id: 'asc'}], take: 50,
-      include: {payer: {select: NAME}},
-    });
-    return {receipts: rows.map((p) => ({id: p.id, amount: p.amount, payerName: displayName(p.payer), jobTitle: p.jobTitle, note: p.note, receivedAt: p.createdAt.toISOString()}))};
-  }
-
+  /**
+   * Send money to another account in the app.
+   *
+   * The same ledger rules as paying someone hired — both wallets locked in a
+   * fixed order, spendable money spent before earned money — minus the job:
+   * this is one person handing money to another, and the statement says so.
+   *
+   * Only the earned part of what is sent arrives withdrawable. Money the
+   * sender added themselves stays spendable-only on the other side too —
+   * otherwise sending it to a friend who withdraws it would undo the rule in
+   * withdraw() in one step.
+   */
   async transfer(payerId: string, dto: CreateTransferDto): Promise<PaymentReceipt> {
     const repeat = await this.paymentByRequest(payerId, dto.requestId);
     if (repeat) return repeat;
 
-    const sender = await this.prisma.user.findUnique({where: {id: payerId}, select: {status: true}});
-    if (!sender || sender.status !== 'ACTIVE') throw AppException.notFound('No active sender account');
+    // Against the database, not the token: a suspended account must stop
+    // sending money at once, not when its token runs out.
+    const sender = await this.prisma.user.findUnique({
+      where: { id: payerId },
+      select: { status: true },
+    });
+    if (!sender || sender.status !== 'ACTIVE') {
+      throw AppException.notFound('No active sender account');
+    }
+
     const payee = await this.resolve(dto.code);
     if (payee.userId === payerId) {
       throw new AppException(
@@ -528,6 +904,9 @@ export class WalletService {
         const payer = locks.get(payerId)!;
         const recipient = locks.get(payee.userId)!;
 
+        // The first copy of this request may have committed while this one
+        // waited for the locks, spending the money checked for below. Answer
+        // with that transfer rather than "not enough money".
         const retried = await this.paymentByRequest(payerId, dto.requestId);
         if (retried) return retried;
 
@@ -552,20 +931,20 @@ export class WalletService {
           },
         });
 
-        const remaining = payer.balance - dto.amount;
+        // Added money is spent first, so only what this takes from the
+        // earned part moves across as earned.
+        const added = payer.balance - payer.withdrawable;
+        const earned = Math.max(0, dto.amount - added);
         const after = await this.post(
           tx,
           payer,
-          {
-            balance: -dto.amount,
-            withdrawable: Math.min(payer.withdrawable, remaining) - payer.withdrawable,
-          },
+          { balance: -dto.amount, withdrawable: earned === 0 ? 0 : -earned },
           { type: 'PAYMENT_SENT', paymentId: payment.id },
         );
         await this.post(
           tx,
           recipient,
-          { balance: dto.amount, withdrawable: Math.max(0, dto.amount - (payer.balance - payer.withdrawable)) },
+          { balance: dto.amount, withdrawable: earned },
           { type: 'PAYMENT_RECEIVED', paymentId: payment.id },
         );
 
@@ -577,6 +956,7 @@ export class WalletService {
           id: payment.id,
           amount: payment.amount,
           payeeName: payee.name,
+          jobId: null,
           jobTitle: null,
           balance: after.balance,
           createdAt: payment.createdAt.toISOString(),
@@ -589,6 +969,15 @@ export class WalletService {
       }
       throw err;
     }
+  }
+
+  /** Whether any account has been published for people to send money to. */
+  private hasDepositAccount(): boolean {
+    return (
+      Boolean(this.config.get('WALLET_DEPOSIT_BKASH', { infer: true })) ||
+      Boolean(this.config.get('WALLET_DEPOSIT_NAGAD', { infer: true })) ||
+      Boolean(this.config.get('WALLET_DEPOSIT_BANK', { infer: true }))
+    );
   }
 
   // --- the ledger itself ---
@@ -771,5 +1160,33 @@ export class WalletService {
       createdAt: w.createdAt.toISOString(),
       processedAt: w.processedAt?.toISOString() ?? null,
     };
+  }
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** "WF-3A9C1B" — short enough to read out, derived so nothing is stored. */
+function shortCode(userId: string): string {
+  return `WF-${userId.replace(/-/g, '').slice(0, 6).toUpperCase()}`;
+}
+
+type InsightsSliceType = WalletInsights['slices'][number]['type'];
+
+/** Midnight a day, week, month or year ago — the start of the span shown. */
+function startOf(range: InsightsRange): Date {
+  const from = new Date();
+  from.setHours(0, 0, 0, 0);
+  switch (range) {
+    case 'D':
+      return from;
+    case 'W':
+      from.setDate(from.getDate() - 6);
+      return from;
+    case 'M':
+      from.setMonth(from.getMonth() - 1);
+      return from;
+    case 'Y':
+      from.setFullYear(from.getFullYear() - 1);
+      return from;
   }
 }

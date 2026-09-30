@@ -76,7 +76,7 @@ export function UpcomingWork() {
     <View style={styles.section}>
       <View style={styles.head}>
         <Text style={[styles.title, { color: c.text }]}>
-          📅 {t('upcoming.title')}
+          {t('upcoming.title')}
         </Text>
         {data.jobs.length > SHOWN ? (
           <Pressable
@@ -202,7 +202,7 @@ function ShiftCard({ job, showDay }: { job: JobListing; showDay: boolean }) {
           { backgroundColor: c.surface, borderColor: c.border },
         ]}
       >
-        <Text style={[styles.time, { color: c.primary }]}>🕐 {time}</Text>
+        <Text style={[styles.time, { color: c.primary }]}>{time}</Text>
 
         <Text style={[styles.jobTitle, { color: c.text }]} numberOfLines={2}>
           {job.title}
@@ -213,9 +213,9 @@ function ShiftCard({ job, showDay }: { job: JobListing; showDay: boolean }) {
             style={[styles.fact, { color: c.textMuted }]}
             numberOfLines={1}
           >
-            📍 {job.location}
+            {job.location}
           </Text>
-          <Text style={[styles.fact, { color: c.textMuted }]}>💰 {pay}</Text>
+          <Text style={[styles.fact, { color: c.textMuted }]}>{pay}</Text>
         </View>
 
         <View style={styles.actions}>

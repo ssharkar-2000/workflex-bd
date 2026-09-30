@@ -1,10 +1,11 @@
-import { PaymentReceivedModal } from '../../src/components/wallet/PaymentReceivedModal';
+import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Redirect, Stack } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { fetchOnboardingStatus } from '../../src/api/onboarding';
 import { useLaunchStore } from '../../src/store/launch-store';
 import { BottomNav, PostJobFab } from '../../src/components/BottomNav';
+import { usePaletteSetStore } from '../../src/lib/palette-set';
 import { useTheme } from '../../src/lib/use-theme';
 
 /**
@@ -24,6 +25,19 @@ import { useTheme } from '../../src/lib/use-theme';
 export default function AppLayout() {
   const gateOpen = useLaunchStore((s) => s.gateOpen);
   const { c } = useTheme();
+
+  /**
+   * Everything from here on wears the terracotta palette.
+   *
+   * Set here rather than on the dashboard because "from the homepage" means
+   * the whole signed-in app, and every screen in it is a child of this
+   * layout. Put back on unmount so signing out returns the welcome and
+   * sign-in screens to the colours they are meant to keep.
+   */
+  useEffect(() => {
+    usePaletteSetStore.getState().use('brand');
+    return () => usePaletteSetStore.getState().use('classic');
+  }, []);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['onboarding-status'],
@@ -65,7 +79,6 @@ export default function AppLayout() {
         <PostJobFab />
       </View>
       <BottomNav />
-      <PaymentReceivedModal />
     </View>
   );
 }

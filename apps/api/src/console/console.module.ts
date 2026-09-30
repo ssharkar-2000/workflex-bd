@@ -4,6 +4,9 @@ import { ConsoleController } from './console.controller';
 import { ConsoleAuthController } from './console-auth.controller';
 import { ConsoleDashboardService } from './console-dashboard.service';
 import { ConsoleWorkersService } from './console-workers.service';
+import { ConsoleJobsService } from './console-jobs.service';
+import { ConsoleOperationsService } from './console-operations.service';
+import { ConsoleSupportService } from './console-support.service';
 
 /**
  * Endpoints shaped for the admin console (apps/admin). See ConsoleController
@@ -15,6 +18,12 @@ import { ConsoleWorkersService } from './console-workers.service';
 @Module({
   imports: [AdminModule],
   controllers: [ConsoleController, ConsoleAuthController],
-  providers: [ConsoleDashboardService, ConsoleWorkersService],
+  providers: [
+    ConsoleDashboardService,
+    ConsoleWorkersService,
+    ConsoleJobsService,
+    ConsoleOperationsService,
+    ConsoleSupportService,
+  ],
 })
 export class ConsoleModule {}

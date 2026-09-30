@@ -12,7 +12,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { VerificationLevel, type AuthUser } from '@workflex/shared';
+import { type AuthUser } from '@workflex/shared';
+import { AppFooter } from './AppFooter';
 import { Avatar } from './Avatar';
 import { LanguageToggle } from './LanguageToggle';
 import { ThemeToggle } from './ThemeToggle';
@@ -41,7 +42,6 @@ import { font, radius, space } from '../lib/theme';
  */
 
 interface Row {
-  icon: string;
   label: TranslationKey;
   /** Omitted while the destination does not exist yet. */
   href?: string;
@@ -50,31 +50,67 @@ interface Row {
 }
 
 const WORKER_ROWS: Row[] = [
-  { icon: '🔍', label: 'menu.findJobs', href: '/(app)/jobs' },
-  { icon: '📄', label: 'menu.myApplications', href: '/(app)/activity' },
+  /**
+   * A posting tool, in the section it was asked to sit in. Both sections show
+   * for every account — see the note beside them — so an employer finds it
+   * here whichever half of the drawer they were reading.
+   */
+  {
+    label: 'menu.jobAssistant',
+    hint: 'menu.jobAssistantHint',
+    href: '/(app)/job-assistant',
+  },
+  /**
+   * Second in Find work, above the "my ..." rows, because it answers a
+   * question that comes before them: where to look, and what to learn. The
+   * rows below it are for tracking work already found.
+   */
+  { label: 'menu.workMap', hint: 'menu.workMapHint', href: '/(app)/work-map' },
+  { label: 'menu.myApplications', href: '/(app)/activity' },
+  // Where an application ends up once it is accepted: the job, and the
+  // recruiter to rate and review.
+  { label: 'menu.myRecruiters', href: '/(app)/my-recruiters' },
   // Same screen, opened with its Saved filter already on — see the `saved`
   // parameter in app/(app)/jobs.tsx.
-  { icon: '🔖', label: 'menu.savedJobs', href: '/(app)/jobs?saved=1' },
-  { icon: '📅', label: 'menu.myShifts' },
+  { label: 'menu.savedJobs', href: '/(app)/jobs?saved=1' },
+  { label: 'menu.myShifts', href: '/(app)/shifts' },
   /**
-   * Messaging has no screen and no table behind it yet, so this row sits with
-   * the other unbuilt features and says "coming next" like they do.
-   *
-   * It is here because the workspace grid on the dashboard used to be the only
-   * place in the app that mentioned messages at all, and that grid has gone.
-   * Dropping the row with it would have quietly deleted the one signal that
-   * messaging is planned.
+   * Above the volunteer row, below the paid rows: an internship is paid work
+   * somebody is looking for, and a fresh graduate reading this section is
+   * looking for exactly that. Both boards reach past our own listings, so
+   * they sit together at the end of Find work.
    */
-  { icon: '💬', label: 'menu.messages' },
+  { label: 'menu.internships', hint: 'menu.internshipsHint', href: '/(app)/internships' },
+  /**
+   * Under Find work, below the paid rows: volunteering is work somebody
+   * looks for in the same frame of mind, and it belongs where they are
+   * already looking rather than in a section of its own.
+   */
+  { label: 'menu.volunteer', hint: 'menu.volunteerHint', href: '/(app)/volunteering' },
+  /** Conversations about a job, from either side — see app/(app)/messages. */
+  { label: 'menu.messages', href: '/(app)/messages' },
 ];
 
 const RECRUITER_ROWS: Row[] = [
-  { icon: '➕', label: 'menu.postJob', href: '/(app)/post-job' },
-  { icon: '📋', label: 'menu.myPostedJobs', href: '/(app)/activity?tab=jobs' },
+  /**
+   * The row asked for in this section. The button itself is on every job's
+   * own screen, beside Apply — an application needs a job to be an
+   * application — so this opens the list to pick one from.
+   */
+  { label: 'menu.oneClick', hint: 'menu.oneClickHint', href: '/(app)/jobs' },
+  { label: 'menu.myPostedJobs', href: '/(app)/activity?tab=jobs' },
   // Applicants belong to a posting, so this opens the postings, each of
   // which opens its own applicants.
-  { icon: '👥', label: 'menu.applicants', href: '/(app)/activity?tab=jobs' },
-  { icon: '🤝', label: 'menu.hiredWorkers', href: '/(app)/hired' },
+  { label: 'menu.applicants', href: '/(app)/activity?tab=jobs' },
+  { label: 'menu.interviews', href: '/(app)/interviews' },
+  { label: 'menu.hiredWorkers', href: '/(app)/hired' },
+  /**
+   * Last in Hire people, because it is the row somebody opens when something
+   * has gone wrong rather than while they are hiring. Being in this section
+   * at all matters: a cancellation at nine at night is not a thing to go
+   * hunting through a menu for.
+   */
+  { label: 'menu.cover', hint: 'menu.coverHint', href: '/(app)/cover' },
 ];
 
 export function DashboardMenu({
@@ -122,7 +158,6 @@ export function DashboardMenu({
 
   const go = (href: string) => hide(() => router.push(href as never));
 
-  const verified = user.verificationLevel >= VerificationLevel.L1_IDENTITY;
   const fullName =
     [user.firstName, user.lastName].filter(Boolean).join(' ') || user.phone;
 
@@ -135,9 +170,13 @@ export function DashboardMenu({
         accessibilityRole="button"
         accessibilityLabel={t('menu.open')}
         accessibilityState={{ expanded: open }}
-        style={[
+        // Hover matches the search and the bell it sits beside.
+        style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [
           styles.button,
-          { backgroundColor: c.surfaceAlt, borderColor: c.border },
+          {
+            backgroundColor: c.surfaceAlt,
+            borderColor: hovered ? c.primary : c.border,
+          },
         ]}
       >
         {/* Three bars drawn as views rather than a "☰" glyph, which renders
@@ -186,7 +225,10 @@ export function DashboardMenu({
               },
             ]}
           >
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.drawerScroll}
+            >
               <Pressable
                 onPress={() => go('/(app)/profile')}
                 style={({ pressed }) => [
@@ -238,37 +280,110 @@ export function DashboardMenu({
 
               <Section title={t('menu.sec.money')}>
                 <MenuRow
-                  row={{ icon: '👛', label: 'menu.wallet', href: '/(app)/wallet' }}
+                  row={{ label: 'menu.wallet', href: '/(app)/wallet' }}
+                  onGo={go}
+                />
+                <MenuRow
+                  row={{
+                    label: 'menu.plans',
+                    hint: 'menu.plansHint',
+                    href: '/(app)/subscription',
+                  }}
                   onGo={go}
                 />
               </Section>
 
               <Divider />
 
+              {/* Verification is not listed here any more: it lives in My
+                  Profile, under the trust score it feeds, reached from the
+                  identity row at the top of this drawer. */}
               <Section title={t('menu.sec.standing')}>
+                {/*
+                  First in "Your standing", above the CV. A CV is what
+                  somebody says about themselves; these are the parts a
+                  university or a former employer has signed for. The
+                  stronger claim goes first.
+                */}
                 <MenuRow
                   row={{
-                    icon: verified ? '✅' : '🛡',
-                    label: 'menu.verification',
-                    hint: verified
-                      ? 'menu.verificationDone'
-                      : 'menu.verificationTodo',
-                    href: verified
-                      ? '/(app)/profile'
-                      : '/(onboarding)/documents',
+                    label: 'menu.chain',
+                    hint: 'menu.chainHint',
+                    href: '/(app)/trustchain',
                   }}
                   onGo={go}
                 />
                 <MenuRow
                   row={{
-                    icon: '📄',
                     label: 'menu.cv',
                     hint: 'menu.cvHint',
                     href: '/(app)/cv',
                   }}
                   onGo={go}
                 />
-                <MenuRow row={{ icon: '⭐', label: 'menu.ratings' }} onGo={go} />
+                <MenuRow
+                  row={{
+                    label: 'menu.resumeBuilder',
+                    hint: 'menu.resumeBuilderHint',
+                    href: '/(app)/resume',
+                  }}
+                  onGo={go}
+                />
+                {/*
+                  Directly above the Learning Lab, because that is where it
+                  sends people. The radar says which skill is worth a
+                  fortnight; the lab is where the fortnight is spent.
+                */}
+                <MenuRow
+                  row={{
+                    label: 'menu.radar',
+                    hint: 'menu.radarHint',
+                    href: '/(app)/skill-radar',
+                  }}
+                  onGo={go}
+                />
+                {/*
+                  Between the radar and the lab, which is the order somebody
+                  actually moves through: the radar says what is in demand,
+                  a mock test says where they stand on it, and the lab is
+                  where the gap gets closed.
+                */}
+                <MenuRow
+                  row={{
+                    label: 'menu.mock',
+                    hint: 'menu.mockHint',
+                    href: '/(app)/mock',
+                  }}
+                  onGo={go}
+                />
+                <MenuRow
+                  row={{
+                    label: 'menu.learningLab',
+                    hint: 'menu.learningLabHint',
+                    href: '/(app)/learning',
+                  }}
+                  onGo={go}
+                />
+                {/*
+                  Beside ratings, because both answer the same question from
+                  an employer's side: what has this person actually done.
+                */}
+                <MenuRow
+                  row={{
+                    label: 'menu.achievements',
+                    hint: 'menu.achievementsHint',
+                    href: '/(app)/achievements',
+                  }}
+                  onGo={go}
+                />
+                <MenuRow
+                  row={{
+                    label: 'menu.ratings',
+                    hint: 'menu.ratingsHint',
+                    href: '/(app)/ratings',
+                  }}
+                  onGo={go}
+                />
               </Section>
 
               <Divider />
@@ -281,12 +396,11 @@ export function DashboardMenu({
               </Setting>
 
               <MenuRow
-                row={{ icon: '❓', label: 'menu.support', href: '/(app)/support' }}
+                row={{ label: 'menu.support', href: '/(app)/support' }}
                 onGo={go}
               />
               <MenuRow
                 row={{
-                  icon: '🚩',
                   label: 'menu.report',
                   hint: 'menu.reportHint',
                   href: '/(app)/report',
@@ -297,10 +411,12 @@ export function DashboardMenu({
               <Divider />
 
               <MenuRow
-                row={{ icon: '🚪', label: 'home.signOut', danger: true }}
+                row={{ label: 'home.signOut', danger: true }}
                 onGo={go}
                 onPress={() => hide(onSignOut)}
               />
+
+              <AppFooter links={false} style={styles.pushDown} />
             </ScrollView>
           </Animated.View>
         </View>
@@ -348,7 +464,6 @@ function MenuRow({
 
   const body = (
     <>
-      <Text style={[styles.rowIcon, soon && styles.dim]}>{row.icon}</Text>
       <View style={styles.rowText}>
         <Text
           style={[
@@ -428,6 +543,11 @@ function Setting({
 }
 
 const styles = StyleSheet.create({
+  // flexGrow lets the drawer body fill its height, which is what gives
+  // pushDown something to push against on a short menu.
+  drawerScroll: { flexGrow: 1 },
+  /** Sends the footer to the bottom of the drawer rather than under the rows. */
+  pushDown: { marginTop: 'auto' },
   button: {
     width: 44,
     height: 44,
@@ -502,7 +622,6 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     borderRadius: radius.md,
   },
-  rowIcon: { fontSize: 16, width: 21, textAlign: 'center' },
   dim: { opacity: 0.45 },
   rowText: { flex: 1 },
   rowLabel: { fontSize: font.sm + 1, fontWeight: '600' },

@@ -25,7 +25,9 @@ import { WalletService } from './wallet.service';
  * The transaction id is unique per method in the database, so one receipt
  * cannot be declared twice, by the same person or by two.
  *
- * Every deposit requires administrator review; declarations never credit automatically.
+ * In development WALLET_AUTO_APPROVE_DEPOSITS credits on sight, because
+ * waiting for a human makes the wallet impossible to try out. It cannot take
+ * effect in production.
  */
 @Injectable()
 export class DepositService {
@@ -67,9 +69,16 @@ export class DepositService {
     });
     if (repeat) return this.toDeposit(repeat);
 
+    // Money can only have been sent to an account the add-money screen
+    // offered; anything else is a claim nobody could ever find.
     if (!this.instructions().accounts.some((a) => a.method === dto.method)) {
-      throw new AppException(ApiErrorCode.VALIDATION_FAILED, 'This deposit method is not configured', HttpStatus.BAD_REQUEST);
+      throw new AppException(
+        ApiErrorCode.VALIDATION_FAILED,
+        'This deposit method is not configured',
+        HttpStatus.BAD_REQUEST,
+      );
     }
+
     let created: TopUp;
     try {
       created = await this.prisma.topUp.create({
@@ -86,7 +95,11 @@ export class DepositService {
       });
     } catch (err) {
       if (isDuplicate(err)) {
-        const winner = await this.prisma.topUp.findFirst({where: {userId, gateway: 'manual', tranId: dto.requestId}});
+        // Two copies of one declaration raced past the lookup above: the
+        // other one won, and this is the same deposit.
+        const winner = await this.prisma.topUp.findFirst({
+          where: { userId, gateway: 'manual', tranId: dto.requestId },
+        });
         if (winner) return this.toDeposit(winner);
         throw new AppException(
           ApiErrorCode.ALREADY_PROCESSED,
@@ -101,11 +114,21 @@ export class DepositService {
       `Deposit ${created.id} declared: ${dto.amount} BDT via ${dto.method} by ${userId}`,
     );
 
+    if (this.autoApproves()) {
+      await this.wallet.creditTopUp(created.id, ['PENDING'], {
+        reviewNote: 'Credited automatically — WALLET_AUTO_APPROVE_DEPOSITS is on',
+      });
+      return this.toDeposit(
+        await this.prisma.topUp.findUniqueOrThrow({ where: { id: created.id } }),
+      );
+    }
+
     return this.toDeposit(created);
   }
 
   /** This account's deposits, newest first. */
   async list(userId: string): Promise<Deposit[]> {
+    // Declared deposits only — card and gateway top-ups have their own flow.
     const rows = await this.prisma.topUp.findMany({
       where: { userId, gateway: 'manual' },
       orderBy: { createdAt: 'desc' },
@@ -120,6 +143,13 @@ export class DepositService {
       throw new AppException(ApiErrorCode.NOT_FOUND, 'No such deposit', HttpStatus.NOT_FOUND);
     }
     return this.toDeposit(row);
+  }
+
+  private autoApproves(): boolean {
+    return (
+      this.config.get('NODE_ENV', { infer: true }) !== 'production' &&
+      this.config.get('WALLET_AUTO_APPROVE_DEPOSITS', { infer: true }) === true
+    );
   }
 
   private toDeposit(row: TopUp): Deposit {

@@ -41,7 +41,7 @@ function returnUrl(): string {
  * and learns the outcome when the gateway sends them to the wallet. Card
  * numbers and PINs never pass through this app or its server.
  */
-function GatewayAddMoneyScreen() {
+export default function AddMoneyScreen() {
   const t = useT();
   const router = useRouter();
   const { c } = useTheme();
@@ -107,6 +107,28 @@ function GatewayAddMoneyScreen() {
         </View>
       }
     >
+      {/* Sending money to the platform's own bKash, Nagad or bank account
+          and declaring it — the way in that needs no payment gateway. Only
+          offered once there is an account to send to. */}
+      {wallet.data?.canDeposit ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/(app)/wallet/deposit')}
+          style={({ pressed }) => [
+            styles.manual,
+            {
+              backgroundColor: pressed ? c.primarySoftBorder : c.primarySoft,
+              borderColor: c.primarySoftBorder,
+            },
+          ]}
+        >
+          <Text style={[styles.manualLabel, { color: c.primaryText }]}>
+            {t('deposit.manualOption')}
+          </Text>
+          <Text style={[styles.manualLabel, { color: c.primaryText }]}>›</Text>
+        </Pressable>
+      ) : null}
+
       {wallet.data && gateway === null ? (
         <Notice tone="warning" body={t('addMoney.unavailable')} />
       ) : null}
@@ -141,7 +163,7 @@ function GatewayAddMoneyScreen() {
         ) : null}
       </Card>
 
-      <Notice tone="info" body={`🔒 ${t('addMoney.how')}`} />
+      <Notice tone="info" body={`${t('addMoney.how')}`} />
     </MoneyScreen>
   );
 }
@@ -150,15 +172,15 @@ const styles = StyleSheet.create({
   footer: { gap: 8 },
   range: { fontSize: font.xs, fontWeight: '700', marginTop: 10 },
   returnHint: { fontSize: font.xs, textAlign: 'center', lineHeight: 17 },
+  manual: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  manualLabel: { fontSize: font.sm, fontWeight: '700', flexShrink: 1 },
 });
-
-export default function AddMoneyChoice() {
-  const router = useRouter();
-  const t = useT();
-  return <View style={{flex: 1}}>
-    <Pressable accessibilityRole="button" onPress={() => router.push('/(app)/wallet/deposit')} style={{padding: 16, backgroundColor: '#E6F6EE'}}>
-      <Text style={{color: '#16794B', fontWeight: '700'}}>{t('deposit.manualOption')}</Text>
-    </Pressable>
-    <GatewayAddMoneyScreen />
-  </View>;
-}

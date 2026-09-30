@@ -35,6 +35,7 @@ export class UsersService {
     return this.prisma.user.create({
       data: {
         phone,
+        publicId: newPublicId(),
         phoneVerifiedAt: new Date(),
         verificationLevel: 0,
       },
@@ -78,6 +79,7 @@ export class UsersService {
 
     return {
       id: user.id,
+      publicId: user.publicId,
       phone: user.phone,
       firstName: user.firstName,
       lastName: user.lastName,
@@ -97,4 +99,21 @@ export class UsersService {
       createdAt: user.createdAt.toISOString(),
     };
   }
+}
+
+/**
+ * The id a person reads out, "WF-3A9C1B".
+ *
+ * Six characters of base32 without the letters that get misheard — no I, O,
+ * 0 or 1 — which is about a billion combinations. Unique in the database, so
+ * the vanishingly rare collision surfaces as a failed insert rather than two
+ * people sharing an id.
+ */
+function newPublicId(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for (let i = 0; i < 6; i++) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return `WF-${out}`;
 }
